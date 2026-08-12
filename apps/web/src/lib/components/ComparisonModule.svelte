@@ -81,7 +81,7 @@
 	.paper {
 		position: relative;
 		background: var(--c-paper);
-		padding: var(--s-4) var(--s-3) var(--s-3);
+		padding: var(--s-4) 11px var(--s-3);
 		font-family: var(--font-mono);
 		/* Bords droits : un ticket n'a pas de coins arrondis. */
 	}
@@ -129,14 +129,14 @@
 	}
 	.row {
 		display: grid;
-		grid-template-columns: 20px 1fr auto;
-		gap: var(--s-1);
+		grid-template-columns: 18px 1fr 46px;
+		gap: 6px;
 		align-items: start;
 		padding: var(--s-2) 0;
 		border-bottom: 1px dashed var(--c-line-strong);
 		/* Hauteur réservée sur la ligne entière (pire cas de retour ligne). */
 		min-height: 80px;
-		font-size: 14px;
+		font-size: 13.5px;
 		color: var(--c-ink);
 	}
 	.idx {
@@ -146,17 +146,18 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		min-width: 0;
 		word-break: break-word;
 	}
 	.mkt {
 		color: var(--c-ink-2);
-		font-size: 13px;
+		font-size: 12.5px;
 	}
 	.right {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
-		gap: 2px;
+		gap: 3px;
 	}
 	.cote {
 		color: var(--c-ink-3);
@@ -181,19 +182,20 @@
 	}
 	.total {
 		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--s-2);
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 2px;
 		padding-top: var(--s-3);
 		margin-top: var(--s-1);
 	}
 	.tlabel {
-		font-size: 12px;
+		font-size: 11px;
 		letter-spacing: 0.4px;
 		color: var(--c-ink-2);
 	}
 	.tval {
-		font-size: 26px;
+		font-size: 30px;
+		line-height: 1;
 		font-feature-settings: 'tnum' 1;
 	}
 	.tval.ink {
