@@ -1,8 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
+import { getUser, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
+import { getSession } from '$lib/server/session';
 import { predictions, writing } from '$lib/server/services';
 import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
+import { computeCharge } from '$lib/server/domain/billing';
 import { checkGeneratedText } from '$lib/server/domain/guards';
 import type { WritingInput } from '$lib/server/services/writing';
 import type { LineVM, ResultVM, Selection } from '$lib/types';
@@ -31,6 +34,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const ticket = id ? getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
 
+	// 0. Mur de connexion : après l'analyse, juste avant le résultat (PRD §7).
+	const session = await getSession(cookies);
+	if (!session) redirect(303, '/connexion?retour=/resultat');
+
 	// 1. Lire les probabilités en table (jamais de calcul ici — règle d'archi n°2).
 	const withProbs: Selection[] = await Promise.all(
 		ticket.selections.map(async (s) => {
@@ -57,16 +64,39 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	};
 	const texte = await writeSafely(writingInput);
 
-	// 4. Débit à l'affichage réussi : la persistance du crédit arrive en Session 5.
-	//    On fige les chiffres du résultat (source de l'image de partage).
-	updateTicket(ticket.id, {
-		statut: 'analyse',
-		result: {
-			probaTotalePct: writingInput.probaTotalePct,
-			probaRenforceePct: writingInput.probaRenforceePct,
-			nbRetirees: writingInput.nbRetirees
+	// 4. Facturation (règle : débit à l'affichage réussi, jamais avant, une fois).
+	//    Idempotent : une fois `billing` posé, on ne recalcule ni ne redébite.
+	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
+	let billing = ticket.billing;
+	if (!billing) {
+		const user = getUser();
+		const charge = computeCharge({
+			nbAnalysables,
+			premierTicket: !user.premierTicketUtilise,
+			rienARetirer: r.rienARetirer
+		});
+
+		if (!charge.gratuit && !charge.bloque) {
+			const cost = charge.credits ?? 0;
+			// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
+			if (user.credits < cost) {
+				redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
+			}
+			record(-cost, 'debit_analyse', ticket.id); // débit à l'affichage
 		}
-	});
+		if (!user.premierTicketUtilise) markPremierTicketUtilise();
+
+		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
+		updateTicket(ticket.id, {
+			statut: 'analyse',
+			billing,
+			result: {
+				probaTotalePct: writingInput.probaTotalePct,
+				probaRenforceePct: writingInput.probaRenforceePct,
+				nbRetirees: writingInput.nbRetirees
+			}
+		});
+	}
 
 	const lignes: LineVM[] = r.selections.map((s) => ({
 		ordre: s.ordre,
@@ -88,5 +118,5 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		rienARetirer: r.rienARetirer,
 		conflitMemeMatch: r.conflitMemeMatch
 	};
-	return { ticketId: ticket.id, vm };
+	return { ticketId: ticket.id, vm, gratuit: billing.gratuit };
 };

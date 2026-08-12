@@ -15,6 +15,11 @@ export interface StoredResult {
 	nbRetirees: number;
 }
 
+export interface StoredBilling {
+	gratuit: boolean;
+	credits: number;
+}
+
 export interface StoredTicket {
 	id: string;
 	statut: TicketStatus;
@@ -22,6 +27,8 @@ export interface StoredTicket {
 	creeLe: number;
 	/** Chiffres figés à l'affichage du résultat (source de l'image de partage). */
 	result?: StoredResult;
+	/** Décision de facturation appliquée une fois (débit idempotent). */
+	billing?: StoredBilling;
 }
 
 const store = new Map<string, StoredTicket>();

@@ -14,7 +14,10 @@
 <svelte:head><title>Ton ticket, renforcé — Muscle Ton Jeu</title></svelte:head>
 
 <main class="container">
-	<h1 class="t-h1">Ton ticket, renforcé</h1>
+	<div class="tete">
+		<h1 class="t-h1">Ton ticket, renforcé</h1>
+		{#if data.gratuit}<span class="offert t-small">Offert</span>{/if}
+	</div>
 
 	{#if vm.conflitMemeMatch}
 		<p class="t-small conflit" role="note">
@@ -54,8 +57,26 @@
 		padding-top: var(--s-4);
 		padding-bottom: var(--s-12);
 	}
-	h1 {
+	.tete {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
 		margin: 0 0 var(--s-4);
+	}
+	.tete h1 {
+		margin: 0;
+	}
+	.offert {
+		display: inline-flex;
+		align-items: center;
+		height: 28px;
+		padding: 0 var(--s-3);
+		border-radius: var(--r-pill);
+		background: var(--c-canvas-sunk);
+		color: var(--c-ink-3);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.6px;
 	}
 	.conflit {
 		color: var(--c-ocre);

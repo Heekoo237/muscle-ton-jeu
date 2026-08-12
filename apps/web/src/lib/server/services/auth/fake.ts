@@ -1,16 +1,20 @@
 import type { AuthService, UserSession } from './index';
+import { getUser } from '$lib/server/fixtures/userStore';
 
 /**
- * Auth factice : un utilisateur de démonstration doté de crédits. La landing
- * reste consultable sans session ; le mur n'est simulé que dans le parcours.
+ * Auth factice basée sur un jeton de session. Déconnecté par défaut : le mur de
+ * connexion (PRD §7) apparaît après l'analyse, juste avant le résultat. Le solde
+ * de la session reflète le registre de crédits (userStore).
  */
 export class FakeAuth implements AuthService {
-	async currentSession(): Promise<UserSession | null> {
-		return { userId: 1, prenom: 'Démo', email: 'demo@example.com', credits: 12 };
+	async currentSession(token?: string): Promise<UserSession | null> {
+		if (token !== 'demo') return null;
+		const u = getUser();
+		return { userId: u.id, prenom: u.prenom, email: u.email, credits: u.credits };
 	}
 
 	async beginGoogleLogin(returnTo: string): Promise<string> {
-		// En réel : URL d'autorisation Google. En factice : retour direct.
+		// En réel : URL d'autorisation Google. En factice : retour direct après « login ».
 		return returnTo;
 	}
 }
