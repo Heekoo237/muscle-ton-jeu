@@ -9,11 +9,19 @@
  */
 import type { Selection, TicketStatus } from '$lib/types';
 
+export interface StoredResult {
+	probaTotalePct: number;
+	probaRenforceePct: number;
+	nbRetirees: number;
+}
+
 export interface StoredTicket {
 	id: string;
 	statut: TicketStatus;
 	selections: Selection[];
 	creeLe: number;
+	/** Chiffres figés à l'affichage du résultat (source de l'image de partage). */
+	result?: StoredResult;
 }
 
 const store = new Map<string, StoredTicket>();

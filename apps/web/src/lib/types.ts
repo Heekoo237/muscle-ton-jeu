@@ -101,3 +101,26 @@ export interface Ticket {
 	probaRenforcee: number | null;
 	selections: Selection[];
 }
+
+/* ---- Vues d'affichage du module de comparaison ---- */
+
+export interface LineVM {
+	ordre: number;
+	index: string;
+	matchLabel: string;
+	libelleFr: string;
+	cote: number | null;
+	fragile: boolean;
+	retiree: boolean;
+	analysable: boolean;
+}
+
+export interface ResultVM {
+	lignes: LineVM[];
+	probaTotalePct: number;
+	probaRenforceePct: number;
+	nbRetirees: number;
+	texte: string;
+	rienARetirer: boolean;
+	conflitMemeMatch: boolean;
+}

@@ -13,10 +13,14 @@ export class FakeVision implements VisionService {
 				{ texteBrut: 'Man Utd - Tottenham  Over 2.5  1.85' },
 				{ texteBrut: 'Lens - Nice  BTTS  1.72' },
 				{ texteBrut: 'Marseille - Lyon  1  2.10' },
+				{ texteBrut: 'Chelsea - Man City  X2  1.55' },
+				{ texteBrut: 'PSG - Monaco  Over 1.5  1.28' },
+				{ texteBrut: 'Atletico - Séville  BTTS Non  1.90' },
+				{ texteBrut: 'Dortmund - Leipzig  2  2.40' },
 				{ texteBrut: 'Real Madrid - Barcelone  TB  1.95' }, // seuil manquant → ambigu
 				{ texteBrut: 'Arsenal - Liverpool  1MT  2.30' } // mi-temps → non couvert
 			],
-			coteTotaleLue: '24.50'
+			coteTotaleLue: '312.50'
 		};
 	}
 }
