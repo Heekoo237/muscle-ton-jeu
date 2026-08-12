@@ -31,11 +31,17 @@ interdit) sont vérifiés en CI.
 
 | Couche | Choix |
 |---|---|
-| Web | SvelteKit (Svelte 5), SSR via adapter-node, TypeScript |
+| Web | SvelteKit (Svelte 5), SSR sur **Vercel** (adapter-vercel), TypeScript |
 | Style | CSS natif + custom properties (tokens `DESIGN.md`), zéro framework |
 | Base / Auth / Stockage | Supabase (Postgres, Auth Google, Storage) |
-| Modèle stat + backtest | Python (numpy/scipy/pandas) |
+| Modèle stat + backtest | Python (numpy/scipy/pandas), exécuté hors Vercel (cron CI) |
+| Jobs planifiés | Vercel Cron + Supabase (réconciliation paiement, purge captures, suivi) |
 | Image de partage | Satori + resvg (SVG→PNG, rendu serveur) |
+
+> **Déploiement Vercel** : racine du projet = `apps/web`. Le pipeline nocturne
+> Python (Poisson/Dixon-Coles + backtest) tourne via cron GitHub Actions et écrit
+> dans `predictions` sur Supabase — jamais dans une fonction serverless. Vision :
+> Gemini Flash ; rédaction : Claude (branchés en Session 8, derrière les services).
 
 ## Stratégie de construction
 

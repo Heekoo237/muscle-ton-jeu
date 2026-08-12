@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from '@sveltejs/adapter-vercel';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 
@@ -10,7 +10,7 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// SSR auto-hébergé (Node). La page publique et l'historique sont rendus serveur ;
+			// SSR sur Vercel. La page publique et l'historique sont rendus serveur ;
 			// règle d'archi n°8 : le serveur décide ce qu'il sérialise, jamais de contenu non payé côté client.
 			adapter: adapter()
 		})
