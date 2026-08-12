@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
 	import ComparisonModule from '$lib/components/ComparisonModule.svelte';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
 
 	function pct(v: number): string {
@@ -50,6 +50,18 @@
 	<a class="btn-primary" href={`/partage/${data.ticketId}`} target="_blank" rel="noopener">
 		Partager
 	</a>
+
+	<!-- Rétention : opt-in notifications, demandé ici et pas à l'arrivée (§10). -->
+	<div class="notif">
+		{#if form?.notifie}
+			<p class="t-body ok">On te prévient quand ton ticket est joué.</p>
+		{:else}
+			<form method="POST" action="?/notifier">
+				<p class="t-body texte">On te prévient quand ton ticket est joué ?</p>
+				<button class="btn-outline" type="submit">Activer les notifications</button>
+			</form>
+		{/if}
+	</div>
 </main>
 
 <style>
@@ -116,6 +128,34 @@
 	}
 	.btn-primary:active {
 		transform: scale(0.98);
+	}
+	.notif {
+		margin-top: var(--s-8);
+		padding-top: var(--s-6);
+		border-top: 1px solid var(--c-line);
+	}
+	.notif .texte {
+		color: var(--c-ink-2);
+		margin: 0 0 var(--s-3);
+	}
+	.notif .ok {
+		color: var(--c-ink-2);
+		margin: 0;
+	}
+	.btn-outline {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 52px;
+		padding: 0 var(--s-6);
+		border-radius: var(--r-pill);
+		background: transparent;
+		color: var(--c-ink);
+		border: 1px solid var(--c-line-strong);
+		font-family: var(--font-body);
+		font-weight: 600;
+		font-size: 16px;
+		cursor: pointer;
 	}
 	@media (min-width: 768px) {
 		.btn-primary {

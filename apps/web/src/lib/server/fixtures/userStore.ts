@@ -55,5 +55,10 @@ export function ledgerEntries(): readonly LedgerEntry[] {
 	return ledger;
 }
 
+/** A déjà rechargé au moins une fois (pour masquer l'encart premier passage). */
+export function hasRecharged(): boolean {
+	return ledger.some((e) => e.motif === 'recharge');
+}
+
 // Réexport pratique pour les appelants qui figent un résultat.
 export type { StoredResult };

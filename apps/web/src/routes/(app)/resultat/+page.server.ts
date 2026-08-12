@@ -1,9 +1,9 @@
 import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { getUser, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getSession } from '$lib/server/session';
-import { predictions, writing } from '$lib/server/services';
+import { predictions, writing, notifications } from '$lib/server/services';
 import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
 import { computeCharge } from '$lib/server/domain/billing';
 import { checkGeneratedText } from '$lib/server/domain/guards';
@@ -93,7 +93,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			result: {
 				probaTotalePct: writingInput.probaTotalePct,
 				probaRenforceePct: writingInput.probaRenforceePct,
-				nbRetirees: writingInput.nbRetirees
+				nbRetirees: writingInput.nbRetirees,
+				nbFragiles: r.selections.filter((s) => s.fragile).length
 			}
 		});
 	}
@@ -120,3 +121,21 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	};
 	return { ticketId: ticket.id, vm, gratuit: billing.gratuit };
 };
+
+export const actions: Actions = {
+	// Autorisation de notification demandée sur l'écran de résultat (PRD §10).
+	// En factice : on enregistre un abonnement fictif. Le vrai Web Push (VAPID,
+	// permission navigateur) est branché en Session 8.
+	notifier: async ({ cookies }) => {
+		const session = await getSession(cookies);
+		if (session) {
+			await notifications.saveSubscription(session.userId, {
+				endpoint: 'fake-endpoint',
+				p256dh: 'fake',
+				auth: 'fake'
+			});
+		}
+		return { notifie: true };
+	}
+};
+

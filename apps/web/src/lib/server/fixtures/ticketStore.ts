@@ -13,6 +13,7 @@ export interface StoredResult {
 	probaTotalePct: number;
 	probaRenforceePct: number;
 	nbRetirees: number;
+	nbFragiles: number;
 }
 
 export interface StoredBilling {
@@ -25,6 +26,8 @@ export interface StoredTicket {
 	statut: TicketStatus;
 	selections: Selection[];
 	creeLe: number;
+	/** Horodatage réel de création (pour l'affichage « Sam. 14 »). */
+	creeLeMs: number;
 	/** Chiffres figés à l'affichage du résultat (source de l'image de partage). */
 	result?: StoredResult;
 	/** Décision de facturation appliquée une fois (débit idempotent). */
@@ -36,13 +39,26 @@ let counter = 0;
 
 export function createTicket(selections: Selection[]): StoredTicket {
 	const id = `t_${++counter}_${selections.length}`;
-	const ticket: StoredTicket = { id, statut: 'en_lecture', selections, creeLe: counter };
+	const ticket: StoredTicket = {
+		id,
+		statut: 'en_lecture',
+		selections,
+		creeLe: counter,
+		creeLeMs: Date.now()
+	};
 	store.set(id, ticket);
 	return ticket;
 }
 
 export function getTicket(id: string): StoredTicket | undefined {
 	return store.get(id);
+}
+
+/** Tickets analysés, les plus récents d'abord (pour « Mes tickets »). */
+export function listAnalysedTickets(): StoredTicket[] {
+	return [...store.values()]
+		.filter((t) => t.statut === 'analyse')
+		.sort((a, b) => b.creeLe - a.creeLe);
 }
 
 export function updateTicket(id: string, patch: Partial<StoredTicket>): StoredTicket | undefined {
