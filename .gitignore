@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+apps/web/.svelte-kit/
+apps/web/build/
+apps/web/.vercel/
+apps/web/.netlify/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+packages/model/data/*.csv
+
+# OS / editor
+.DS_Store
+*.log
+
+# Test artifacts
+apps/web/test-results/
+apps/web/playwright-report/
