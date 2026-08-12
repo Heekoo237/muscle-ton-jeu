@@ -1,5 +1,4 @@
 <script lang="ts">
-	import Footer from '$lib/components/Footer.svelte';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 </script>
 
@@ -15,6 +14,7 @@
 	<!-- Bande hero : unique lavis autorisé du produit (DESIGN.md §5.1) -->
 	<section class="hero">
 		<div class="container">
+			<!-- logo-ink : le btn-primary consomme déjà l'accent dans ce viewport (§10.1) -->
 			<h1 class="t-display logo">MUSCLE<br />TON<br />JEU</h1>
 			<p class="t-body-lg chapeau measure">
 				Envoie la capture de ton ticket. On repère les sélections fragiles et on te
@@ -24,9 +24,25 @@
 			<LegalNote variant="hero" />
 		</div>
 	</section>
-</main>
 
-<Footer />
+	<!-- Positionnement, sans chiffre (sobriété chiffrée sur surface publique) -->
+	<section class="band">
+		<div class="container measure">
+			<h2 class="t-h2">On lit ton ticket entier, pas un match isolé.</h2>
+			<p class="t-body">
+				C'est l'unité réelle du joueur. On repère les sélections fragiles et on te
+				montre une version renforcée du même ticket, obtenue en retirant ces
+				sélections. On n'ajoute jamais un match que tu n'as pas choisi.
+			</p>
+			<h2 class="t-h2 mt">Un taux de réussite n'est jamais montré seul.</h2>
+			<p class="t-body">
+				Il est toujours accompagné du rendement à mise fixe. C'est le seul chiffre
+				honnête. Notre historique est public et horodaté avant le coup d'envoi,
+				ratés inclus, non modifiable après.
+			</p>
+		</div>
+	</section>
+</main>
 
 <style>
 	.hero {
@@ -34,7 +50,7 @@
 		padding: var(--s-12) 0;
 	}
 	.logo {
-		color: var(--c-accent); /* 3e et dernier emploi de l'accent : le logo */
+		color: var(--c-ink);
 		margin: 0 0 var(--s-6);
 	}
 	.chapeau {
@@ -58,6 +74,16 @@
 	.btn-primary:active {
 		transform: scale(0.98);
 	}
+	.band {
+		padding: var(--s-10) 0;
+	}
+	.band .t-body {
+		color: var(--c-ink-2);
+		margin: var(--s-3) 0 0;
+	}
+	.mt {
+		margin-top: var(--s-8);
+	}
 	@media (min-width: 768px) {
 		.hero {
 			padding: var(--s-16) 0;
@@ -68,6 +94,9 @@
 		.btn-primary {
 			width: auto;
 			min-width: 280px;
+		}
+		.band {
+			padding: var(--s-16) 0;
 		}
 	}
 	@media (min-width: 1280px) {

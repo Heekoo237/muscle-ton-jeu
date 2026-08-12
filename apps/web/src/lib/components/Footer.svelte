@@ -14,7 +14,7 @@
 		</nav>
 		<div class="legal">
 			<BadgeAge inverse />
-			<p class="t-small">Mentions légales · CGU · Confidentialité</p>
+			<a class="t-small legal-link" href="/legal">Mentions légales · CGU · Confidentialité</a>
 		</div>
 		<p class="t-small note">
 			Muscle Ton Jeu n’accepte aucune mise et ne verse aucun gain.
@@ -54,9 +54,12 @@
 		gap: var(--s-3);
 		margin-bottom: var(--s-3);
 	}
-	.legal p {
+	.legal-link {
 		color: rgba(248, 241, 228, 0.72);
-		margin: 0;
+		text-decoration-color: rgba(248, 241, 228, 0.4);
+	}
+	.legal-link:hover {
+		color: var(--c-ink-inverse);
 	}
 	.note {
 		color: rgba(248, 241, 228, 0.72);
