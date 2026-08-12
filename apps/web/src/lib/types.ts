@@ -75,13 +75,19 @@ export interface Selection {
 	ordre: number;
 	texteBrut: string;
 	fixtureId: number | null;
+	/** Match reconnu, prêt à afficher (« Arsenal – Liverpool »). */
+	matchLabel: string;
 	marche: Market | null;
 	etatResolution: ResolutionState;
+	/** Pourquoi la ligne n'est pas certaine (non couvert, inconnu, ambigu). */
+	raison?: 'non_couvert' | 'inconnu' | 'ambigu';
+	/** Cas ambigu : marchés proposés au choix (jamais deviné). */
+	candidates?: Market[];
 	coteSaisie: number | null;
 	probabilite: number | null; // copiée depuis predictions
 	fragile: boolean;
 	retireeDuRenforce: boolean;
-	/** Libellé français prêt à afficher (« Arsenal ou match nul »). */
+	/** Libellé français du marché prêt à afficher (« Arsenal ou match nul »). */
 	libelleFr: string;
 }
 

@@ -14,6 +14,7 @@ function sel(ordre: number, probabilite: number, fixtureId = ordre): Selection {
 		ordre,
 		texteBrut: `sel ${ordre}`,
 		fixtureId,
+		matchLabel: `Match ${ordre}`,
 		marche: 'WIN_HOME',
 		etatResolution: 'certain',
 		coteSaisie: null,

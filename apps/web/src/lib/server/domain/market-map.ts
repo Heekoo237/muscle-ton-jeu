@@ -14,6 +14,8 @@ export interface MarketResolution {
 	market: Market | null;
 	/** Renseigné quand state !== 'certain' : pourquoi. */
 	raison?: 'non_couvert' | 'inconnu' | 'ambigu';
+	/** Pour un cas ambigu : les marchés proposés au choix (jamais deviné). */
+	candidates?: Market[];
 }
 
 /** Normalisation d'une notation bookmaker avant recherche en table. */
@@ -92,10 +94,25 @@ const UNCOVERED = [
 	/\bhandicap\b/
 ];
 
+/**
+ * Notations « plus/moins de buts » SANS seuil visible → ambigu (PRD §6.3).
+ * On ne devine jamais le seuil : on propose les trois au choix.
+ */
+const AMBIGUOUS_OVER = new Set(['tb', 'over', 'plus', 'total >', 'total']);
+const AMBIGUOUS_UNDER = new Set(['tm', 'under', 'moins']);
+const OVER_CANDIDATES: Market[] = ['OVER_1_5', 'OVER_2_5', 'OVER_3_5'];
+const UNDER_CANDIDATES: Market[] = ['UNDER_1_5', 'UNDER_2_5', 'UNDER_3_5'];
+
 export function resolveMarket(notation: string): MarketResolution {
 	const n = normalize(notation);
 	if (n in TABLE) {
 		return { state: 'certain', market: TABLE[n] };
+	}
+	if (AMBIGUOUS_OVER.has(n)) {
+		return { state: 'ambigu', market: null, raison: 'ambigu', candidates: OVER_CANDIDATES };
+	}
+	if (AMBIGUOUS_UNDER.has(n)) {
+		return { state: 'ambigu', market: null, raison: 'ambigu', candidates: UNDER_CANDIDATES };
 	}
 	if (UNCOVERED.some((re) => re.test(n))) {
 		return { state: 'inconnu', market: null, raison: 'non_couvert' };

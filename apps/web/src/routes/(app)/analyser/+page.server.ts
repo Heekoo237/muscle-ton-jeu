@@ -1,0 +1,28 @@
+import { redirect } from '@sveltejs/kit';
+import type { Actions } from './$types';
+import { vision, sports } from '$lib/server/services';
+import { resolveTicket } from '$lib/server/domain/resolve';
+import { createTicket } from '$lib/server/fixtures/ticketStore';
+
+/**
+ * Envoi des captures → lecture (vision) → résolution (code) → sauvegarde du
+ * ticket AVANT tout paiement (règle de facturation n°2) → écran de validation.
+ *
+ * En factice, la vision ignore les fichiers et rend un ticket type. Le vrai
+ * modèle (Session 8) reçoit les images ; le reste du chemin ne change pas.
+ */
+export const actions: Actions = {
+	default: async ({ cookies }) => {
+		const raw = await vision.readTicket([]);
+		const [fixtures, teams] = await Promise.all([sports.upcomingFixtures(), sports.teams()]);
+		const selections = resolveTicket(raw, fixtures, teams);
+		const ticket = createTicket(selections);
+		cookies.set('ticketId', ticket.id, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			maxAge: 60 * 60 * 24
+		});
+		redirect(303, '/analyser/validation');
+	}
+};
