@@ -273,6 +273,20 @@ def section_44(df):
         print(f"  {name:<22}{_bin_ece(p, y)*100:>7.2f}%{np.mean((p-y)**2):>9.4f}{p.mean()*100:>8.1f}%{y.mean()*100:>12.1f}%")
     print("  (ECE bas = bien calibré ; si élevé → marché à passer « non couvert »)")
 
+    # BTTS : le biais est-il constant ou varie-t-il par championnat ?
+    btts = ((g >= 1) & (a >= 1)).astype(int)
+    print("\n  « Les deux marquent » — biais PAR championnat (réel − modèle)")
+    print(f"    {'championnat':<22}{'modèle':>8}{'réel':>8}{'biais':>8}")
+    order = []
+    for lg, gg in df.groupby("league_name"):
+        real = ((gg["fthg"] >= 1) & (gg["ftag"] >= 1)).mean()
+        mod = gg["m_btts"].mean()
+        order.append((lg, mod, real, real - mod))
+    for lg, mod, real, bias in sorted(order, key=lambda r: r[3]):
+        print(f"    {lg:<22}{100*mod:>7.1f}%{100*real:>7.1f}%{100*bias:>+7.1f}")
+    print(f"    → biais global {100*(btts.mean()-df['m_btts'].mean()):+.1f} pt, mais NON constant "
+          "(−1,6 à +7,4) → correction PAR LIGUE. BTTS suspendu.")
+
 
 def main():
     if not CACHE.exists():

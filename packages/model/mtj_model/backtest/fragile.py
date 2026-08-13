@@ -62,10 +62,73 @@ def _tickets(sel: pd.DataFrame, n_tickets=60000):
     return rows
 
 
+def _per_market_thresholds(df: pd.DataFrame) -> None:
+    """Seuil par marché : les probas sont plus hautes sur les marchés sûrs, un
+    seuil unique à 0,55 ne marquerait presque rien en double chance."""
+    ftr = df["ftr"].to_numpy()
+    tot = (df["fthg"] + df["ftag"]).to_numpy()
+    covered = {0: {"H", "D"}, 1: {"D", "A"}, 2: {"H", "A"}}
+    dc = df[["m_dc_hd", "m_dc_da", "m_dc_ha"]].to_numpy(float)
+    pick = dc.argmax(1)
+    markets = {
+        "1X2 (favori)": (None, None),  # traité à part ci-dessus
+        "double chance": (dc[np.arange(len(df)), pick],
+                          np.array([ftr[i] in covered[pick[i]] for i in range(len(df))])),
+        "plus de 1,5": (df["m_o15"].to_numpy(float), tot >= 2),
+        "plus de 2,5": (df["m_o25"].to_numpy(float), tot >= 3),
+        "plus de 3,5": (df["m_o35"].to_numpy(float), tot >= 4),
+        "moins de 2,5": (df["m_u25"].to_numpy(float), tot <= 2),
+    }
+    print("\n" + "=" * 66)
+    print("Seuil PAR MARCHÉ — calé pour marquer ~60 % des sélections (comme 1X2)")
+    print("=" * 66)
+    print(f"  {'marché':<16}{'base échec':>11}{'p médiane':>11}{'seuil':>8}{'préc':>7}{'rappel':>8}")
+    for name, (p, won) in markets.items():
+        if p is None:
+            continue
+        lost = ~np.asarray(won)
+        t = float(np.quantile(p, 0.60))  # seuil marquant ~60 % des sélections
+        flag = p < t
+        prec = 100 * lost[flag].mean() if flag.sum() else 0.0
+        rec = 100 * flag[lost].mean() if lost.sum() else 0.0
+        print(f"  {name:<16}{100*lost.mean():>10.1f}%{np.median(p):>11.2f}{t:>8.2f}{prec:>6.0f}%{rec:>7.0f}%")
+
+
+def _ticket_probability(sel: pd.DataFrame) -> None:
+    """Proba combinée affichée = produit des sélections. Le chiffre des maquettes."""
+    rng = np.random.default_rng(SEED)
+    p = sel["p_model"].to_numpy()
+    N = len(p)
+
+    def sample(k, reinforce=False, t=0.55, floor=4, n=40000):
+        out = []
+        for _ in range(n):
+            pk = p[rng.choice(N, size=k, replace=False)]
+            if reinforce:
+                keep = pk >= t
+                if keep.sum() < floor:
+                    keep = np.zeros(k, bool)
+                    keep[np.argsort(pk)[::-1][:floor]] = True
+                pk = pk[keep]
+            out.append(float(np.prod(pk)))
+        return np.array(out)
+
+    print("\n" + "=" * 66)
+    print("Proba combinée du ticket (produit) — le chiffre des maquettes")
+    print("=" * 66)
+    for k in (6, 9, 12):
+        tp = sample(k)
+        print(f"  {k:>2} sél. BRUT      médiane {100*np.median(tp):5.2f}%  "
+              f"(q25 {100*np.quantile(tp,.25):4.2f}%  q75 {100*np.quantile(tp,.75):4.2f}%)")
+    tp9 = sample(9, reinforce=True)
+    print(f"   9 sél. RENFORCÉ  médiane {100*np.median(tp9):5.2f}%  (retrait <0,55, plancher 4)")
+
+
 def main():
     if not CACHE.exists():
         raise SystemExit("Cache absent — lance d'abord : python -m mtj_model.backtest.generate")
     df = pd.read_csv(CACHE)
+    df = df.dropna(subset=["open_ps_h", "open_ps_d", "open_ps_a", "close_ps_h", "close_ps_d", "close_ps_a"]).reset_index(drop=True)
     sel = _selections(df)
     won = sel["won"].to_numpy()
     p = sel["p_model"].to_numpy()
@@ -112,6 +175,9 @@ def main():
                 rec = flag[lost].mean()
                 print(f"  {name:<40}{'':>8}{100*prec:>10.1f}%{100*rec:>8.1f}%{100*flag.mean():>7.0f}%")
         print()
+
+    _per_market_thresholds(df)
+    _ticket_probability(sel)
 
 
 if __name__ == "__main__":

@@ -79,6 +79,78 @@ réserve que la source fournisse la ligue **avec cotes de clôture** :
   domination du Bayern joue peu (un favori dominant est facile à prédire). À
   confirmer à l'étape 4.
 
+## Architecture hybride de probabilité (décision étape 4)
+
+Le pipeline nocturne ne fait **pas** une seule chose : selon le marché, il lit une
+cote ou il calcule le modèle. Tranché par le backtest, pas par préférence.
+
+| Marché | Source | Pourquoi |
+|---|---|---|
+| 1X2 | **cote d'ouverture dé-vigée** | le marché bat le modèle, fusion `w=0` (4.0) |
+| Plus/moins 2,5 | **cote dé-vigée** | idem |
+| Double chance | **modèle** | aucune cote de référence, ECE 1,5-2,6 % (4.4) |
+| Plus/moins 1,5 & 3,5 | **modèle** | bien calibrés (~3 %) |
+| Les deux marquent | **SUSPENDU** | biais non corrigé (voir plus bas) |
+
+Le détail machine est dans `constants.py` (`PROBABILITY_SOURCE`).
+
+> [!IMPORTANT]
+> **Repli obligatoire.** Quand la cote d'un marché « cote » est indisponible, le
+> **modèle prend le relais** — mais la confiance affichée est **abaissée**
+> (`CONFIDENCE_ON_FALLBACK`). On ne présente jamais un repli modèle comme une
+> lecture de marché.
+
+## Seuil de fragilité (étape 4.5)
+
+Une sélection est **fragile** si sa probabilité passe sous le seuil de **son
+marché**. Testé sur 60 000 tickets synthétiques de 6-12 sélections.
+
+- **Définition retenue : probabilité seule.** Le désaccord modèle/marché et le
+  mouvement de cote ont été testés puis **écartés** : ils baissent la précision
+  (4.1/4.2), et le mouvement n'existe pas encore au calcul nocturne.
+- **Seuil PAR MARCHÉ**, pas unique : les probas sont plus hautes sur les marchés
+  sûrs. `WIN_*` 0,55 · double chance 0,80 · plus de 1,5 → 0,79 · plus de 2,5 →
+  0,55 · plus de 3,5 → 0,33 · moins de 2,5 → 0,51. Chaque seuil marque ~60 % des
+  sélections du marché (même point de fonctionnement que le 1X2 validé).
+- **Honnêteté du signal (1X2)** : précision **54 %** pour un taux d'échec de base
+  **45,6 %** → réel mais **modéré** (~8 pt au-dessus du hasard). Chiffres figés
+  dans `constants.py` (`FRAGILE_1X2_PRECISION`, `FRAGILE_1X2_BASE_FAILURE`) pour
+  qu'ils restent sous les yeux et ne soient pas oubliés.
+- **Ordre de grandeur produit** : un ticket de 9 favoris 1X2 affiche une proba
+  combinée **médiane 0,22 %** ; le même ticket **renforcé** (retrait des <0,55,
+  plancher 4) remonte à **~14 %**. C'est ce contraste que portent les maquettes.
+
+## Confiance par championnat (étape 4.3)
+
+Classement par **calibration** (ECE 1X2), pas par gain sur le naïf. **Aucune
+exclusion** — un ECE de 5-6 % est imprécis, pas mauvais : on baisse la confiance
+affichée (champ PRD), on ne cache pas la ligue.
+
+| Confiance | ECE | Championnats |
+|---|---|---|
+| **normale** | < 4 % | Premier League, Serie A, La Liga, Belgique* |
+| **modérée** | 4-5,5 % | Süper Lig, Ligue 1, Eredivisie, Liga Portugal, Bundesliga, Scottish Prem. |
+| **faible** | > 6 % | Super League (Grèce) |
+
+\* Belgique à 4,2 % (limite) ; classée « normale » par décision produit. Table
+machine : `LEAGUE_CONFIDENCE` dans `constants.py`.
+
+## BTTS — pourquoi c'est suspendu
+
+Le modèle **sous-estime** « les deux équipes marquent » : prédit 50,9 %, réel
+54,1 % (**+3,3 pt**). Deux constats mesurés avant réouverture :
+
+- **Le biais n'est PAS constant.** Il va de **−1,6 pt** (Bundesliga) à **+7,4 pt**
+  (La Liga) selon le championnat. Une correction globale unique laisserait donc
+  La Liga à +4 et sur-corrigerait la Bundesliga.
+- **Ce n'est pas qu'un recalage.** Un biais qui varie par ligue et pointe surtout
+  sur les ligues à défenses ouvertes (La Liga, Ligue 1, Turquie) trahit la
+  **structure de dépendance** : le Dixon-Coles ne corrige que les scores faibles
+  (0-0, 1-0, 0-1, 1-1) via ρ, et sous-estime la co-occurrence de buts ailleurs.
+  Une simple correction marginale (Platt/isotonique) alignerait la moyenne mais
+  pas la structure. Piste correcte : recalibration **par ligue**, ou un ρ / une
+  corrélation buts qui respire selon la ligue. À traiter avant de rouvrir BTTS.
+
 ## Commandes
 
 ```bash
