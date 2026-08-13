@@ -1,0 +1,6 @@
+# Données régénérables en une commande (python -m mtj_model.data.load)
+data/raw/
+data/*.db
+__pycache__/
+*.pyc
+.pytest_cache/
