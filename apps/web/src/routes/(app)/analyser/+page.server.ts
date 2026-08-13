@@ -3,6 +3,7 @@ import type { Actions } from './$types';
 import { vision, sports } from '$lib/server/services';
 import { resolveTicket } from '$lib/server/domain/resolve';
 import { createTicket } from '$lib/server/fixtures/ticketStore';
+import { getAppSession } from '$lib/server/session';
 
 /**
  * Envoi des captures → lecture (vision) → résolution (code) → sauvegarde du
@@ -12,11 +13,13 @@ import { createTicket } from '$lib/server/fixtures/ticketStore';
  * modèle (Session 8) reçoit les images ; le reste du chemin ne change pas.
  */
 export const actions: Actions = {
-	default: async ({ cookies }) => {
+	default: async (event) => {
+		const { cookies } = event;
+		const session = await getAppSession(event);
 		const raw = await vision.readTicket([]);
 		const [fixtures, teams] = await Promise.all([sports.upcomingFixtures(), sports.teams()]);
 		const selections = resolveTicket(raw, fixtures, teams);
-		const ticket = await createTicket(selections);
+		const ticket = await createTicket(selections, session?.userId ?? null);
 		cookies.set('ticketId', ticket.id, {
 			path: '/',
 			httpOnly: true,

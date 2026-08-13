@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
-import { getUser, record } from '$lib/server/fixtures/userStore';
+import { ensureAppUser, record } from '$lib/server/fixtures/userStore';
 import { createTicket, getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import type { Selection } from '$lib/types';
 
@@ -32,13 +32,13 @@ export const GET: RequestHandler = async () => {
 
 	const steps: Record<string, unknown> = {};
 	try {
-		const user = await getUser();
+		const user = await ensureAppUser('__diag__', 'diag@example.com', 'Diag');
 		steps.userId = user.id;
 
-		const created = await createTicket([
-			testSelection(1, 'WIN_HOME'),
-			testSelection(2, null)
-		]);
+		const created = await createTicket(
+			[testSelection(1, 'WIN_HOME'), testSelection(2, null)],
+			user.id
+		);
 		steps.created = created.id;
 
 		const read = await getTicket(created.id);
@@ -53,7 +53,7 @@ export const GET: RequestHandler = async () => {
 		steps.resultRenforce = read2?.result?.probaRenforceePct ?? null;
 
 		// Registre de crédits (delta 0 → aucun effet sur le solde ni sur hasRecharged).
-		await record(0, 'offert');
+		await record(user.id, 0, 'offert');
 		steps.ledgerInsert = 'ok';
 
 		// Nettoyage du ticket de test (cascade sur les sélections).

@@ -6,7 +6,6 @@
  * retour (`retour`) n'est pas stockée ici : elle transite par l'URL d'attente.
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
-import { getUser } from './userStore';
 
 export interface Recharge {
 	credits: number;
@@ -17,16 +16,15 @@ const mem = new Map<string, Recharge>();
 
 export async function trackRecharge(
 	txnId: string,
-	data: { credits: number; montant: number }
+	data: { credits: number; montant: number; userId: number }
 ): Promise<void> {
 	if (!isSupabaseConfigured()) {
 		mem.set(txnId, { credits: data.credits, credited: false });
 		return;
 	}
 	const sb = supabaseAdmin();
-	const u = await getUser();
 	await sb.from('transactions').insert({
-		user_id: u.id,
+		user_id: data.userId,
 		montant: data.montant,
 		credits: data.credits,
 		statut: 'pending',

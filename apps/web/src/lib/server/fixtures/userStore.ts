@@ -1,22 +1,19 @@
 /**
- * userStore.ts — Utilisateur + registre de crédits.
+ * userStore.ts — Utilisateur + registre de crédits, par compte.
  *
- * Deux implémentations derrière la même interface (async) :
- *  - Supabase (persistant) quand les variables d'env sont présentes ;
- *  - en mémoire (factice) sinon — pour le développement local.
+ * Deux implémentations derrière la même interface async : Supabase (persistant,
+ * un utilisateur par compte Google) si configuré, sinon un utilisateur de
+ * démonstration unique en mémoire (local).
  *
  * Le registre `credit_ledger` est la source de vérité du solde ; `users.credits`
- * en est le cache. Règle de facturation n°1 : le crédit se débite à l'affichage.
- *
- * Tant que l'authentification Google réelle n'est pas branchée, on travaille avec
- * un utilisateur de démonstration unique (google_id = '__demo__').
+ * en est le cache. Le crédit se débite à l'affichage réussi (facturation n°1).
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 import type { StoredResult } from './ticketStore';
 
 export type LedgerReason = 'recharge' | 'debit_analyse' | 'offert' | 'parrainage';
 
-export interface DemoUser {
+export interface AppUser {
 	id: number;
 	prenom: string;
 	email: string;
@@ -24,12 +21,10 @@ export interface DemoUser {
 	premierTicketUtilise: boolean;
 }
 
-const DEMO_GOOGLE_ID = '__demo__';
-
 /* ------------------------------------------------------------------------ */
-/*  Implémentation en mémoire (repli local)                                  */
+/*  Repli en mémoire (local, sans Supabase)                                  */
 /* ------------------------------------------------------------------------ */
-const memUser: DemoUser = {
+const memUser: AppUser = {
 	id: 1,
 	prenom: 'Démo',
 	email: 'demo@example.com',
@@ -39,81 +34,107 @@ const memUser: DemoUser = {
 const memLedger: { motif: LedgerReason }[] = [];
 
 /* ------------------------------------------------------------------------ */
-/*  Implémentation Supabase                                                   */
+/*  Interface publique (async)                                               */
 /* ------------------------------------------------------------------------ */
-async function ensureDemoUser(): Promise<DemoUser> {
+
+/** Trouve ou crée l'utilisateur applicatif lié à un compte Google. */
+export async function ensureAppUser(
+	googleId: string,
+	email: string,
+	prenom: string
+): Promise<AppUser> {
+	if (!isSupabaseConfigured()) return memUser;
 	const sb = supabaseAdmin();
 	const { data: found } = await sb
 		.from('users')
 		.select('id, prenom, email, credits, premier_ticket_utilise')
-		.eq('google_id', DEMO_GOOGLE_ID)
+		.eq('google_id', googleId)
 		.maybeSingle();
 	let row = found;
 	if (!row) {
 		const { data: created, error } = await sb
 			.from('users')
-			.insert({ google_id: DEMO_GOOGLE_ID, prenom: 'Démo', email: 'demo@example.com', credits: 0 })
+			.insert({ google_id: googleId, email, prenom })
 			.select('id, prenom, email, credits, premier_ticket_utilise')
 			.single();
 		if (error) throw error;
 		row = created;
 	}
-	return {
-		id: row.id,
-		prenom: row.prenom ?? 'Démo',
-		email: row.email ?? '',
-		credits: row.credits ?? 0,
-		premierTicketUtilise: row.premier_ticket_utilise ?? false
-	};
+	return toAppUser(row);
 }
 
-/* ------------------------------------------------------------------------ */
-/*  Interface publique (async)                                               */
-/* ------------------------------------------------------------------------ */
-export async function getUser(): Promise<DemoUser> {
+export async function getUserById(userId: number): Promise<AppUser | null> {
 	if (!isSupabaseConfigured()) return memUser;
-	return ensureDemoUser();
+	const sb = supabaseAdmin();
+	const { data } = await sb
+		.from('users')
+		.select('id, prenom, email, credits, premier_ticket_utilise')
+		.eq('id', userId)
+		.maybeSingle();
+	return data ? toAppUser(data) : null;
 }
 
-export async function record(delta: number, motif: LedgerReason, ticketId?: string): Promise<void> {
+export async function record(
+	userId: number,
+	delta: number,
+	motif: LedgerReason,
+	ticketId?: string
+): Promise<void> {
 	if (!isSupabaseConfigured()) {
 		memLedger.push({ motif });
 		memUser.credits += delta;
 		return;
 	}
 	const sb = supabaseAdmin();
-	const u = await ensureDemoUser();
 	await sb.from('credit_ledger').insert({
-		user_id: u.id,
+		user_id: userId,
 		delta,
 		motif,
 		ticket_id: ticketId ? Number(ticketId) : null
 	});
-	await sb.from('users').update({ credits: u.credits + delta }).eq('id', u.id);
+	const u = await getUserById(userId);
+	await sb.from('users').update({ credits: (u?.credits ?? 0) + delta }).eq('id', userId);
 }
 
-export async function markPremierTicketUtilise(): Promise<void> {
+export async function markPremierTicketUtilise(userId: number): Promise<void> {
 	if (!isSupabaseConfigured()) {
 		memUser.premierTicketUtilise = true;
 		return;
 	}
-	const sb = supabaseAdmin();
-	const u = await ensureDemoUser();
-	await sb.from('users').update({ premier_ticket_utilise: true }).eq('id', u.id);
+	await supabaseAdmin().from('users').update({ premier_ticket_utilise: true }).eq('id', userId);
 }
 
-export async function hasRecharged(): Promise<boolean> {
+export async function hasRecharged(userId: number): Promise<boolean> {
 	if (!isSupabaseConfigured()) {
 		return memLedger.some((e) => e.motif === 'recharge');
 	}
-	const sb = supabaseAdmin();
-	const u = await ensureDemoUser();
-	const { count } = await sb
+	const { count } = await supabaseAdmin()
 		.from('credit_ledger')
 		.select('*', { count: 'exact', head: true })
-		.eq('user_id', u.id)
+		.eq('user_id', userId)
 		.eq('motif', 'recharge');
 	return (count ?? 0) > 0;
+}
+
+/** Session factice locale : l'utilisateur démo unique. */
+export function memDemoUser(): AppUser {
+	return memUser;
+}
+
+function toAppUser(row: {
+	id: number;
+	prenom: string | null;
+	email: string | null;
+	credits: number | null;
+	premier_ticket_utilise: boolean | null;
+}): AppUser {
+	return {
+		id: row.id,
+		prenom: row.prenom ?? 'Invité',
+		email: row.email ?? '',
+		credits: row.credits ?? 0,
+		premierTicketUtilise: row.premier_ticket_utilise ?? false
+	};
 }
 
 export type { StoredResult };

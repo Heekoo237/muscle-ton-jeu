@@ -8,7 +8,6 @@
  */
 import type { Market, Selection, TicketStatus } from '$lib/types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
-import { getUser } from './userStore';
 
 export interface StoredResult {
 	probaTotalePct: number;
@@ -30,6 +29,8 @@ export interface StoredTicket {
 	creeLeMs: number;
 	result?: StoredResult;
 	billing?: StoredBilling;
+	/** Propriétaire ; null tant que le ticket est anonyme (avant connexion). */
+	userId?: number | null;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -109,7 +110,10 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 /* ------------------------------------------------------------------------ */
 /*  Interface publique (async)                                               */
 /* ------------------------------------------------------------------------ */
-export async function createTicket(selections: Selection[]): Promise<StoredTicket> {
+export async function createTicket(
+	selections: Selection[],
+	userId: number | null = null
+): Promise<StoredTicket> {
 	if (!isSupabaseConfigured()) {
 		const id = `t_${++memCounter}_${selections.length}`;
 		const ticket: StoredTicket = {
@@ -117,16 +121,16 @@ export async function createTicket(selections: Selection[]): Promise<StoredTicke
 			statut: 'en_lecture',
 			selections,
 			creeLe: memCounter,
-			creeLeMs: Date.now()
+			creeLeMs: Date.now(),
+			userId
 		};
 		memStore.set(id, ticket);
 		return ticket;
 	}
 	const sb = supabaseAdmin();
-	const u = await getUser();
 	const { data: t, error } = await sb
 		.from('tickets')
-		.insert({ user_id: u.id, statut: 'en_lecture', nb_selections: selections.length })
+		.insert({ user_id: userId, statut: 'en_lecture', nb_selections: selections.length })
 		.select('id, statut, cree_le')
 		.single();
 	if (error) throw error;
@@ -166,6 +170,7 @@ export async function updateTicket(
 	const sb = supabaseAdmin();
 	const upd: Row = {};
 	if (patch.statut) upd.statut = patch.statut;
+	if (patch.userId !== undefined) upd.user_id = patch.userId;
 	if (patch.billing) upd.cout_credits = patch.billing.credits;
 	if (patch.result) {
 		upd.proba_totale = patch.result.probaTotalePct / 100;
@@ -186,18 +191,17 @@ export async function updateTicket(
 	return getTicket(id);
 }
 
-export async function listAnalysedTickets(): Promise<StoredTicket[]> {
+export async function listAnalysedTickets(userId: number): Promise<StoredTicket[]> {
 	if (!isSupabaseConfigured()) {
 		return [...memStore.values()]
 			.filter((t) => t.statut === 'analyse')
 			.sort((a, b) => b.creeLe - a.creeLe);
 	}
 	const sb = supabaseAdmin();
-	const u = await getUser();
 	const { data: rows } = await sb
 		.from('tickets')
 		.select('*, selections(*)')
-		.eq('user_id', u.id)
+		.eq('user_id', userId)
 		.eq('statut', 'analyse')
 		.order('cree_le', { ascending: false });
 	return (rows ?? []).map((t) => rowToTicket(t, (t.selections as Row[]) ?? []));

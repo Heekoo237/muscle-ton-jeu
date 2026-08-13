@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getSession } from '$lib/server/session';
-import { getUser, hasRecharged } from '$lib/server/fixtures/userStore';
+import { getAppSession } from '$lib/server/session';
+import { hasRecharged } from '$lib/server/fixtures/userStore';
 import { listAnalysedTickets } from '$lib/server/fixtures/ticketStore';
 import { sports, predictions } from '$lib/server/services';
 import { marketLabelFr } from '$lib/server/domain/market-map';
@@ -29,9 +29,9 @@ export interface Bilan {
 	tombes: number;
 }
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async (event) => {
 	// Le dashboard est la maison du connecté : sans session, retour à l'accueil.
-	const session = await getSession(cookies);
+	const session = await getAppSession(event);
 	if (!session) redirect(303, '/');
 
 	// Zone 2 — Analyse du matin : un match gratuit, marché le plus probable.
@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	}
 
 	// Zone 3 — Mes tickets.
-	const tickets: TicketCardVM[] = (await listAnalysedTickets()).map((t) => {
+	const tickets: TicketCardVM[] = (await listAnalysedTickets(session.userId)).map((t) => {
 		const nbMatchs = t.selections.filter((s) => s.etatResolution === 'certain').length;
 		return {
 			id: t.id,
@@ -69,7 +69,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	}
 
 	// Encart premier passage : après le ticket offert, avant la première recharge.
-	const user = await getUser();
 	const dernier = tickets[0];
 	const prochainCout = dernier ? (creditCost(dernier.nbMatchs) ?? 2) : 2;
 
@@ -77,7 +76,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		daily,
 		tickets,
 		bilan,
-		premierPassage: user.premierTicketUtilise && !(await hasRecharged()),
+		premierPassage: session.premierTicketUtilise && !(await hasRecharged(session.userId)),
 		prochainCout
 	};
 };

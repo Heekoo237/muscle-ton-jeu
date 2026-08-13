@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
-import { getUser, hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
-import { getSession } from '$lib/server/session';
+import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
+import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
 import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
 import { computeCharge } from '$lib/server/domain/billing';
@@ -29,13 +29,14 @@ async function writeSafely(input: WritingInput): Promise<string> {
 		: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.';
 }
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async (event) => {
+	const { cookies } = event;
 	const id = cookies.get('ticketId');
 	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
 
 	// 0. Mur de connexion : après l'analyse, juste avant le résultat (PRD §7).
-	const session = await getSession(cookies);
+	const session = await getAppSession(event);
 	if (!session) redirect(303, '/connexion?retour=/resultat');
 
 	// 1. Lire les probabilités en table (jamais de calcul ici — règle d'archi n°2).
@@ -69,27 +70,27 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
 	let billing = ticket.billing;
 	if (!billing) {
-		const user = await getUser();
 		const charge = computeCharge({
 			nbAnalysables,
-			premierTicket: !user.premierTicketUtilise,
+			premierTicket: !session.premierTicketUtilise,
 			rienARetirer: r.rienARetirer
 		});
 
 		if (!charge.gratuit && !charge.bloque) {
 			const cost = charge.credits ?? 0;
 			// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
-			if (user.credits < cost) {
+			if (session.credits < cost) {
 				redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
 			}
-			await record(-cost, 'debit_analyse', ticket.id); // débit à l'affichage
+			await record(session.userId, -cost, 'debit_analyse', ticket.id); // débit à l'affichage
 		}
-		if (!user.premierTicketUtilise) await markPremierTicketUtilise();
+		if (!session.premierTicketUtilise) await markPremierTicketUtilise(session.userId);
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
 		await updateTicket(ticket.id, {
 			statut: 'analyse',
 			billing,
+			userId: session.userId,
 			result: {
 				probaTotalePct: writingInput.probaTotalePct,
 				probaRenforceePct: writingInput.probaRenforceePct,
@@ -121,15 +122,20 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	};
 	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
 	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
-	return { ticketId: ticket.id, vm, gratuit: billing.gratuit, montreRecharge: !(await hasRecharged()) };
+	return {
+		ticketId: ticket.id,
+		vm,
+		gratuit: billing.gratuit,
+		montreRecharge: !(await hasRecharged(session.userId))
+	};
 };
 
 export const actions: Actions = {
 	// Autorisation de notification demandée sur l'écran de résultat (PRD §10).
 	// En factice : on enregistre un abonnement fictif. Le vrai Web Push (VAPID,
 	// permission navigateur) est branché en Session 8.
-	notifier: async ({ cookies }) => {
-		const session = await getSession(cookies);
+	notifier: async (event) => {
+		const session = await getAppSession(event);
 		if (session) {
 			await notifications.saveSubscription(session.userId, {
 				endpoint: 'fake-endpoint',

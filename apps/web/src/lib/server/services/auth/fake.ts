@@ -1,15 +1,14 @@
 import type { AuthService, UserSession } from './index';
-import { getUser } from '$lib/server/fixtures/userStore';
+import { memDemoUser } from '$lib/server/fixtures/userStore';
 
 /**
- * Auth factice basée sur un jeton de session. Déconnecté par défaut : le mur de
- * connexion (PRD §7) apparaît après l'analyse, juste avant le résultat. Le solde
- * de la session reflète le registre de crédits (userStore).
+ * Auth factice (repli local). La résolution de session réelle vit dans
+ * `lib/server/session.ts` (Supabase Auth) ; ce service reste pour l'interface.
  */
 export class FakeAuth implements AuthService {
 	async currentSession(token?: string): Promise<UserSession | null> {
 		if (token !== 'demo') return null;
-		const u = await getUser();
+		const u = memDemoUser();
 		return { userId: u.id, prenom: u.prenom, email: u.email, credits: u.credits };
 	}
 
