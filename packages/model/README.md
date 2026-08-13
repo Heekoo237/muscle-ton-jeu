@@ -66,3 +66,12 @@ python -m mtj_model.calibrate            # étape 2 : optimise ξ (récence) par
 ```
 
 Sortie : base SQLite isolée `data/mtj_stats.db` (git‑ignorée, régénérable).
+
+## Calibration de ξ — périmètre
+
+Les **11 championnats** sont calibrés (aucun n'est écarté pour historique
+insuffisant : chacun dispose de 2 saisons complètes avant la saison
+d'évaluation). Un seul cas est ignoré, au niveau du MATCH, pas du championnat :
+le **tout premier match d'une équipe promue**, tant qu'elle n'a aucun historique
+(≈ 17 matchs sur ≈ 3 462, soit 0,5 %). Dès son premier match joué, l'équipe entre
+dans l'historique et devient prédictible. Aucun championnat n'est donc exclu.
