@@ -26,7 +26,9 @@
 			Envoie la capture de ton ticket. On te montre les sélections fragiles et ton
 			ticket renforcé.
 		</p>
-		<a class="btn-primary" href="/analyser">Analyser mon ticket</a>
+		<a class="btn-primary" href="/analyser"
+			>Analyser mon ticket{data.ticketOffert ? ' gratuitement' : ''}</a
+		>
 		{#if data.premierPassage}
 			<p class="t-small encart">
 				Ton prochain ticket coûtera {data.prochainCout} crédit{data.prochainCout > 1 ? 's' : ''}.

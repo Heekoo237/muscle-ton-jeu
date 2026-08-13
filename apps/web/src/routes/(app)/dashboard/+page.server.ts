@@ -77,6 +77,8 @@ export const load: PageServerLoad = async (event) => {
 		tickets,
 		bilan,
 		premierPassage: session.premierTicketUtilise && !(await hasRecharged(session.userId)),
+		// Le ticket d'essai est encore disponible tant que le premier n'a pas servi.
+		ticketOffert: !session.premierTicketUtilise,
 		prochainCout
 	};
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { enhance, applyAction } from '$app/forms';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
@@ -11,6 +12,29 @@
 
 	let reading = $state(false);
 	let step = $state(0);
+
+	// Aperçu des captures : dès qu'une image est choisie, on l'affiche. L'utilisateur
+	// voit que sa capture est bien prise, sans attendre de valider. Aperçu local
+	// (objet URL) : aucun octet ne part sur le réseau à ce stade.
+	const SLOTS = [0, 1, 2];
+	let previews = $state<(string | null)[]>([null, null, null]);
+	let inputs: (HTMLInputElement | null)[] = [null, null, null];
+
+	function onPick(i: number, e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		if (previews[i]) URL.revokeObjectURL(previews[i]!);
+		previews[i] = URL.createObjectURL(file);
+	}
+
+	function clear(i: number) {
+		if (previews[i]) URL.revokeObjectURL(previews[i]!);
+		previews[i] = null;
+		if (inputs[i]) inputs[i]!.value = ''; // ne pas soumettre une capture retirée
+	}
+
+	onDestroy(() => previews.forEach((u) => u && URL.revokeObjectURL(u)));
 
 	// Durée minimale d'affichage : chaque étape doit avoir le temps d'apparaître,
 	// même si le serveur répond instantanément (la vraie vision prendra le relais).
@@ -46,20 +70,42 @@
 		}}
 	>
 		<div class="slots">
-			{#each [0, 1, 2] as i (i)}
-				<label class="upload-slot t-body">
-					<input type="file" accept="image/*" name={`capture_${i}`} hidden />
-					<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-						<path
-							d="M12 5v14M5 12h14"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
+			{#each SLOTS as i (i)}
+				<div class="slot" class:filled={previews[i]}>
+					<label class="pick t-body">
+						<input
+							type="file"
+							accept="image/*"
+							name={`capture_${i}`}
+							hidden
+							bind:this={inputs[i]}
+							onchange={(e) => onPick(i, e)}
 						/>
-					</svg>
-					<span>Capture {i + 1}</span>
-				</label>
+						{#if previews[i]}
+							<img src={previews[i]} alt={`Capture ${i + 1}`} />
+						{:else}
+							<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+								<path
+									d="M12 5v14M5 12h14"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+							</svg>
+							<span>Capture {i + 1}</span>
+						{/if}
+					</label>
+					{#if previews[i]}
+						<span class="tag t-small">Capture {i + 1} · reçue</span>
+						<button
+							type="button"
+							class="clear"
+							aria-label={`Retirer la capture ${i + 1}`}
+							onclick={() => clear(i)}>✕</button
+						>
+					{/if}
+				</div>
 			{/each}
 		</div>
 
@@ -69,7 +115,7 @@
 		</p>
 
 		<button class="btn-primary" type="submit" disabled={reading}>
-			{reading ? 'Lecture en cours…' : 'Analyser mon ticket'}
+			{reading ? 'Lecture en cours…' : 'Analyser mon ticket gratuitement'}
 		</button>
 	</form>
 </main>
@@ -108,19 +154,73 @@
 		gap: var(--s-3);
 		margin-bottom: var(--s-4);
 	}
-	.upload-slot {
+	.slot {
+		position: relative;
+		height: 120px;
+	}
+	.pick {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		gap: var(--s-2);
-		height: 120px;
+		width: 100%;
+		height: 100%;
 		border-radius: var(--r-lg);
 		background: var(--c-canvas-sunk);
 		color: var(--c-ink-2);
 		border: 1px dashed var(--c-line-strong);
 		cursor: pointer;
 		text-align: center;
+		overflow: hidden;
+		box-sizing: border-box;
+	}
+	/* Capture reçue : la vignette remplit l'emplacement, bord plein (plus de tiret). */
+	.slot.filled .pick {
+		border-style: solid;
+		border-color: var(--c-line-strong);
+		background: var(--c-surface);
+	}
+	.pick img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: inherit;
+	}
+	.tag {
+		position: absolute;
+		left: var(--s-2);
+		bottom: var(--s-2);
+		display: inline-flex;
+		align-items: center;
+		height: 24px;
+		padding: 0 var(--s-2);
+		border-radius: var(--r-pill);
+		background: var(--c-canvas);
+		border: 1px solid var(--c-line);
+		color: var(--c-ink);
+		pointer-events: none;
+	}
+	.clear {
+		position: absolute;
+		top: var(--s-2);
+		right: var(--s-2);
+		width: 28px;
+		height: 28px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--r-pill);
+		background: var(--c-canvas);
+		border: 1px solid var(--c-line-strong);
+		color: var(--c-ink);
+		font-size: 13px;
+		line-height: 1;
+		cursor: pointer;
+		transition: transform 100ms ease-out;
+	}
+	.clear:active {
+		transform: scale(0.92);
 	}
 	.note {
 		color: var(--c-ink-3);

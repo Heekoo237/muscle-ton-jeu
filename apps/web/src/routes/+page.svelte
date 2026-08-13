@@ -87,7 +87,7 @@
 				<div style="font-family:{ANTON};font-size:18px;line-height:1;letter-spacing:-0.4px;text-transform:uppercase">Muscle Ton Jeu</div>
 				<h1 style="margin:0;font-family:{ANTON};font-weight:400;font-size:clamp(44px,5.2vw,72px);line-height:1;letter-spacing:-1.2px;text-transform:uppercase;text-wrap:balance">Un match va faire<br />tomber ton ticket</h1>
 				<div style="font-size:18px;line-height:1.45;color:#4A4238;max-width:34ch">Envoie la capture. On te montre lequel, et ta version renforcée.</div>
-				<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:#C93A1A;color:#F8F1E4;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Analyser mon ticket</a>
+				<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:#C93A1A;color:#F8F1E4;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Analyser mon ticket gratuitement</a>
 				<div style="font-size:16px;color:#4A4238">Envoie une capture. Réponse en 30 secondes.</div>
 				<div style="font-size:14px;line-height:1.4;color:#6E6357">18+ · Outil d’aide à la décision, pas un pronostic garanti</div>
 			</div>
@@ -302,7 +302,7 @@
 				{/each}
 			</div>
 
-			<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:#C93A1A;color:#F8F1E4;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Analyser mon ticket</a>
+			<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:#C93A1A;color:#F8F1E4;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Analyser mon ticket gratuitement</a>
 		</div>
 	</div>
 
