@@ -1,152 +1,191 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import TicketCard from '$lib/components/TicketCard.svelte';
-	import TallyBlock from '$lib/components/TallyBlock.svelte';
 	import LegalNote from '$lib/components/LegalNote.svelte';
-	import Footer from '$lib/components/Footer.svelte';
+	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 
 	let { data }: { data: PageData } = $props();
 
+	const jour = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' });
 	const heure = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
 	function pct(v: number): string {
 		return `${v.toString().replace('.', ',')} %`;
 	}
-	function cote(v: number): string {
-		return v.toFixed(2).replace('.', ',');
+	function kickoff(ms: number): string {
+		return `${jour.format(new Date(ms))} · ${heure.format(new Date(ms))}`;
 	}
+
+	// Le 3e bloc n'apparaît qu'à partir de 3 tickets analysés.
+	const montreTombes = $derived(data.stats.ticketsAnalyses >= 3);
 </script>
 
-<svelte:head><title>Mon tableau de bord — Muscle Ton Jeu</title></svelte:head>
+<svelte:head><title>Accueil — Muscle Ton Jeu</title></svelte:head>
 
-<!-- Hero -->
-<section class="hero">
-	<div class="container inner">
-		<h1 class="t-display titre">Ton ticket<br />tient-il<br />debout ?</h1>
-		<p class="t-body-lg sub">
-			Envoie la capture de ton ticket. On te montre les sélections fragiles et ton
-			ticket renforcé.
-		</p>
-		<a class="btn-primary" href="/analyser"
-			>Analyser mon ticket{data.ticketOffert ? ' gratuitement' : ''}</a
-		>
-		{#if data.premierPassage}
-			<p class="t-small encart">
-				Ton prochain ticket coûtera {data.prochainCout} crédit{data.prochainCout > 1 ? 's' : ''}.
-				Recharge à partir de 500 F.
-			</p>
-		{/if}
-		<LegalNote variant="hero" />
-	</div>
-</section>
+<div class="wrap">
+	<!-- 1 · SALUTATION -->
+	<h1 class="t-display salut">Bonjour {data.prenom}</h1>
 
-<!-- Analyse du matin -->
-{#if data.daily}
-	<section class="band canvas">
-		<div class="container inner">
-			<h2 class="t-h2">L'analyse du matin</h2>
-			<div class="daily">
-				<div class="row1">
-					<span class="t-body">{data.daily.matchLabel}</span>
-					<span class="t-cote">{heure.format(new Date(data.daily.dateMs))}</span>
-				</div>
-				<div class="row1">
-					<span class="t-small dim">{data.daily.marche} · cote proposée</span>
-					<span class="t-cote">{cote(data.daily.coteProposee)}</span>
-				</div>
-				<div class="sep"></div>
-				<div class="row1">
-					<span class="t-small dim">Chances réelles</span>
-					<span class="t-chiffre-md">{pct(data.daily.probabilitePct)}</span>
-				</div>
-				<LegalNote />
-			</div>
+	<!-- 2 · TROIS STATISTIQUES (jamais animées : les chiffres apparaissent) -->
+	<section class="stats" aria-label="Tes statistiques">
+		<div class="stat">
+			<span class="num t-chiffre-md">{data.credits}</span>
+			<span class="lbl t-small">crédit{data.credits > 1 ? 's' : ''} restant{data.credits > 1 ? 's' : ''}</span>
 		</div>
+		<div class="stat">
+			<span class="num t-chiffre-md">{data.stats.ticketsAnalyses}</span>
+			<span class="lbl t-small">ticket{data.stats.ticketsAnalyses > 1 ? 's' : ''} analysé{data.stats.ticketsAnalyses > 1 ? 's' : ''}</span>
+		</div>
+		{#if montreTombes}
+			<div class="stat">
+				<span class="num t-chiffre-md">
+					{data.stats.fragilesTombes} <span class="sur">sur {data.stats.fragilesMarques}</span>
+				</span>
+				<span class="lbl t-small">fragiles effectivement tombés</span>
+			</div>
+		{/if}
 	</section>
-{/if}
 
-<!-- Mes tickets -->
-<section class="band sunk">
-	<div class="container inner">
-		<h2 class="t-h2">Mes tickets</h2>
-		{#if data.tickets.length === 0}
-			<p class="t-body dim">Ton premier ticket analysé apparaîtra ici.</p>
-		{:else}
+	<!-- 3 · DEUX BOUTONS (un seul accent visible) -->
+	<div class="actions">
+		<a class="btn-primary" href="/analyser">Analyser un ticket</a>
+		<a class="btn-dark" href="/recharge">Recharger</a>
+	</div>
+
+	<!-- 4 · ANALYSE DU JOUR -->
+	{#if data.daily}
+		<section class="bloc">
+			<h2 class="t-h2">L'analyse du jour</h2>
+			{#if data.dailyVue}
+				<div class="daily vue">
+					<div class="row1">
+						<span class="t-body">{data.daily.matchLabel}</span>
+						<span class="badge">vue</span>
+					</div>
+					<p class="t-small dim">Prochaine analyse offerte demain matin.</p>
+				</div>
+			{:else}
+				<div class="daily">
+					<div class="row1">
+						<span class="t-body">{data.daily.matchLabel}</span>
+						<span class="t-cote">{heure.format(new Date(data.daily.dateMs))}</span>
+					</div>
+					<div class="row1">
+						<span class="t-small dim">{data.daily.marche} · chances réelles</span>
+						<span class="t-chiffre-md">{pct(data.daily.probabilitePct)}</span>
+					</div>
+					<LegalNote />
+				</div>
+			{/if}
+		</section>
+	{/if}
+
+	<!-- 5 · TICKETS EN COURS (uniquement ; sinon rien) -->
+	{#if data.ticketsEnCours.length > 0}
+		<section class="bloc">
+			<h2 class="t-h2">Tickets en cours</h2>
 			<div class="liste">
-				{#each data.tickets as t (t.id)}
-					<TicketCard dateMs={t.dateMs} nbMatchs={t.nbMatchs} nbFragiles={t.nbFragiles} />
+				{#each data.ticketsEnCours as t (t.id)}
+					<a class="encours" href={`/dashboard/historique/${t.id}`}>
+						<div class="l1">
+							<span class="t-h3">{jour.format(new Date(t.dateMs))} · {t.nbMatchs} match{t.nbMatchs > 1 ? 's' : ''}</span>
+							<span class="badge">En attente</span>
+						</div>
+						{#if t.kickoffMs != null}
+							<span class="l2 t-small dim">Coup d'envoi {kickoff(t.kickoffMs)}</span>
+						{/if}
+					</a>
 				{/each}
 			</div>
-		{/if}
-	</div>
-</section>
+		</section>
+	{/if}
 
-<!-- Bilan -->
-{#if data.bilan}
-	<section class="band canvas">
-		<div class="container inner">
-			<h2 class="t-h2">Bilan</h2>
-			<TallyBlock
-				ticketsAnalyses={data.bilan.ticketsAnalyses}
-				fragilesMarques={data.bilan.fragilesMarques}
-				tombes={data.bilan.tombes}
-			/>
-		</div>
-	</section>
-{/if}
-
-<Footer />
+	<!-- 6 · BANDEAU D'HISTORIQUE (données réelles, ≥ 20 résultats) -->
+	{#if data.historique.length >= 20}
+		<HistoryMarquee items={data.historique} />
+	{/if}
+</div>
 
 <style>
-	.inner {
+	.wrap {
+		max-width: 720px;
+		margin-inline: auto;
+		padding: var(--s-6) var(--s-4) var(--s-10);
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-4);
+		gap: var(--s-8);
 	}
-	.hero {
-		background: linear-gradient(180deg, #fbeae3 0%, #f8f1e4 100%);
-		padding: var(--s-12) 0;
-	}
-	.hero .titre {
+	.salut {
 		margin: 0;
 		color: var(--c-ink);
 	}
-	.hero .sub {
-		color: var(--c-ink-2);
-		margin: 0;
+
+	/* 2 · Statistiques */
+	.stats {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: var(--s-3);
 	}
-	.encart {
+	.stat {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
 		background: var(--c-canvas-sunk);
 		border-radius: var(--r-md);
-		padding: var(--s-3) var(--s-4);
+		padding: var(--s-4);
+	}
+	.num {
+		color: var(--c-ink);
+		font-feature-settings: 'tnum' 1;
+	}
+	.num .sur {
+		font-size: 16px;
+		color: var(--c-ink-3);
+		letter-spacing: 0;
+	}
+	.lbl {
 		color: var(--c-ink-2);
 	}
-	.btn-primary {
+
+	/* 3 · Actions */
+	.actions {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+	}
+	.btn-primary,
+	.btn-dark {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 100%;
 		height: 52px;
 		border-radius: var(--r-pill);
-		background: var(--c-accent);
-		color: var(--c-ink-inverse);
+		font-family: var(--font-body);
 		font-weight: 600;
 		font-size: 16px;
 		text-decoration: none;
+		transition: transform 100ms ease-out;
 	}
-	.btn-primary:active {
+	.btn-primary {
+		background: var(--c-accent);
+		color: var(--c-ink-inverse);
+	}
+	.btn-dark {
+		background: var(--c-ink);
+		color: var(--c-ink-inverse);
+	}
+	.btn-primary:active,
+	.btn-dark:active {
 		transform: scale(0.98);
 	}
-	.band {
-		padding: var(--s-10) 0;
-		border-top: 1px solid var(--c-line);
+
+	/* 4 & 5 · Blocs */
+	.bloc {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
 	}
-	.band.canvas {
-		background: var(--c-canvas);
-	}
-	.band.sunk {
-		background: var(--c-canvas-sunk);
-	}
-	.band .t-h2 {
+	.bloc .t-h2 {
 		margin: 0;
 	}
 	.daily {
@@ -158,6 +197,10 @@
 		flex-direction: column;
 		gap: var(--s-3);
 	}
+	.daily.vue {
+		background: var(--c-canvas-sunk);
+		border-color: var(--c-line);
+	}
 	.row1 {
 		display: flex;
 		align-items: baseline;
@@ -166,29 +209,59 @@
 	}
 	.dim {
 		color: var(--c-ink-2);
-	}
-	.sep {
-		height: 1px;
-		background: var(--c-line);
+		margin: 0;
 	}
 	.liste {
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
 	}
-	@media (min-width: 768px) {
-		.hero {
-			padding: var(--s-16) 0;
+	.encours {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		background: var(--c-surface);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+		padding: var(--s-4);
+		text-decoration: none;
+		color: var(--c-ink);
+		transition: transform 100ms ease-out;
+	}
+	.encours:active {
+		transform: scale(0.99);
+	}
+	.l1 {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
+	}
+	.l2 {
+		color: var(--c-ink-2);
+	}
+	.badge {
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		height: 28px;
+		padding: 0 var(--s-3);
+		border-radius: var(--r-pill);
+		background: var(--c-canvas-sunk);
+		color: var(--c-ink-3);
+		font-size: 14px;
+	}
+	.daily.vue .badge {
+		background: var(--c-surface);
+	}
+
+	@media (min-width: 600px) {
+		.actions {
+			flex-direction: row;
 		}
-		.hero .titre {
-			font-size: 56px;
-		}
-		.btn-primary {
-			width: auto;
-			min-width: 280px;
-		}
-		.band {
-			padding: var(--s-16) 0;
+		.actions .btn-primary,
+		.actions .btn-dark {
+			flex: 1;
 		}
 	}
 </style>

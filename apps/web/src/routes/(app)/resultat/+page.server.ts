@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
+import { getTicket, updateTicket, saveAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
@@ -88,6 +88,8 @@ export const load: PageServerLoad = async (event) => {
 		if (!session.premierTicketUtilise) await markPremierTicketUtilise(session.userId);
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
+		// Fige le texte rendu : l'historique le relira à vie, sans jamais refacturer.
+		await saveAnalysisText(ticket.id, texte);
 		await updateTicket(ticket.id, {
 			statut: 'analyse',
 			billing,

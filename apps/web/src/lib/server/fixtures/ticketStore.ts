@@ -103,7 +103,8 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 		creeLe: 0,
 		creeLeMs: t.cree_le ? Date.parse(t.cree_le as string) : Date.now(),
 		result,
-		billing
+		billing,
+		userId: t.user_id === null || t.user_id === undefined ? null : Number(t.user_id)
 	};
 }
 
@@ -189,6 +190,34 @@ export async function updateTicket(
 		}
 	}
 	return getTicket(id);
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Texte d'analyse — figé au moment de l'analyse, relu à vie (jamais refacturé) */
+/* ------------------------------------------------------------------------ */
+const memAnalyses = new Map<string, string>();
+
+/** Fige le texte rédigé pour un ticket, tel qu'il a été rendu à l'utilisateur. */
+export async function saveAnalysisText(ticketId: string, texte: string): Promise<void> {
+	if (!isSupabaseConfigured()) {
+		memAnalyses.set(ticketId, texte);
+		return;
+	}
+	// Idempotent : une analyse par ticket (clé primaire ticket_id).
+	await supabaseAdmin()
+		.from('analyses')
+		.upsert({ ticket_id: Number(ticketId), texte }, { onConflict: 'ticket_id' });
+}
+
+/** Relit le texte figé d'un ticket analysé (consultation d'historique). */
+export async function getAnalysisText(ticketId: string): Promise<string | null> {
+	if (!isSupabaseConfigured()) return memAnalyses.get(ticketId) ?? null;
+	const { data } = await supabaseAdmin()
+		.from('analyses')
+		.select('texte')
+		.eq('ticket_id', Number(ticketId))
+		.maybeSingle();
+	return (data?.texte as string) ?? null;
 }
 
 export async function listAnalysedTickets(userId: number): Promise<StoredTicket[]> {

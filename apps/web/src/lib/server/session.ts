@@ -16,6 +16,8 @@ export interface AppSession {
 	email: string;
 	credits: number;
 	premierTicketUtilise: boolean;
+	/** Photo de profil Google, si disponible ; sinon null (repli initiale). */
+	avatarUrl: string | null;
 }
 
 export async function getAppSession(event: RequestEvent): Promise<AppSession | null> {
@@ -29,12 +31,15 @@ export async function getAppSession(event: RequestEvent): Promise<AppSession | n
 			(meta.name as string) ||
 			(user.email ? user.email.split('@')[0] : 'Invité');
 		const appUser = await ensureAppUser(user.id, user.email ?? '', prenom);
+		const avatarUrl =
+			(meta.avatar_url as string) || (meta.picture as string) || null;
 		return {
 			userId: appUser.id,
 			prenom: appUser.prenom,
 			email: appUser.email,
 			credits: appUser.credits,
-			premierTicketUtilise: appUser.premierTicketUtilise
+			premierTicketUtilise: appUser.premierTicketUtilise,
+			avatarUrl
 		};
 	}
 
@@ -46,6 +51,7 @@ export async function getAppSession(event: RequestEvent): Promise<AppSession | n
 		prenom: u.prenom,
 		email: u.email,
 		credits: u.credits,
-		premierTicketUtilise: u.premierTicketUtilise
+		premierTicketUtilise: u.premierTicketUtilise,
+		avatarUrl: null
 	};
 }
