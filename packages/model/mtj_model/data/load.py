@@ -40,6 +40,20 @@ CLOSE_OU25 = {
     "b365": ("B365C>2.5", "B365C<2.5"),
 }
 
+# Cotes d'OUVERTURE (pré-match, sans le préfixe « C ») : elles existent au moment
+# du calcul nocturne, contrairement à la clôture. Ce sont elles qui comptent pour
+# comparer honnêtement le modèle.
+OPEN_1X2 = {
+    "avg": ("AvgH", "AvgD", "AvgA"),
+    "ps": ("PSH", "PSD", "PSA"),
+    "b365": ("B365H", "B365D", "B365A"),
+}
+OPEN_OU25 = {
+    "avg": ("Avg>2.5", "Avg<2.5"),
+    "ps": ("P>2.5", "P<2.5"),
+    "b365": ("B365>2.5", "B365<2.5"),
+}
+
 
 def _download(force: bool) -> list[Path]:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -123,6 +137,13 @@ def load(force: bool = False) -> None:
     for tag, (o, u) in CLOSE_OU25.items():
         clean[f"close_{tag}_o25"] = _col(raw, o)
         clean[f"close_{tag}_u25"] = _col(raw, u)
+    for tag, (h, d, a) in OPEN_1X2.items():
+        clean[f"open_{tag}_h"] = _col(raw, h)
+        clean[f"open_{tag}_d"] = _col(raw, d)
+        clean[f"open_{tag}_a"] = _col(raw, a)
+    for tag, (o, u) in OPEN_OU25.items():
+        clean[f"open_{tag}_o25"] = _col(raw, o)
+        clean[f"open_{tag}_u25"] = _col(raw, u)
 
     # On ne garde que des matchs joués (résultat connu).
     clean = clean[clean["date"].notna() & clean["fthg"].notna() & clean["ftag"].notna()]

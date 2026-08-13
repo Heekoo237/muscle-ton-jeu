@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from ..constants import XI_PER_DAY
+from ..markets import market_probabilities
 from ..poisson import score_matrix
 from ..strength import fit_league
 
@@ -26,6 +27,12 @@ EVAL_SEASON = "2425"
 GRID = 11
 
 ODDS_COLS = [
+    # ouverture (existe au calcul nocturne) — 1X2 et plus/moins 2,5
+    "open_avg_h", "open_avg_d", "open_avg_a",
+    "open_ps_h", "open_ps_d", "open_ps_a",
+    "open_avg_o25", "open_avg_u25",
+    "open_ps_o25", "open_ps_u25",
+    # clôture (information « du futur », pour l'analyse du mouvement)
     "close_avg_h", "close_avg_d", "close_avg_a",
     "close_ps_h", "close_ps_d", "close_ps_a",
     "close_avg_o25", "close_avg_u25",
@@ -41,14 +48,6 @@ def _load() -> dict[str, pd.DataFrame]:
     return {lg: g.sort_values("date").reset_index(drop=True) for lg, g in df.groupby("league_code")}
 
 
-def _probs_1x2_ou(mat: np.ndarray) -> tuple[float, float, float, float, float]:
-    i = np.arange(GRID)
-    home, away = i[:, None], i[None, :]
-    ph = float(mat[home > away].sum())
-    pd_ = float(np.trace(mat))
-    pa = float(mat[home < away].sum())
-    over = float(mat[(home + away) >= 3].sum())
-    return ph, pd_, pa, over, 1.0 - over
 
 
 def generate() -> pd.DataFrame:
@@ -68,13 +67,16 @@ def generate() -> pd.DataFrame:
                 eg = fit.expected_goals(m["home"], m["away"])
                 if eg is None:
                     continue
-                ph, pd_, pa, over, under = _probs_1x2_ou(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
+                mk = market_probabilities(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
                 rows.append({
                     "league_code": m["league_code"], "league_name": m["league_name"],
                     "date": m["date"].date().isoformat(), "home": m["home"], "away": m["away"],
                     "fthg": int(m["fthg"]), "ftag": int(m["ftag"]), "ftr": m["ftr"],
                     "lh": round(eg[0], 4), "la": round(eg[1], 4),
-                    "m_h": ph, "m_d": pd_, "m_a": pa, "m_o25": over, "m_u25": under,
+                    "m_h": mk["WIN_HOME"], "m_d": mk["DRAW"], "m_a": mk["WIN_AWAY"],
+                    "m_dc_hd": mk["DC_HOME_DRAW"], "m_dc_da": mk["DC_DRAW_AWAY"], "m_dc_ha": mk["DC_HOME_AWAY"],
+                    "m_o15": mk["OVER_1_5"], "m_o25": mk["OVER_2_5"], "m_o35": mk["OVER_3_5"],
+                    "m_u25": mk["UNDER_2_5"], "m_btts": mk["BTTS_YES"],
                     **{c: m[c] for c in ODDS_COLS},
                 })
     out = pd.DataFrame(rows)
