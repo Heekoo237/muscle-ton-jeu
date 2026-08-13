@@ -44,7 +44,8 @@ PROBABILITY_SOURCE = {
     "WIN_HOME": "odds", "DRAW": "odds", "WIN_AWAY": "odds",   # 1X2
     "OVER_2_5": "odds", "UNDER_2_5": "odds",                  # plus/moins 2,5
     "DC_HOME_DRAW": "model", "DC_DRAW_AWAY": "model", "DC_HOME_AWAY": "model",
-    "OVER_1_5": "model", "OVER_3_5": "model",                 # plus/moins 1,5 & 3,5
+    "OVER_1_5": "model", "UNDER_1_5": "model",                # plus/moins 1,5
+    "OVER_3_5": "model", "UNDER_3_5": "model",                # plus/moins 3,5
     # BTTS SUSPENDU (biais +3,3 pt, non constant : -1,6 Bundesliga à +7,4 La Liga).
     # Ré-ouvrir seulement après correction PAR LIGUE. Voir README étape 4.
 }
@@ -73,9 +74,11 @@ FRAGILE_THRESHOLDS = {
     "WIN_HOME": 0.44, "DRAW": 0.44, "WIN_AWAY": 0.44,        # 1X2  (base échec 45,7 %)
     "DC_HOME_DRAW": 0.74, "DC_DRAW_AWAY": 0.74, "DC_HOME_AWAY": 0.74,  # double chance (base 22,3 %)
     "OVER_1_5": 0.72,     # plus de 1,5 (base 23,0 %)
+    "UNDER_1_5": 0.18,    # moins de 1,5 (base 77 %)
     "OVER_2_5": 0.48,     # plus de 2,5 (base ~43 %)
-    "OVER_3_5": 0.24,     # plus de 3,5 (base 69,2 %)
     "UNDER_2_5": 0.42,    # moins de 2,5
+    "OVER_3_5": 0.24,     # plus de 3,5 (base 69,2 %)
+    "UNDER_3_5": 0.63,    # moins de 3,5 (base 31 %)
 }
 FRAGILE_MIN_SELECTIONS = 4  # plancher du ticket renforcé (règle d'or n°3), jamais moins
 
@@ -95,9 +98,9 @@ FRAGILE_1X2_BASE_FAILURE = 0.457   # taux d'échec des favoris d'ouverture sans 
 FRAGILE_BADGE_VISIBLE = {
     "WIN_HOME": True, "DRAW": True, "WIN_AWAY": True,   # 1X2 — précision ~60 %
     "OVER_2_5": True, "UNDER_2_5": True,                # plus/moins 2,5 — ~50 %
-    "OVER_3_5": True,                                   # plus de 3,5 — précision ~78 %
+    "OVER_3_5": True, "UNDER_1_5": True,                # échec fréquent → précision ~80 %
     "DC_HOME_DRAW": False, "DC_DRAW_AWAY": False, "DC_HOME_AWAY": False,  # double chance
-    "OVER_1_5": False,                                  # plus de 1,5
+    "OVER_1_5": False, "UNDER_3_5": False,             # marchés « sûrs » — précision plate
 }
 FRAGILE_NEUTRAL_MENTION = "la moins solide de ton ticket"  # retrait sans badge « fragile »
 
@@ -121,3 +124,26 @@ LEAGUE_CONFIDENCE = {
     "G1": "faible",    # Super League (Grèce) ECE 6,4 %
 }
 DEFAULT_CONFIDENCE = "modérée"  # championnat inconnu / non calibré
+
+# Traduction label → valeur numérique (colonne predictions.confiance, NUMERIC).
+CONFIDENCE_VALUE = {"normale": 1.0, "modérée": 0.66, "faible": 0.33}
+
+
+def confidence_for(league_code: str, source: str) -> float:
+    """Confiance numérique d'une prédiction, selon la ligue et la source.
+
+    - source "odds"  : le marché a fixé le prix → confiance « normale ».
+    - source "model" : confiance = palier de calibration du championnat (4.3).
+    - source "repli" : cote attendue mais absente → jamais mieux que « modérée »
+      (règle CONFIDENCE_ON_FALLBACK), et jamais au-dessus du palier de la ligue.
+    """
+    league = LEAGUE_CONFIDENCE.get(league_code, DEFAULT_CONFIDENCE)
+    if source == "odds":
+        label = "normale"
+    elif source == "repli":
+        # le minimum (plus prudent) entre le repli et le palier de la ligue
+        order = ("faible", "modérée", "normale")
+        label = min(CONFIDENCE_ON_FALLBACK, league, key=order.index)
+    else:  # model
+        label = league
+    return CONFIDENCE_VALUE[label]

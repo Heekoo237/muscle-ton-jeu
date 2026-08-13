@@ -175,6 +175,60 @@ Le modèle **sous-estime** « les deux équipes marquent » : prédit 50,9 %, r�
   pas la structure. Piste correcte : recalibration **par ligue**, ou un ρ / une
   corrélation buts qui respire selon la ligue. À traiter avant de rouvrir BTTS.
 
+## Pipeline de production (`mtj_model.pipeline`)
+
+Le code qui a produit les courbes de calibration **est** le code qui tourne en
+production — pas de réimplémentation TypeScript de Dixon-Coles, qui finirait par
+diverger et invaliderait le backtest.
+
+```
+Python offline  → entraînement, calibration, backtest
+Python nocturne → calcule les probabilités, ÉCRIT dans Postgres  (nightly)
+Python 6 h      → collecteur de cotes, historise les mouvements   (collector)
+TypeScript      → l'application, qui ne fait que LIRE predictions
+```
+
+L'application ne parle jamais à Python. Elle lit Postgres. **Aucune écriture dans
+`predictions` depuis l'app, jamais** (règle d'archi n°1 et 2).
+
+**Deux jobs DISTINCTS, jamais fusionnés** — les cotes bougent toute la journée,
+les probabilités se figent une fois par nuit :
+
+| Job | Cadence | Écrit | Commande |
+|---|---|---|---|
+| `collector` | toutes les 6 h | `odds_snapshots` | `python -m mtj_model.pipeline.collector` |
+| `nightly` | 1×/jour (~4 h) | `predictions` | `python -m mtj_model.pipeline.nightly` |
+| `health` | surveillance | — (lit `pipeline_runs`) | `python -m mtj_model.pipeline.health` |
+
+Base cible : une seule variable, `MTJ_DATABASE_URL` (chaîne Postgres du pooler
+Supabase). Migration : `packages/db/migrations/0005_predictions_pipeline.sql`.
+
+**Historiser, ne pas écraser.** `predictions` a pour clé `(fixture, marché, jour
+de calcul)` : une ligne par jour. On reconstruit exactement ce qu'on annonçait un
+jour donné — base de l'historique public. Le temps réel lit la dernière ligne.
+
+**Idempotence.** Rejouer une nuit met à jour les mêmes lignes (UPSERT sur la
+clé) — aucun doublon si une nuit échoue puis reprend. Le collecteur : une ligne
+par fenêtre de 6 h.
+
+**Surveillance.** Chaque exécution ouvre/ferme une ligne `pipeline_runs` avec le
+compte de matchs **par championnat et par source** (cote / modèle / repli).
+`health` sort en code ≠ 0 si un job n'a pas réussi depuis > 36 h (nocturne) ou
+> 12 h (collecteur) — à brancher sur l'alerte. Un pipeline mort en silence, c'est
+une semaine de probabilités périmées servies aux utilisateurs.
+
+**Fournisseur de données** encapsulé dans `pipeline/provider.py` (règle d'archi
+n°4) : le reste du pipeline ignore d'où viennent calendrier, résultats et cotes.
+Changer de source (CSV gratuit → API payante) ne touche que ce fichier. Aucune
+implémentation réelle n'est branchée ici (réseau bloqué, pas de clé) : `provider`
+est nul et lève explicitement ; on branche une classe conforme et on la
+sélectionne dans `get_provider()`.
+
+> [!NOTE]
+> `leagues.provider_ref` doit porter le **code football-data** (`E0`, `F1`, …) :
+> c'est la clé qui relie un championnat à sa confiance calibrée
+> (`LEAGUE_CONFIDENCE`) et au ξ de récence.
+
 ## Commandes
 
 ```bash
