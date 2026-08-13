@@ -19,10 +19,13 @@
 
 	onDestroy(() => objectUrls.forEach((u) => URL.revokeObjectURL(u)));
 
-	/** Rasterise le SVG autonome (polices embarquées) en PNG, côté client. */
+	/** Récupère l'image en PNG. Le serveur la rend déjà en PNG ; repli : on
+	 *  rasterise le SVG côté client (canvas) si jamais l'endpoint renvoie du SVG. */
 	async function toPng(): Promise<Blob> {
-		const svgText = await (await fetch(imageUrl)).text();
-		const svgUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+		const blob = await (await fetch(imageUrl)).blob();
+		if (blob.type.includes('png')) return blob;
+
+		const svgUrl = URL.createObjectURL(blob);
 		objectUrls.push(svgUrl);
 		const img = new Image();
 		img.decoding = 'async';

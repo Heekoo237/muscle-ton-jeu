@@ -25,6 +25,7 @@
 		"vitest": "^4.1.10"
 	},
 	"dependencies": {
+		"@resvg/resvg-js": "^2.6.2",
 		"@supabase/ssr": "^0.12.4",
 		"@supabase/supabase-js": "^2.112.3"
 	}
