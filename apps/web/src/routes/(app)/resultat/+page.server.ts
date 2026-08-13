@@ -7,6 +7,7 @@ import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
 import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
 import { computeCharge } from '$lib/server/domain/billing';
+import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
 import type { WritingInput } from '$lib/server/services/writing';
 import type { LineVM, ResultVM, Selection } from '$lib/types';
@@ -71,21 +72,35 @@ export const load: PageServerLoad = async (event) => {
 	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
 	let billing = ticket.billing;
 	if (!billing) {
+		// Trois vérifications pour le ticket offert :
+		//  1) le compte n'a jamais consommé son offre (premier_ticket_utilise faux),
+		//  2) l'empreinte d'appareil n'a pas déjà consommé une offre,
+		//  3) le ticket est substantiel : ≥ 3 sélections analysables, non « tout solide ».
+		const fp = cookies.get('mtj_fp') ?? '';
+		const offreDejaSurAppareil = fp !== '' && (await hasConsumedOffer(fp));
+		const compteEligible = !session.premierTicketUtilise && nbAnalysables >= 3 && !r.rienARetirer;
+		const promoEligible = compteEligible && !offreDejaSurAppareil;
+
 		const charge = computeCharge({
 			nbAnalysables,
-			premierTicket: !session.premierTicketUtilise,
+			premierTicket: promoEligible,
 			rienARetirer: r.rienARetirer
 		});
 
-		if (!charge.gratuit && !charge.bloque) {
+		if (charge.raison === 'premier_ticket') {
+			// Offre accordée : on la consomme à l'affichage réussi (compte + appareil).
+			await recordOfferConsumed(fp);
+			await markPremierTicketUtilise(session.userId);
+		} else if (!charge.gratuit && !charge.bloque) {
 			const cost = charge.credits ?? 0;
 			// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
 			if (session.credits < cost) {
-				redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
+				// Empreinte déjà servie sur un compte neuf : message honnête, sans reproche.
+				const motif = compteEligible && offreDejaSurAppareil ? '&motif=empreinte' : '';
+				redirect(303, `/recharge?besoin=${cost}&retour=/resultat${motif}`);
 			}
 			await record(session.userId, -cost, 'debit_analyse', ticket.id); // débit à l'affichage
 		}
-		if (!session.premierTicketUtilise) await markPremierTicketUtilise(session.userId);
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
 		// Fige le texte rendu : l'historique le relira à vie, sans jamais refacturer.

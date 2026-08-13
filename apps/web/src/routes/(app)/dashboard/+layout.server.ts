@@ -15,7 +15,11 @@ function dayKey(d = new Date()): string {
  */
 export const load: LayoutServerLoad = async (event) => {
 	const session = await getAppSession(event);
-	if (!session) redirect(303, '/connexion?retour=/dashboard');
+	if (!session) {
+		// Route protégée : on revient exactement là où l'utilisateur voulait aller.
+		const cible = event.url.pathname + event.url.search;
+		redirect(303, `/connexion?retour=${encodeURIComponent(cible)}`);
+	}
 
 	const recharge = await hasRecharged(session.userId);
 

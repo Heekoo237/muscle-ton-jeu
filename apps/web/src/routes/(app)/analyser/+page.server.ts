@@ -13,7 +13,11 @@ import { getAppSession } from '$lib/server/session';
  */
 export const load: PageServerLoad = async (event) => {
 	const session = await getAppSession(event);
-	return { ticketOffert: !session || !session.premierTicketUtilise };
+	return {
+		ticketOffert: !session || !session.premierTicketUtilise,
+		// Bandeau « premier ticket offert » pour un compte tout juste créé (?offert=1).
+		offert: event.url.searchParams.get('offert') === '1'
+	};
 };
 
 /**

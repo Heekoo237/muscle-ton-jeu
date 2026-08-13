@@ -3,6 +3,9 @@
 	// Page autonome : bandeau défilant en haut, son propre pied de page en bas
 	// (donc hors du groupe (public) qui ajoute nav + footer).
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	const ANTON = "'Anton', Impact, sans-serif";
 	const MONO = "'JetBrains Mono', ui-monospace, monospace";
@@ -67,6 +70,18 @@
 
 <div style="background:#F8F1E4;font-family:var(--font-body);color:#24201B">
 
+	<!-- ═══ 0 · BARRE DE NAVIGATION ═══ -->
+	<!-- Wordmark à gauche, entrée de compte à droite. L'auth n'est JAMAIS en accent :
+	     le seul accent au-dessus de la ligne de flottaison reste « Analyser mon ticket ». -->
+	<nav style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,3.5vw,40px);box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px">
+		<a href="/" style="font-family:{ANTON};font-size:20px;line-height:1;letter-spacing:-0.5px;text-transform:uppercase;color:#24201B;text-decoration:none">Muscle Ton Jeu</a>
+		{#if data.connecte}
+			<a class="authlink" href="/dashboard">Mon compte</a>
+		{:else}
+			<a class="authlink" href="/connexion">Se connecter</a>
+		{/if}
+	</nav>
+
 	<!-- ═══ 1 · BANDEAU DÉFILANT ═══ -->
 	<div style="background:#24201B;overflow:hidden;padding:14px 0">
 		<div class="marquee-track" style="display:flex;width:max-content">
@@ -84,7 +99,6 @@
 	<div style="background:linear-gradient(180deg,#FBEAE3 0%,#F8F1E4 100%);border-bottom:1px solid #E2D6C0;overflow:hidden">
 		<div style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,80px) clamp(16px,3.5vw,40px);box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:clamp(28px,4vw,64px)">
 			<div style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:20px">
-				<div style="font-family:{ANTON};font-size:18px;line-height:1;letter-spacing:-0.4px;text-transform:uppercase">Muscle Ton Jeu</div>
 				<h1 style="margin:0;font-family:{ANTON};font-weight:400;font-size:clamp(44px,5.2vw,72px);line-height:1;letter-spacing:-1.2px;text-transform:uppercase;text-wrap:balance">Un match va faire<br />tomber ton ticket</h1>
 				<div style="font-size:18px;line-height:1.45;color:#4A4238;max-width:34ch">Envoie la capture. On te montre lequel, et ta version renforcée.</div>
 				<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:#C93A1A;color:#F8F1E4;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Analyser mon ticket gratuitement</a>
@@ -358,6 +372,31 @@
 		}
 		to {
 			transform: translate3d(-50%, 0, 0);
+		}
+	}
+	/* Entrée de compte : contour sobre sur desktop, simple lien texte sur mobile
+	   (jamais de menu hamburger, jamais d'accent de marque). */
+	.authlink {
+		display: inline-flex;
+		align-items: center;
+		height: 44px;
+		padding: 0 16px;
+		border: 1px solid #c9b79a;
+		border-radius: 999px;
+		font-weight: 600;
+		font-size: 16px;
+		color: #24201b;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	@media (max-width: 559px) {
+		.authlink {
+			border: none;
+			padding: 0;
+			height: auto;
+			text-decoration: underline;
+			text-decoration-color: #c9b79a;
+			text-underline-offset: 2px;
 		}
 	}
 	.marquee-track {

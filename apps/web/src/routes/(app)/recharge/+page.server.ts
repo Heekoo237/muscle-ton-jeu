@@ -15,12 +15,19 @@ export const load: PageServerLoad = async (event) => {
 	if (!session) redirect(303, '/connexion?retour=/recharge');
 	const { url } = event;
 	const besoin = Number(url.searchParams.get('besoin')) || 0;
+	// Message honnête quand le ticket offert a déjà servi sur l'appareil : aucun
+	// reproche, juste le fait et la sortie (recharge).
+	const message =
+		url.searchParams.get('motif') === 'empreinte'
+			? 'Le ticket offert a déjà été utilisé sur cet appareil. Recharge à partir de 500 F pour continuer.'
+			: null;
 	return {
 		besoin, // > 0 quand on arrive par le blocage d'affichage
 		credits: session.credits,
 		retour: safeReturn(url),
 		packs: PACKS,
-		featured: besoin > 0 ? featuredPack(besoin) : 'ticket'
+		featured: besoin > 0 ? featuredPack(besoin) : 'ticket',
+		message
 	};
 };
 

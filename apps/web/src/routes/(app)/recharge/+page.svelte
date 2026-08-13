@@ -27,6 +27,10 @@
 		<h1 class="t-h1">Recharger</h1>
 	{/if}
 
+	{#if data.message}
+		<p class="t-body message" role="note">{data.message}</p>
+	{/if}
+
 	<form method="POST" action="?/payer" class="packs">
 		<input type="hidden" name="retour" value={data.retour} />
 		<label class="field-label t-small" for="msisdn">Ton numéro Mobile Money</label>
@@ -73,6 +77,14 @@
 	.garde {
 		color: var(--c-ink-2);
 		margin: var(--s-3) 0 var(--s-8);
+	}
+	.message {
+		background: var(--c-ocre-wash);
+		border: 1px solid var(--c-ocre-line);
+		border-radius: var(--r-md);
+		padding: var(--s-3) var(--s-4);
+		color: var(--c-ink);
+		margin: 0 0 var(--s-6);
 	}
 	.field-label {
 		display: block;

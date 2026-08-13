@@ -37,30 +37,40 @@ const memLedger: { motif: LedgerReason }[] = [];
 /*  Interface publique (async)                                               */
 /* ------------------------------------------------------------------------ */
 
-/** Trouve ou crée l'utilisateur applicatif lié à un compte Google. */
-export async function ensureAppUser(
+/**
+ * Trouve ou crée l'utilisateur applicatif lié à un compte Google, en indiquant
+ * s'il vient d'être créé (`isNew`) — utile pour router un compte neuf différemment.
+ */
+export async function ensureAppUserDetailed(
 	googleId: string,
 	email: string,
 	prenom: string
-): Promise<AppUser> {
-	if (!isSupabaseConfigured()) return memUser;
+): Promise<{ user: AppUser; isNew: boolean }> {
+	if (!isSupabaseConfigured()) return { user: memUser, isNew: false };
 	const sb = supabaseAdmin();
 	const { data: found } = await sb
 		.from('users')
 		.select('id, prenom, email, credits, premier_ticket_utilise')
 		.eq('google_id', googleId)
 		.maybeSingle();
-	let row = found;
-	if (!row) {
-		const { data: created, error } = await sb
-			.from('users')
-			.insert({ google_id: googleId, email, prenom })
-			.select('id, prenom, email, credits, premier_ticket_utilise')
-			.single();
-		if (error) throw error;
-		row = created;
-	}
-	return toAppUser(row);
+	if (found) return { user: toAppUser(found), isNew: false };
+	const { data: created, error } = await sb
+		.from('users')
+		.insert({ google_id: googleId, email, prenom })
+		.select('id, prenom, email, credits, premier_ticket_utilise')
+		.single();
+	if (error) throw error;
+	return { user: toAppUser(created), isNew: true };
+}
+
+/** Trouve ou crée l'utilisateur applicatif lié à un compte Google. */
+export async function ensureAppUser(
+	googleId: string,
+	email: string,
+	prenom: string
+): Promise<AppUser> {
+	const { user } = await ensureAppUserDetailed(googleId, email, prenom);
+	return user;
 }
 
 export async function getUserById(userId: number): Promise<AppUser | null> {

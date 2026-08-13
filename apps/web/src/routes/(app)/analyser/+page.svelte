@@ -1,11 +1,26 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { enhance, applyAction } from '$app/forms';
 	import type { PageData } from './$types';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	// Empreinte d'appareil : marqueur local persistant, posé en cookie pour que le
+	// serveur puisse vérifier la gratuité du premier ticket (indicatif, non bloquant).
+	onMount(() => {
+		try {
+			let fp = localStorage.getItem('mtj_fp');
+			if (!fp) {
+				fp = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+				localStorage.setItem('mtj_fp', fp);
+			}
+			document.cookie = `mtj_fp=${fp}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+		} catch {
+			// stockage indisponible (navigation privée stricte) : empreinte ignorée
+		}
+	});
 
 	// Écran de lecture : pendant l'analyse, on montre un état réel qui avance
 	// (on lit → on reconnaît → on calcule), sur fond de bandeau d'ambiance. Pas de
@@ -52,6 +67,10 @@
 <FlowHeader title="Analyser un ticket" back="/" />
 
 <main class="container">
+	{#if data.offert}
+		<div class="offert-banner t-body">Ton premier ticket est offert.</div>
+	{/if}
+
 	<p class="t-body-lg intro measure">Envoie 1 à 3 captures de ton ticket. Rien d'autre.</p>
 
 	<form
@@ -150,6 +169,14 @@
 <style>
 	main {
 		padding-top: var(--s-6);
+	}
+	.offert-banner {
+		background: var(--c-accent-wash);
+		border: 1px solid var(--c-accent-line);
+		border-radius: var(--r-md);
+		padding: var(--s-3) var(--s-4);
+		color: var(--c-ink);
+		margin-bottom: var(--s-4);
 	}
 	.intro {
 		color: var(--c-ink-2);
