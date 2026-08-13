@@ -1,4 +1,7 @@
-"""Sources des données : 6 championnats × 3 saisons, football-data.co.uk.
+"""Sources des données : championnats × saisons, football-data.co.uk.
+
+Tout est piloté par la CONFIGURATION (`config/leagues.toml`) : ajouter un
+championnat ou une saison est une ligne de config, pas du code.
 
 Source CANONIQUE : football-data.co.uk (gratuit, résultats + cotes de clôture).
 Dans cet environnement, l'accès à ce domaine est bloqué par la politique réseau ;
@@ -6,45 +9,32 @@ on récupère alors les MÊMES fichiers gratuits depuis un miroir GitHub public.
 Le choix se fait par la variable d'environnement `MTJ_DATA_SOURCE` :
 
     MTJ_DATA_SOURCE=footballdata   # source officielle (production / réseau ouvert)
-    MTJ_DATA_SOURCE=mirror         # miroir GitHub (défaut ici)
+    MTJ_DATA_SOURCE=mirror         # miroir GitHub (défaut ici, dépannage réseau)
 
-Changer de source est un one-liner : rien d'autre dans le pipeline n'en dépend.
+⚠️ Le miroir est un DÉPANNAGE, pas une dépendance de production (voir README).
 """
 from __future__ import annotations
 
 import os
+import tomllib
+from pathlib import Path
 
-# Championnats couverts (code football-data → nom, pays).
-# Seuls les championnats que football-data.co.uk fournit AVEC cotes de clôture.
-# Non disponibles sur cette source : Saudi Pro League, Champions League, Euro,
-# CAN (sélections), Argentine et Brésil (présents seulement dans les « Extra
-# Leagues » de football-data, format différent et cotes réduites).
-LEAGUES: dict[str, tuple[str, str]] = {
-    "E0": ("Premier League", "Angleterre"),
-    "F1": ("Ligue 1", "France"),
-    "SP1": ("La Liga", "Espagne"),
-    "I1": ("Serie A", "Italie"),
-    "D1": ("Bundesliga", "Allemagne"),
-    "P1": ("Liga Portugal", "Portugal"),
-    "B1": ("Jupiler Pro League", "Belgique"),
-    "N1": ("Eredivisie", "Pays-Bas"),
-    "T1": ("Süper Lig", "Turquie"),
-    "G1": ("Super League", "Grèce"),
-    "SC0": ("Scottish Premiership", "Écosse"),
-}
-
-# 3 saisons complètes. Pour chaque code de saison football-data (ex. "2324") :
-#   - le code officiel dans l'URL mmz4281
-#   - le dossier correspondant dans le miroir (dataYYYY = saison DÉBUTANT en YYYY,
-#     vérifié par les fenêtres de dates : data2022 = saison 2022-2023).
-SEASONS: dict[str, dict[str, str]] = {
-    "2223": {"label": "2022-2023", "fd": "2223", "mirror": "data2022"},
-    "2324": {"label": "2023-2024", "fd": "2324", "mirror": "data2023"},
-    "2425": {"label": "2024-2025", "fd": "2425", "mirror": "data2024"},
-}
+PKG_ROOT = Path(__file__).resolve().parents[2]  # packages/model
+CONFIG_PATH = Path(os.environ.get("MTJ_LEAGUES_CONFIG", PKG_ROOT / "config" / "leagues.toml"))
 
 _FOOTBALLDATA_BASE = "https://www.football-data.co.uk/mmz4281"
 _MIRROR_BASE = "https://raw.githubusercontent.com/LorEri2/StatsMax/main/CSV_Data"
+
+
+def _load_config() -> tuple[dict[str, tuple[str, str]], dict[str, dict[str, str]]]:
+    with open(CONFIG_PATH, "rb") as f:
+        cfg = tomllib.load(f)
+    leagues = {code: (v[0], v[1]) for code, v in cfg["leagues"].items()}
+    seasons = {s["code"]: {"label": s["label"], "fd": s["fd"], "mirror": s["mirror"]} for s in cfg["seasons"]}
+    return leagues, seasons
+
+
+LEAGUES, SEASONS = _load_config()
 
 
 def data_source() -> str:
@@ -60,5 +50,5 @@ def csv_url(div: str, season_code: str) -> str:
 
 
 def all_targets() -> list[tuple[str, str]]:
-    """Toutes les paires (championnat, saison) à charger — 6 × 3 = 18."""
+    """Toutes les paires (championnat, saison) à charger."""
     return [(div, code) for code in SEASONS for div in LEAGUES]

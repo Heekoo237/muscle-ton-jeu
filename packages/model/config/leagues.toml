@@ -1,0 +1,43 @@
+# Configuration des données du backtest.
+# Ajouter un championnat ou une saison = UNE LIGNE ici. Aucun code à toucher.
+
+# ── Championnats ────────────────────────────────────────────────────────────
+# Clé  = code football-data (E0, F1, …).  Valeur = [ "Nom affiché", "Pays" ].
+# On démarre sur 11 championnats européens de 1re division. Pour élargir aux
+# ligues secondaires ou non-européennes, ajouter simplement une ligne (à
+# condition que la source la fournisse — voir README).
+[leagues]
+E0  = ["Premier League", "Angleterre"]
+F1  = ["Ligue 1", "France"]
+SP1 = ["La Liga", "Espagne"]
+I1  = ["Serie A", "Italie"]
+D1  = ["Bundesliga", "Allemagne"]
+P1  = ["Liga Portugal", "Portugal"]
+B1  = ["Jupiler Pro League", "Belgique"]
+N1  = ["Eredivisie", "Pays-Bas"]
+T1  = ["Süper Lig", "Turquie"]
+G1  = ["Super League", "Grèce"]
+SC0 = ["Scottish Premiership", "Écosse"]
+
+# ── Saisons ─────────────────────────────────────────────────────────────────
+# code   = code saison football-data (utilisé pour nommer les fichiers locaux)
+# label  = libellé lisible
+# fd     = code officiel dans l'URL mmz4281 (source officielle)
+# mirror = dossier correspondant dans le miroir GitHub (dépannage réseau)
+[[seasons]]
+code = "2223"
+label = "2022-2023"
+fd = "2223"
+mirror = "data2022"
+
+[[seasons]]
+code = "2324"
+label = "2023-2024"
+fd = "2324"
+mirror = "data2023"
+
+[[seasons]]
+code = "2425"
+label = "2024-2025"
+fd = "2425"
+mirror = "data2024"

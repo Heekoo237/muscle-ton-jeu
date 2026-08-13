@@ -8,10 +8,7 @@ Squelette — implémentation en Session 7.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import numpy as np
+import numpy as np
 
 # Doit rester synchronisé avec `market` (SQL) et `Market` (TS).
 COVERED_MARKETS = (
@@ -22,8 +19,8 @@ COVERED_MARKETS = (
 )
 
 
-def market_probabilities(matrix: "np.ndarray") -> dict[str, float]:
-    """Somme la grille de scores en probabilités de marché.
+def market_probabilities(matrix: np.ndarray) -> dict[str, float]:
+    """Somme la grille de scores 7×7 en probabilités des 14 marchés couverts.
 
     | Marché        | Calcul                                  |
     |---------------|-----------------------------------------|
@@ -32,4 +29,34 @@ def market_probabilities(matrix: "np.ndarray") -> dict[str, float]:
     | OVER_N        | cases où total > N                      |
     | BTTS_YES      | cases où les deux valeurs > 0           |
     """
-    raise NotImplementedError("Session 7 — sommation de la grille par marché")
+    n = matrix.shape[0]
+    idx = np.arange(n)
+    home = idx[:, None]
+    away = idx[None, :]
+    total = home + away
+
+    win_home = float(matrix[home > away].sum())
+    draw = float(np.trace(matrix))
+    win_away = float(matrix[home < away].sum())
+
+    over_15 = float(matrix[total >= 2].sum())
+    over_25 = float(matrix[total >= 3].sum())
+    over_35 = float(matrix[total >= 4].sum())
+    btts_yes = float(matrix[(home >= 1) & (away >= 1)].sum())
+
+    return {
+        "WIN_HOME": win_home,
+        "DRAW": draw,
+        "WIN_AWAY": win_away,
+        "DC_HOME_DRAW": win_home + draw,
+        "DC_DRAW_AWAY": draw + win_away,
+        "DC_HOME_AWAY": win_home + win_away,
+        "OVER_1_5": over_15,
+        "UNDER_1_5": 1.0 - over_15,
+        "OVER_2_5": over_25,
+        "UNDER_2_5": 1.0 - over_25,
+        "OVER_3_5": over_35,
+        "UNDER_3_5": 1.0 - over_35,
+        "BTTS_YES": btts_yes,
+        "BTTS_NO": 1.0 - btts_yes,
+    }
