@@ -29,8 +29,13 @@ def dsn() -> str:
 
 @contextmanager
 def connect():
-    """Connexion transactionnelle (commit explicite, rollback si exception)."""
-    with psycopg.connect(dsn()) as con:
+    """Connexion transactionnelle (commit explicite, rollback si exception).
+
+    `prepare_threshold=None` désactive les requêtes préparées côté serveur :
+    obligatoire avec le pooler « transaction » de Supabase (pgbouncer), qui ne
+    les conserve pas d'une transaction à l'autre.
+    """
+    with psycopg.connect(dsn(), prepare_threshold=None) as con:
         try:
             yield con
             con.commit()

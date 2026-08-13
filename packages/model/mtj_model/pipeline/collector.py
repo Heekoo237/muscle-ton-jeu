@@ -63,30 +63,42 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
         )
 
     detail: dict[str, int] = defaultdict(int)
+    erreurs: dict[str, str] = {}
     total = 0
     with connect() as con:
         run_id = _open_run(con)
-        try:
-            for lg in league_worklist(con):
-                odds = provider.odds(lg["odds_api_key"], days_ahead=days)
-                fixture_cache: dict[str, int] = {}
-                for o in odds:
-                    fid = fixture_cache.get(o.fixture_ref)
-                    if fid is None:
-                        fid = resolve_fixture(con, lg["league_id"], o)
-                        fixture_cache[o.fixture_ref] = fid
-                    _write_snapshot(con, fid, o.marche, o.bookmaker, o.cote, fenetre)
-                    detail[lg["fd_code"]] += 1
-                    total += 1
-            _close_run(con, run_id, "success", total, dict(detail) | {"fenetre": fenetre.isoformat()})
-        except Exception as exc:  # noqa: BLE001
-            _close_run(con, run_id, "failed", total, dict(detail), erreur=str(exc)[:2000])
-            raise
+        leagues = league_worklist(con)
+        for lg in leagues:
+            # Un championnat qui échoue (clé de sport erronée, 404, réseau) ne doit
+            # PAS faire tomber les autres. Point de reprise (savepoint) par ligue :
+            # ce qui échoue est annulé seul, le reste est conservé.
+            try:
+                with con.transaction():
+                    odds = provider.odds(lg["odds_api_key"], days_ahead=days)
+                    fixture_cache: dict[str, int] = {}
+                    for o in odds:
+                        fid = fixture_cache.get(o.fixture_ref)
+                        if fid is None:
+                            fid = resolve_fixture(con, lg["league_id"], o)
+                            fixture_cache[o.fixture_ref] = fid
+                        _write_snapshot(con, fid, o.marche, o.bookmaker, o.cote, fenetre)
+                        detail[lg["fd_code"]] += 1
+                        total += 1
+            except Exception as exc:  # noqa: BLE001
+                erreurs[lg["fd_code"]] = str(exc)[:300]
 
-    print(f"Collecteur {fenetre:%Y-%m-%d %H:%M UTC} : {total} cotes relevées.")
+        statut = "success" if not erreurs else ("failed" if len(erreurs) == len(leagues) else "partial")
+        journal = dict(detail) | {"fenetre": fenetre.isoformat()}
+        if erreurs:
+            journal["erreurs"] = erreurs
+        _close_run(con, run_id, statut, total, journal, erreur="; ".join(erreurs) or None)
+
+    print(f"Collecteur {fenetre:%Y-%m-%d %H:%M UTC} : {total} cotes relevées ({statut}).")
     for lg, n in sorted(detail.items()):
         print(f"  {lg:<5} {n:>4} cotes")
-    return {"fenetre": fenetre.isoformat(), "snapshots": total, "detail": dict(detail)}
+    for lg, e in sorted(erreurs.items()):
+        print(f"  {lg:<5} ÉCHEC : {e}")
+    return {"fenetre": fenetre.isoformat(), "snapshots": total, "statut": statut, "erreurs": erreurs}
 
 
 def main() -> None:

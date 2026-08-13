@@ -1,0 +1,67 @@
+name: Collecte des cotes
+
+# Deux façons de se déclencher :
+#  - automatiquement toutes les 6 heures (le collecteur) ;
+#  - à la main (bouton « Run workflow »), pour vérifier la couverture, créer les
+#    tables, ou lancer une collecte de test.
+#
+# ⚠️ Le déclenchement AUTOMATIQUE (schedule) ne fonctionne que depuis la branche
+# par défaut du dépôt (main). Sur une autre branche, seul le bouton manuel marche.
+on:
+  schedule:
+    - cron: '0 */6 * * *'      # toutes les 6 h (heure UTC)
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Quoi lancer"
+        type: choice
+        default: collecter
+        options:
+          - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
+          - migrer-base           # crée/complète les tables dans Supabase
+          - collecter             # relève les cotes une fois
+
+concurrency:
+  group: collecte-cotes          # jamais deux collectes en même temps
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/model
+    env:
+      MTJ_PROVIDER: oddsapi
+      MTJ_PROVIDER_KEY: ${{ secrets.MTJ_PROVIDER_KEY }}
+      MTJ_DATABASE_URL: ${{ secrets.MTJ_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer le paquet et ses dépendances
+        run: pip install -e .
+
+      - name: Vérifier la couverture des 11 championnats
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-couverture'
+        run: python -m mtj_model.pipeline.verify
+
+      - name: Créer / compléter les tables (migrations)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'migrer-base'
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog; do
+            echo "== migration $f =="
+            psql "$MTJ_DATABASE_URL" -v ON_ERROR_STOP=1 -f ../db/migrations/$f.sql
+          done
+
+      - name: Collecter les cotes
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')
+        run: python -m mtj_model.pipeline.collector
+
+      - name: Surveillance (fraîcheur des jobs)
+        if: github.event_name == 'schedule'
+        run: python -m mtj_model.pipeline.health
