@@ -17,5 +17,12 @@ import math
 #
 # Décision : on se place au MILIEU du plateau (365 j), pas à son extrémité.
 # ⚠️ À RECALIBRER quand on ajoutera des saisons : l'optimum pourrait raccourcir.
+#
+# ξ UNIQUE (pas par ligue) : vérifié par championnat, les optima ne basculent
+# qu'entre 240 et 480 j sur des écarts dans le bruit (parfois 0,0001 nat/match).
+# Avec ~230-380 matchs de test par ligue, une décote par championnat n'est pas
+# identifiable — la régler reviendrait à surapprendre le bruit. On garde un ξ
+# global ; c'est la calibration PAR CHAMPIONNAT (étape 4) qui décide de la
+# couverture, pas ξ.
 RECENCY_HALF_LIFE_DAYS = 365.0
 XI_PER_DAY = math.log(2.0) / RECENCY_HALF_LIFE_DAYS  # ≈ 0.001899 par jour
