@@ -9,7 +9,7 @@ import { getUser } from '$lib/server/fixtures/userStore';
 export class FakeAuth implements AuthService {
 	async currentSession(token?: string): Promise<UserSession | null> {
 		if (token !== 'demo') return null;
-		const u = getUser();
+		const u = await getUser();
 		return { userId: u.id, prenom: u.prenom, email: u.email, credits: u.credits };
 	}
 

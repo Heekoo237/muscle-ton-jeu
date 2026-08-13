@@ -31,7 +31,7 @@ async function writeSafely(input: WritingInput): Promise<string> {
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
-	const ticket = id ? getTicket(id) : undefined;
+	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
 
 	// 0. Mur de connexion : après l'analyse, juste avant le résultat (PRD §7).
@@ -69,7 +69,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
 	let billing = ticket.billing;
 	if (!billing) {
-		const user = getUser();
+		const user = await getUser();
 		const charge = computeCharge({
 			nbAnalysables,
 			premierTicket: !user.premierTicketUtilise,
@@ -82,12 +82,12 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			if (user.credits < cost) {
 				redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
 			}
-			record(-cost, 'debit_analyse', ticket.id); // débit à l'affichage
+			await record(-cost, 'debit_analyse', ticket.id); // débit à l'affichage
 		}
-		if (!user.premierTicketUtilise) markPremierTicketUtilise();
+		if (!user.premierTicketUtilise) await markPremierTicketUtilise();
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
-		updateTicket(ticket.id, {
+		await updateTicket(ticket.id, {
 			statut: 'analyse',
 			billing,
 			result: {
@@ -121,7 +121,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	};
 	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
 	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
-	return { ticketId: ticket.id, vm, gratuit: billing.gratuit, montreRecharge: !hasRecharged() };
+	return { ticketId: ticket.id, vm, gratuit: billing.gratuit, montreRecharge: !(await hasRecharged()) };
 };
 
 export const actions: Actions = {

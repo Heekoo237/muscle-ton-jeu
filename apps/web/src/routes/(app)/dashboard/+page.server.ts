@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	}
 
 	// Zone 3 — Mes tickets.
-	const tickets: TicketCardVM[] = listAnalysedTickets().map((t) => {
+	const tickets: TicketCardVM[] = (await listAnalysedTickets()).map((t) => {
 		const nbMatchs = t.selections.filter((s) => s.etatResolution === 'certain').length;
 		return {
 			id: t.id,
@@ -69,7 +69,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	}
 
 	// Encart premier passage : après le ticket offert, avant la première recharge.
-	const user = getUser();
+	const user = await getUser();
 	const dernier = tickets[0];
 	const prochainCout = dernier ? (creditCost(dernier.nbMatchs) ?? 2) : 2;
 
@@ -77,7 +77,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		daily,
 		tickets,
 		bilan,
-		premierPassage: user.premierTicketUtilise && !hasRecharged(),
+		premierPassage: user.premierTicketUtilise && !(await hasRecharged()),
 		prochainCout
 	};
 };

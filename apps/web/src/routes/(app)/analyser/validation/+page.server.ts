@@ -30,7 +30,7 @@ export interface ValidationLineVM extends Selection {
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
-	const ticket = id ? getTicket(id) : undefined;
+	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
@@ -48,7 +48,7 @@ export const actions: Actions = {
 	// Résout une ligne ambiguë avec le marché choisi par l'utilisateur (jamais deviné).
 	corriger: async ({ cookies, request }) => {
 		const id = cookies.get('ticketId');
-		const ticket = id ? getTicket(id) : undefined;
+		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
 
 		const form = await request.formData();
@@ -68,29 +68,29 @@ export const actions: Actions = {
 				libelleFr: marketLabelFr(marche, home, away)
 			};
 		});
-		updateTicket(ticket.id, { selections });
+		await updateTicket(ticket.id, { selections });
 		redirect(303, '/analyser/validation');
 	},
 
 	// Retire une ligne non reconnue : elle sort du ticket, jamais facturée.
 	retirer: async ({ cookies, request }) => {
 		const id = cookies.get('ticketId');
-		const ticket = id ? getTicket(id) : undefined;
+		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
 
 		const form = await request.formData();
 		const ordre = Number(form.get('ordre'));
 		const selections = ticket.selections.filter((s) => s.ordre !== ordre);
-		updateTicket(ticket.id, { selections });
+		await updateTicket(ticket.id, { selections });
 		redirect(303, '/analyser/validation');
 	},
 
 	// Valide la lecture : le ticket passe en « valide », direction le résultat.
 	finaliser: async ({ cookies }) => {
 		const id = cookies.get('ticketId');
-		const ticket = id ? getTicket(id) : undefined;
+		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
-		updateTicket(ticket.id, { statut: 'valide' });
+		await updateTicket(ticket.id, { statut: 'valide' });
 		redirect(303, '/resultat');
 	}
 };

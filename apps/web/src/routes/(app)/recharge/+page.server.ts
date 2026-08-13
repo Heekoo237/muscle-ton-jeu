@@ -12,7 +12,7 @@ function safeReturn(url: URL): string {
 
 export const load: PageServerLoad = async ({ url }) => {
 	const besoin = Number(url.searchParams.get('besoin')) || 0;
-	const user = getUser();
+	const user = await getUser();
 	return {
 		besoin, // > 0 quand on arrive par le blocage d'affichage
 		credits: user.credits,
@@ -36,7 +36,7 @@ export const actions: Actions = {
 		if (!pack) return fail(400, { message: 'Pack inconnu' });
 
 		const credits = pack.credits === 'illimite' ? 999 : pack.credits;
-		const user = getUser();
+		const user = await getUser();
 		const intent = await payment.initiate({
 			userId: user.id,
 			montant: pack.prix,
@@ -44,7 +44,8 @@ export const actions: Actions = {
 			msisdn
 		});
 
-		trackRecharge(intent.txnId, { credits, retour, packNom: pack.nom });
-		redirect(303, `/recharge/attente?txn=${encodeURIComponent(intent.txnId)}`);
+		await trackRecharge(intent.txnId, { credits, montant: pack.prix });
+		const q = new URLSearchParams({ txn: intent.txnId, retour });
+		redirect(303, `/recharge/attente?${q.toString()}`);
 	}
 };

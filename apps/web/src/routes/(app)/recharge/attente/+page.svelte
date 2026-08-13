@@ -16,7 +16,7 @@
 		<div class="pulse" aria-hidden="true"></div>
 		<h1 class="t-h1">On vérifie encore.</h1>
 		<p class="t-body-lg intro">
-			Ton paiement {data.packNom} peut prendre quelques secondes. Reste ici, on te crédite dès que c'est confirmé.
+			Ton paiement peut prendre quelques secondes. Reste ici, on te crédite dès que c'est confirmé.
 		</p>
 		<a class="t-small support" href="/aide">J'ai payé, je n'ai rien reçu</a>
 	{:else}

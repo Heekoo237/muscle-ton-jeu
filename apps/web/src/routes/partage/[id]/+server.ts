@@ -19,8 +19,8 @@ function esc(s: string): string {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export const GET: RequestHandler = ({ params }) => {
-	const ticket = getTicket(params.id);
+export const GET: RequestHandler = async ({ params }) => {
+	const ticket = await getTicket(params.id);
 	if (!ticket?.result) error(404, 'Ticket introuvable');
 	const { probaTotalePct, probaRenforceePct, nbRetirees } = ticket.result;
 

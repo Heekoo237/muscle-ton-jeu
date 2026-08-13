@@ -17,6 +17,6 @@ export const load: LayoutServerLoad = async ({ cookies }) => {
 		connecte: session !== null,
 		credits: session?.credits ?? 0,
 		prenom: session?.prenom ?? null,
-		montreCredits: hasRecharged()
+		montreCredits: await hasRecharged()
 	};
 };

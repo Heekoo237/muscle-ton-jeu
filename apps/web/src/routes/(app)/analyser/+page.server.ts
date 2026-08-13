@@ -16,7 +16,7 @@ export const actions: Actions = {
 		const raw = await vision.readTicket([]);
 		const [fixtures, teams] = await Promise.all([sports.upcomingFixtures(), sports.teams()]);
 		const selections = resolveTicket(raw, fixtures, teams);
-		const ticket = createTicket(selections);
+		const ticket = await createTicket(selections);
 		cookies.set('ticketId', ticket.id, {
 			path: '/',
 			httpOnly: true,
