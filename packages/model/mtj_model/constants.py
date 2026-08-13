@@ -57,29 +57,49 @@ CONFIDENCE_ON_FALLBACK = "modérée"  # cote absente → modèle en repli, jamai
 # et le mouvement de cote ont été testés et ÉCARTÉS — ils baissent la précision
 # (étape 4.1/4.2) et le mouvement est inconnu au calcul nocturne.
 #
-# Chaque seuil est calé sur le MÊME point de fonctionnement que le 1X2 validé :
-# marquer ~60 % des sélections du marché, rappel ~70 % des perdantes. Les seuils
-# diffèrent parce que les probabilités sont structurellement plus hautes sur les
-# marchés « sûrs » (une double chance médiane est à 0,78, un 1X2 à 0,50) — un
-# seuil unique à 0,55 ne marquerait presque rien en double chance.
+# POINT DE FONCTIONNEMENT = DÉCISION PRODUIT (30 %), pas une convention. Les
+# courbes précision/rappel (fragile.py, _pr_curves) montrent que sur les marchés
+# « cote » la précision monte quand on marque moins ; l'elbow est à ~30 % de
+# sélections marquées (1X2 : précision 60 % vs 56 % à 60 %). En dessous (20 %) on
+# ne gagne que +2 pt de précision pour −12 pt de rappel. On marque donc PEU et
+# JUSTE. Chaque seuil = 30ᵉ centile de la proba affichée du marché.
 #
-# HONNÊTETÉ SUR LE SIGNAL (référence 1X2, seuil 0,55) :
-#   précision 54 %  ·  taux d'échec de base 45,6 %  →  le signal n'est que ~8 pt
-#   au-dessus du hasard. Réel mais MODÉRÉ. Le plancher de 4 sélections (règle d'or
-#   n°3) empêche de vider le ticket même quand beaucoup de sélections sont marquées.
+# HONNÊTETÉ SUR LE SIGNAL (1X2, au point 30 %) :
+#   précision 60 %  ·  taux d'échec de base 45,6 %  →  ~14 pt au-dessus du hasard.
+#   Réel mais modéré. Le plancher de 4 sélections (règle d'or n°3) empêche de
+#   vider le ticket même quand plusieurs sélections sont marquées.
+FRAGILE_OPERATING_POINT = 0.30  # fraction de sélections marquées (décision produit)
 FRAGILE_THRESHOLDS = {
-    "WIN_HOME": 0.55, "DRAW": 0.55, "WIN_AWAY": 0.55,        # 1X2  (base échec 45,6 %)
-    "DC_HOME_DRAW": 0.80, "DC_DRAW_AWAY": 0.80, "DC_HOME_AWAY": 0.80,  # double chance (base 22,2 %)
-    "OVER_1_5": 0.79,     # plus de 1,5 (base 22,9 %)
-    "OVER_2_5": 0.55,     # plus de 2,5 (base 46,6 %)
-    "OVER_3_5": 0.33,     # plus de 3,5 (base 69,1 %)
-    "UNDER_2_5": 0.51,    # moins de 2,5 (base 53,4 %)
+    "WIN_HOME": 0.44, "DRAW": 0.44, "WIN_AWAY": 0.44,        # 1X2  (base échec 45,7 %)
+    "DC_HOME_DRAW": 0.74, "DC_DRAW_AWAY": 0.74, "DC_HOME_AWAY": 0.74,  # double chance (base 22,3 %)
+    "OVER_1_5": 0.72,     # plus de 1,5 (base 23,0 %)
+    "OVER_2_5": 0.48,     # plus de 2,5 (base ~43 %)
+    "OVER_3_5": 0.24,     # plus de 3,5 (base 69,2 %)
+    "UNDER_2_5": 0.42,    # moins de 2,5
 }
 FRAGILE_MIN_SELECTIONS = 4  # plancher du ticket renforcé (règle d'or n°3), jamais moins
 
 # Trace des chiffres qui JUSTIFIENT le seuil 1X2, pour qu'ils restent visibles.
-FRAGILE_1X2_PRECISION = 0.54       # part des sélections marquées qui tombent vraiment
-FRAGILE_1X2_BASE_FAILURE = 0.456   # taux d'échec des favoris d'ouverture sans filtre
+FRAGILE_1X2_PRECISION = 0.60       # au point 30 % : part des marquées qui tombent
+FRAGILE_1X2_BASE_FAILURE = 0.457   # taux d'échec des favoris d'ouverture sans filtre
+
+# ── Badge « fragile » visible vs retrait silencieux mais jamais muet ──────────
+# Sur les marchés « modèle sûr » (double chance, plus de 1,5), la précision est
+# PLATE ~28 % quel que soit le seuil (fragile.py) : le modèle ne sait pas classer
+# les échecs. Y afficher un badge « fragile » rouge crierait au loup (on marquerait
+# des sélections qui passent 3 fois sur 4). Décision produit :
+#   - Badge « fragile » VISIBLE seulement là où la précision dépasse ~50 %.
+#   - Sur les autres marchés, la sélection sert au classement interne du retrait ;
+#     si le renforcement la retire, on l'explique par une MENTION NEUTRE (voir
+#     FRAGILE_NEUTRAL_MENTION) — « on retire sans crier au loup, jamais en silence ».
+FRAGILE_BADGE_VISIBLE = {
+    "WIN_HOME": True, "DRAW": True, "WIN_AWAY": True,   # 1X2 — précision ~60 %
+    "OVER_2_5": True, "UNDER_2_5": True,                # plus/moins 2,5 — ~50 %
+    "OVER_3_5": True,                                   # plus de 3,5 — précision ~78 %
+    "DC_HOME_DRAW": False, "DC_DRAW_AWAY": False, "DC_HOME_AWAY": False,  # double chance
+    "OVER_1_5": False,                                  # plus de 1,5
+}
+FRAGILE_NEUTRAL_MENTION = "la moins solide de ton ticket"  # retrait sans badge « fragile »
 
 
 # ── Confiance affichée PAR CHAMPIONNAT ───────────────────────────────────────

@@ -108,14 +108,26 @@ marché**. Testé sur 60 000 tickets synthétiques de 6-12 sélections.
 - **Définition retenue : probabilité seule.** Le désaccord modèle/marché et le
   mouvement de cote ont été testés puis **écartés** : ils baissent la précision
   (4.1/4.2), et le mouvement n'existe pas encore au calcul nocturne.
-- **Seuil PAR MARCHÉ**, pas unique : les probas sont plus hautes sur les marchés
-  sûrs. `WIN_*` 0,55 · double chance 0,80 · plus de 1,5 → 0,79 · plus de 2,5 →
-  0,55 · plus de 3,5 → 0,33 · moins de 2,5 → 0,51. Chaque seuil marque ~60 % des
-  sélections du marché (même point de fonctionnement que le 1X2 validé).
-- **Honnêteté du signal (1X2)** : précision **54 %** pour un taux d'échec de base
-  **45,6 %** → réel mais **modéré** (~8 pt au-dessus du hasard). Chiffres figés
-  dans `constants.py` (`FRAGILE_1X2_PRECISION`, `FRAGILE_1X2_BASE_FAILURE`) pour
-  qu'ils restent sous les yeux et ne soient pas oubliés.
+- **Point de fonctionnement = décision produit : 30 % de sélections marquées.**
+  Les courbes précision/rappel (`fragile.py`, `_pr_curves`) montrent un elbow à
+  ~30 % sur les marchés « cote » : on marque **peu et juste** (1X2 précision 60 %
+  vs 56 % si on marque 60 %). En dessous (20 %), +2 pt de précision coûtent
+  −12 pt de rappel.
+- **Seuil PAR MARCHÉ** (30ᵉ centile de la proba affichée) : `WIN_*` 0,44 · double
+  chance 0,74 · plus de 1,5 → 0,72 · plus de 2,5 → 0,48 · plus de 3,5 → 0,24 ·
+  moins de 2,5 → 0,42.
+- **Deux régimes de précision.** Sur les marchés « cote » (1X2, plus/moins 2,5) la
+  précision **répond** au seuil (~50-60 %). Sur les marchés « modèle sûr » (double
+  chance, plus de 1,5) elle est **plate ~28 %** : le modèle ne sait pas classer
+  les échecs. → **Badge « fragile » visible seulement là où la précision dépasse
+  ~50 %** (`FRAGILE_BADGE_VISIBLE`). Sur les autres, la sélection sert au
+  classement interne du retrait ; si on la retire, on l'explique par une **mention
+  neutre** (« la moins solide de ton ticket ») — on retire sans crier au loup,
+  **jamais en silence**.
+- **Honnêteté du signal (1X2, point 30 %)** : précision **60 %** pour un taux
+  d'échec de base **45,7 %** → réel mais **modéré** (~14 pt au-dessus du hasard).
+  Chiffres figés dans `constants.py` (`FRAGILE_1X2_PRECISION`,
+  `FRAGILE_1X2_BASE_FAILURE`) pour qu'ils restent sous les yeux.
 - **Ordre de grandeur produit** (dépend du type de ticket) :
   - 9 **favoris 1X2 purs** : brut médiane **0,22 %** → renforcé ~14 % (pire cas,
     peu joué en vrai).
