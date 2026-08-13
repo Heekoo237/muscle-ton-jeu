@@ -75,3 +75,14 @@ d'évaluation). Un seul cas est ignoré, au niveau du MATCH, pas du championnat 
 le **tout premier match d'une équipe promue**, tant qu'elle n'a aucun historique
 (≈ 17 matchs sur ≈ 3 462, soit 0,5 %). Dès son premier match joué, l'équipe entre
 dans l'historique et devient prédictible. Aucun championnat n'est donc exclu.
+
+**Valeur retenue** : demi-vie **365 jours** (ξ ≈ 0,0019/jour), voir
+`constants.py`. La courbe log-vraisemblance est plate de 180 à 540 jours ; on se
+place au milieu du plateau, pas à son extrémité (l'optimum brut ~500 j est
+probablement surestimé, faute de vieux matchs à sous-pondérer avec 3 saisons).
+
+> [!WARNING]
+> **ξ est à RECALIBRER quand on ajoutera des saisons.** Avec plus d'historique,
+> l'optimum de la demi-vie pourrait raccourcir. Relancer `python -m
+> mtj_model.calibrate` et mettre à jour `RECENCY_HALF_LIFE_DAYS` dans
+> `constants.py`.
