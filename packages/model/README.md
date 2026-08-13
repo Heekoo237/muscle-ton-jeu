@@ -196,12 +196,49 @@ les probabilités se figent une fois par nuit :
 
 | Job | Cadence | Écrit | Commande |
 |---|---|---|---|
+| `verify` | avant de payer | — (lit /sports) | `python -m mtj_model.pipeline.verify` |
 | `collector` | toutes les 6 h | `odds_snapshots` | `python -m mtj_model.pipeline.collector` |
 | `nightly` | 1×/jour (~4 h) | `predictions` | `python -m mtj_model.pipeline.nightly` |
 | `health` | surveillance | — (lit `pipeline_runs`) | `python -m mtj_model.pipeline.health` |
 
 Base cible : une seule variable, `MTJ_DATABASE_URL` (chaîne Postgres du pooler
-Supabase). Migration : `packages/db/migrations/0005_predictions_pipeline.sql`.
+Supabase). Migrations : `0005_predictions_pipeline.sql` + `0006_league_catalog.sql`.
+
+## Fournisseur : The Odds API
+
+Orienté cotes, **Pinnacle disponible en région `eu`** (notre référence de
+dé-vigeage). Couvre nos 11 championnats, dont les trois à risque (Écosse,
+Belgique, Grèce). Gratuit 500 crédits/mois (sans carte) pour vérifier ; ~30 $/mois
+en production (notre volume ≈ 2 600 crédits/mois, 7× de marge).
+
+**Deux référentiels de championnat, une table de correspondance** (exigé) :
+`leagues.provider_ref` porte le code football-data (`E0`…, référentiel du MODÈLE :
+confiance + ξ) ; `league_catalog` le relie à la clé The Odds API (`soccer_epl`…,
+référentiel des COTES). La même correspondance existe en Python
+(`constants.ODDS_API_KEYS`) pour que `verify` tourne sans base.
+
+**Mise en route (dans TON environnement — le proxy du bac à sable bloque le
+domaine)** :
+
+```bash
+# 1. Clé gratuite sur the-odds-api.com (sans carte).
+export MTJ_PROVIDER=oddsapi MTJ_PROVIDER_KEY=<clé>
+
+# 2. Vérifier la couverture des 11 ligues AVANT de payer (gratuit, /sports) :
+python -m mtj_model.pipeline.verify        # confirme Turquie + les 3 à risque
+
+# 3. Appliquer les migrations, puis lancer le collecteur :
+export MTJ_DATABASE_URL='postgresql://…:6543/postgres'
+python -m mtj_model.pipeline.collector     # à planifier toutes les 6 h
+```
+
+Le collecteur crée au passage les matchs et équipes manquants (rattachement par
+nom, idempotent) : il est autosuffisant, pas besoin d'attendre le nocturne.
+
+> [!NOTE]
+> Les clés `ODDS_API_KEYS` sont un point de départ ; `verify` les réconcilie avec
+> la liste /sports réelle. Une clé fausse (ex. Turquie) se corrige en une ligne
+> dans `constants.py` **et** la migration 0006.
 
 **Historiser, ne pas écraser.** `predictions` a pour clé `(fixture, marché, jour
 de calcul)` : une ligne par jour. On reconstruit exactement ce qu'on annonçait un
@@ -219,15 +256,15 @@ une semaine de probabilités périmées servies aux utilisateurs.
 
 **Fournisseur de données** encapsulé dans `pipeline/provider.py` (règle d'archi
 n°4) : le reste du pipeline ignore d'où viennent calendrier, résultats et cotes.
-Changer de source (CSV gratuit → API payante) ne touche que ce fichier. Aucune
-implémentation réelle n'est branchée ici (réseau bloqué, pas de clé) : `provider`
-est nul et lève explicitement ; on branche une classe conforme et on la
-sélectionne dans `get_provider()`.
+The Odds API y est branché ; changer de source ne touche que ce fichier. Le
+parsing des réponses est isolé en fonctions pures (`parse_odds`, `parse_scores`),
+testées sans réseau. `get_provider()` est le seul point de sélection
+(`MTJ_PROVIDER` / `MTJ_PROVIDER_KEY`).
 
 > [!NOTE]
-> `leagues.provider_ref` doit porter le **code football-data** (`E0`, `F1`, …) :
-> c'est la clé qui relie un championnat à sa confiance calibrée
-> (`LEAGUE_CONFIDENCE`) et au ξ de récence.
+> `leagues.provider_ref` porte le **code football-data** (`E0`, `F1`, …) : clé de
+> la confiance calibrée (`LEAGUE_CONFIDENCE`) et du ξ. `league_catalog` le relie
+> à la clé The Odds API — les deux référentiels ne se confondent jamais.
 
 ## Commandes
 

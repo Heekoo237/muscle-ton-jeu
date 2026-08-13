@@ -128,6 +128,23 @@ DEFAULT_CONFIDENCE = "modérée"  # championnat inconnu / non calibré
 # Traduction label → valeur numérique (colonne predictions.confiance, NUMERIC).
 CONFIDENCE_VALUE = {"normale": 1.0, "modérée": 0.66, "faible": 0.33}
 
+# Correspondance des deux référentiels de championnat : code football-data (clé du
+# modèle) → clé The Odds API (clé du fournisseur de cotes). DOIT rester synchronisé
+# avec la table `league_catalog` (migration 0006). Sert à `verify` sans base.
+ODDS_API_KEYS = {
+    "E0": "soccer_epl",
+    "F1": "soccer_france_ligue_one",
+    "SP1": "soccer_spain_la_liga",
+    "I1": "soccer_italy_serie_a",
+    "D1": "soccer_germany_bundesliga",
+    "P1": "soccer_portugal_primeira_liga",
+    "B1": "soccer_belgium_first_div",
+    "N1": "soccer_netherlands_eredivisie",
+    "T1": "soccer_turkey_super_league",
+    "G1": "soccer_greece_super_league",
+    "SC0": "soccer_spl",
+}
+
 
 def confidence_for(league_code: str, source: str) -> float:
     """Confiance numérique d'une prédiction, selon la ligue et la source.

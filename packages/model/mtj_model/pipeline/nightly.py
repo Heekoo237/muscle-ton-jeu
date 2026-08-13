@@ -124,14 +124,20 @@ def _close_run(con, run_id: int, statut: str, fixtures: int, detail: dict, erreu
 
 
 def _sync_via_provider(con, days: int) -> None:
-    """Étape 1-2 : caler calendrier + résultats via le fournisseur (règle n°4).
-    Sans fournisseur branché, on saute — les fixtures sont supposées déjà en base."""
+    """Étape 1-2 : rafraîchir les RÉSULTATS récents via le fournisseur (règle n°4),
+    pour que les forces d'équipes soient à jour. Le calendrier et les cotes sont
+    déjà amenés par le collecteur. Sans fournisseur branché, on saute — les
+    fixtures et résultats sont supposés déjà en base (ex. amorçage football-data).
+
+    NB : le nocturne complet (backfill résultats) peut attendre ; l'urgence est le
+    collecteur. Ici on ne bloque jamais le calcul si la synchro n'est pas branchée.
+    """
     provider = get_provider()
     if isinstance(provider, NullProvider):
-        print("Fournisseur non branché : synchronisation ignorée (fixtures lues telles quelles).")
+        print("Fournisseur non branché : synchro des résultats ignorée (base lue telle quelle).")
         return
-    # Un fournisseur réel remplirait ici leagues/teams/fixtures (upsert par provider_ref).
-    raise NotImplementedError("Branche l'upsert du fournisseur réel ici (provider.fixtures).")
+    from .sync import refresh_scores  # import tardif : la synchro réelle vit à part
+    refresh_scores(con, provider, days_from=3)
 
 
 def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:

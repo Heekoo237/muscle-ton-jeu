@@ -95,3 +95,54 @@ def test_1x2_probs_are_coherent_triple():
     rows = {r.marche: r for r in league_predictions(hist, upcoming, "E0", pd.Timestamp("2024-06-01"), {})}
     total = rows["WIN_HOME"].probabilite + rows["DRAW"].probabilite + rows["WIN_AWAY"].probabilite
     assert abs(total - 1.0) < 0.02  # somme ~1 (arrondis + grille finie)
+
+
+# --- Parsing des réponses The Odds API (pur, sans réseau) -----------------
+from mtj_model.pipeline.provider import parse_odds, parse_scores  # noqa: E402
+
+_ODDS_SAMPLE = [{
+    "id": "evt1", "sport_key": "soccer_epl", "commence_time": "2026-08-15T14:00:00Z",
+    "home_team": "Arsenal", "away_team": "Chelsea",
+    "bookmakers": [{
+        "key": "pinnacle",
+        "markets": [
+            {"key": "h2h", "outcomes": [
+                {"name": "Arsenal", "price": 1.90},
+                {"name": "Chelsea", "price": 4.20},
+                {"name": "Draw", "price": 3.60},
+            ]},
+            {"key": "totals", "outcomes": [
+                {"name": "Over", "price": 1.95, "point": 2.5},
+                {"name": "Under", "price": 1.90, "point": 2.5},
+                {"name": "Over", "price": 2.60, "point": 3.5},  # doit etre ignore
+            ]},
+        ],
+    }],
+}]
+
+
+def test_parse_odds_maps_markets():
+    odds = parse_odds(_ODDS_SAMPLE, "soccer_epl")
+    got = {o.marche: o.cote for o in odds}
+    assert got == {"WIN_HOME": 1.90, "WIN_AWAY": 4.20, "DRAW": 3.60,
+                   "OVER_2_5": 1.95, "UNDER_2_5": 1.90}  # 3,5 ignore
+    assert all(o.fixture_ref == "evt1" and o.home == "Arsenal" for o in odds)
+
+
+def test_parse_odds_skips_event_without_bookmaker():
+    ev = [{"id": "e", "commence_time": "2026-08-15T14:00:00Z",
+           "home_team": "A", "away_team": "B", "bookmakers": []}]
+    assert parse_odds(ev, "soccer_epl") == []
+
+
+def test_parse_scores_finished_and_pending():
+    events = [
+        {"id": "f1", "commence_time": "2026-08-10T14:00:00Z", "completed": True,
+         "home_team": "A", "away_team": "B",
+         "scores": [{"name": "A", "score": "2"}, {"name": "B", "score": "1"}]},
+        {"id": "f2", "commence_time": "2026-08-20T14:00:00Z", "completed": False,
+         "home_team": "C", "away_team": "D", "scores": None},
+    ]
+    res = {f.provider_ref: f for f in parse_scores(events, "soccer_epl")}
+    assert res["f1"].status == "finished" and res["f1"].score_home == 2 and res["f1"].score_away == 1
+    assert res["f2"].status == "scheduled" and res["f2"].score_home is None
