@@ -116,9 +116,21 @@ marché**. Testé sur 60 000 tickets synthétiques de 6-12 sélections.
   **45,6 %** → réel mais **modéré** (~8 pt au-dessus du hasard). Chiffres figés
   dans `constants.py` (`FRAGILE_1X2_PRECISION`, `FRAGILE_1X2_BASE_FAILURE`) pour
   qu'ils restent sous les yeux et ne soient pas oubliés.
-- **Ordre de grandeur produit** : un ticket de 9 favoris 1X2 affiche une proba
-  combinée **médiane 0,22 %** ; le même ticket **renforcé** (retrait des <0,55,
-  plancher 4) remonte à **~14 %**. C'est ce contraste que portent les maquettes.
+- **Ordre de grandeur produit** (dépend du type de ticket) :
+  - 9 **favoris 1X2 purs** : brut médiane **0,22 %** → renforcé ~14 % (pire cas,
+    peu joué en vrai).
+  - 9 **mixte réaliste** (3 double chance + 3 plus/moins + 3 en 1X2) : brut
+    médiane **1,41 %** → renforcé **~7,8 %** (retrait au point 30 %). C'est ce
+    profil, proche des utilisateurs réels, que doivent refléter les maquettes.
+
+> [!WARNING]
+> **Dette avant lancement — chiffres des maquettes.** Les maquettes affichent
+> 1,3 % → 7,5 %. Mesuré sur un ticket **mixte** réaliste : **1,41 % → 7,8 %** →
+> les maquettes sont **cohérentes**, à condition que leurs exemples représentent
+> un ticket mixte (et non un combiné de favoris 1X2 purs, qui donnerait 0,22 %).
+> Le « après » remonte quand le retrait est plus agressif. À vérifier maquette
+> par maquette avant le lancement : chaque exemple doit être un ordre de grandeur
+> réel et étiqueté comme tel.
 
 ## Confiance par championnat (étape 4.3)
 

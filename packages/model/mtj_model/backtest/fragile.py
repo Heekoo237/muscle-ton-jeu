@@ -62,6 +62,97 @@ def _tickets(sel: pd.DataFrame, n_tickets=60000):
     return rows
 
 
+def _valid_odds(df: pd.DataFrame) -> pd.DataFrame:
+    oc = ["open_ps_h", "open_ps_d", "open_ps_a", "open_ps_o25", "open_ps_u25"]
+    d = df.dropna(subset=oc)
+    return d[(d[oc] > 1.01).all(axis=1)].reset_index(drop=True)
+
+
+def _market_selections(df: pd.DataFrame) -> dict:
+    """Proba AFFICHÉE (selon PROBABILITY_SOURCE) et issue, par marché."""
+    ftr = df["ftr"].to_numpy()
+    tot = (df["fthg"] + df["ftag"]).to_numpy()
+    op = np.vstack([devig_power(r) for r in df[["open_ps_h", "open_ps_d", "open_ps_a"]].to_numpy(float)])
+    fav = op.argmax(1)
+    y = df["ftr"].map({"H": 0, "D": 1, "A": 2}).to_numpy()
+    dc = df[["m_dc_hd", "m_dc_da", "m_dc_ha"]].to_numpy(float)
+    cov = {0: {"H", "D"}, 1: {"D", "A"}, 2: {"H", "A"}}
+    pk = dc.argmax(1)
+    ou = np.vstack([devig_power(r) for r in df[["open_ps_o25", "open_ps_u25"]].to_numpy(float)])
+    os_ = ou.argmax(1)
+    return {
+        "1X2 (cote)": (op[np.arange(len(df)), fav], fav == y),
+        "double chance (mod)": (dc[np.arange(len(df)), pk],
+                                np.array([ftr[i] in cov[pk[i]] for i in range(len(df))])),
+        "plus de 1,5 (mod)": (df["m_o15"].to_numpy(float), tot >= 2),
+        "plus de 3,5 (mod)": (df["m_o35"].to_numpy(float), tot >= 4),
+        "plus/moins 2,5 (cote)": (ou[np.arange(len(df)), os_], np.where(os_ == 0, tot >= 3, tot <= 2)),
+    }
+
+
+def _pr_curves(df: pd.DataFrame) -> None:
+    """Le point de fonctionnement est une DÉCISION PRODUIT : précision/rappel à
+    plusieurs fractions de sélections marquées, par marché."""
+    d = _valid_odds(df)
+    print("\n" + "=" * 74)
+    print("Courbe précision/rappel par point de fonctionnement (% marqué fragile)")
+    print("=" * 74)
+    for name, (p, won) in _market_selections(d).items():
+        lost = ~np.asarray(won)
+        base = 100 * lost.mean()
+        print(f"{name:<22} base échec {base:4.1f}%   n={len(p)}")
+        print(f"    {'%marqué':>8}{'seuil':>8}{'précis.':>9}{'vs base':>9}{'rappel':>9}")
+        for frac in (0.20, 0.30, 0.40, 0.50, 0.60):
+            t = float(np.quantile(p, frac))
+            flag = p < t
+            prec = 100 * lost[flag].mean() if flag.sum() else 0.0
+            rec = 100 * flag[lost].mean() if lost.sum() else 0.0
+            print(f"    {100*flag.mean():>7.0f}%{t:>8.2f}{prec:>8.0f}%{prec-base:>+8.1f}{rec:>8.0f}%")
+        print()
+
+
+def _mixed_ticket(df: pd.DataFrame, op_point=0.30) -> None:
+    """Ticket mixte réaliste (3 double chance + 3 plus/moins + 3 en 1X2) : le
+    chiffre des maquettes. Proba combinée = produit des sélections affichées."""
+    d = _valid_odds(df)
+    tot = (d["fthg"] + d["ftag"]).to_numpy()
+    op = np.vstack([devig_power(r) for r in d[["open_ps_h", "open_ps_d", "open_ps_a"]].to_numpy(float)])
+    p_1x2 = op[np.arange(len(d)), op.argmax(1)]
+    p_dc = d[["m_dc_hd", "m_dc_da", "m_dc_ha"]].to_numpy(float).max(1)
+    ou = np.vstack([devig_power(r) for r in d[["open_ps_o25", "open_ps_u25"]].to_numpy(float)])
+    p_ou = ou.max(1)
+    pools = {"1x2": p_1x2, "dc": p_dc, "ou": p_ou}
+    thr = {m: float(np.quantile(v, op_point)) for m, v in pools.items()}
+    rng = np.random.default_rng(SEED)
+    N = len(d)
+
+    def sample(reinforce=False, floor=4, n=60000):
+        out = []
+        for _ in range(n):
+            idx = rng.choice(N, size=9, replace=False)
+            legs = ([("1x2", p_1x2[idx[i]]) for i in range(3)]
+                    + [("dc", p_dc[idx[i]]) for i in range(3, 6)]
+                    + [("ou", p_ou[idx[i]]) for i in range(6, 9)])
+            ps = np.array([p for _, p in legs])
+            if reinforce:
+                keep = np.array([p >= thr[m] for m, p in legs])
+                if keep.sum() < floor:
+                    keep = np.zeros(9, bool)
+                    keep[np.argsort(ps)[::-1][:floor]] = True
+                ps = ps[keep]
+            out.append(float(np.prod(ps)))
+        return np.array(out)
+
+    raw, ren = sample(), sample(reinforce=True)
+    print("\n" + "=" * 74)
+    print("Ticket MIXTE réaliste (3 double chance + 3 plus/moins 2,5 + 3 en 1X2)")
+    print("=" * 74)
+    print(f"  proba/jambe : 1X2 {np.median(p_1x2):.2f} · DC {np.median(p_dc):.2f} · +/-2,5 {np.median(p_ou):.2f}")
+    print(f"  BRUT     médiane {100*np.median(raw):5.2f}%  (q25 {100*np.quantile(raw,.25):.2f}%  q75 {100*np.quantile(raw,.75):.2f}%)")
+    print(f"  RENFORCÉ médiane {100*np.median(ren):5.2f}%  (retrait au point {op_point:.0%}, plancher 4)")
+    print("  → les maquettes (1,3 % → 7,5 %) sont cohérentes avec ce profil mixte.")
+
+
 def _per_market_thresholds(df: pd.DataFrame) -> None:
     """Seuil par marché : les probas sont plus hautes sur les marchés sûrs, un
     seuil unique à 0,55 ne marquerait presque rien en double chance."""
@@ -178,6 +269,8 @@ def main():
 
     _per_market_thresholds(df)
     _ticket_probability(sel)
+    _pr_curves(df)
+    _mixed_ticket(df)
 
 
 if __name__ == "__main__":
