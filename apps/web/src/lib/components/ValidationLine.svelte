@@ -1,176 +1,186 @@
 <script lang="ts">
-	// Ligne de l'écran de validation (DESIGN.md §7.9). Trois états, doublés d'une
-	// forme (filet gauche 3 px + icône), jamais dépendants de la seule couleur.
-	// Corrections sans clavier : chips en pilule. Formulaires progressifs → OK sans JS.
+	// Ligne de validation de lecture (maquette ui-screens ÉCRAN 2). Trois états,
+	// doublés d'une forme (filet gauche 3 px + icône). Correction sans clavier :
+	// choix en pilule pleine largeur. Formulaires progressifs → OK sans JS.
 	import type { Selection, Market } from '$lib/types';
 	import { formatCote } from '$lib/format';
 
-	let { selection }: { selection: Selection } = $props();
+	type VM = Selection & { candidateLabels?: { market: Market; label: string }[] };
+	let { selection }: { selection: VM } = $props();
 
 	const index = $derived(String(selection.ordre).padStart(2, '0'));
-
-	/** OVER_2_5 → « 2,5 » pour les chips de seuil. */
-	function seuil(m: Market): string {
-		return m.replace(/^(OVER|UNDER)_/, '').replace('_', ',');
-	}
-	const overUnder = $derived(
-		selection.candidates?.[0]?.startsWith('OVER') ? 'Plus de' : 'Moins de'
+	const question = $derived(
+		selection.candidates?.[0]?.startsWith('OVER')
+			? 'Plus de buts — choisis le seuil'
+			: selection.candidates?.[0]?.startsWith('UNDER')
+				? 'Moins de buts — choisis le seuil'
+				: 'Deux lectures possibles'
 	);
 </script>
 
-<div class="line" data-state={selection.etatResolution}>
-	<span class="idx t-cote">{index}</span>
-
-	<div class="body">
-		<p class="match t-body">{selection.matchLabel || selection.texteBrut}</p>
-
-		{#if selection.etatResolution === 'certain'}
-			<div class="l2">
-				<span class="t-small marche">{selection.libelleFr}</span>
-				{#if selection.coteSaisie != null}
-					<span class="t-cote cote">{formatCote(selection.coteSaisie)}</span>
-				{/if}
-			</div>
-		{:else if selection.etatResolution === 'ambigu'}
-			<p class="t-small question">Quel seuil ? {overUnder} combien de buts ?</p>
-			<form method="POST" action="?/corriger" class="chips">
-				<input type="hidden" name="ordre" value={selection.ordre} />
-				{#each selection.candidates ?? [] as m (m)}
-					<button class="chip t-body" name="marche" value={m}>{seuil(m)}</button>
-				{/each}
-			</form>
-		{:else}
-			<p class="t-small nonc">non analysée · non facturée</p>
-			<form method="POST" action="?/retirer">
-				<input type="hidden" name="ordre" value={selection.ordre} />
-				<button class="btn-ghost t-body">Retirer</button>
-			</form>
-		{/if}
+{#if selection.etatResolution === 'certain'}
+	<div class="line green">
+		<span class="idx">{index}</span>
+		<span class="ic">✓</span>
+		<div class="mid">
+			<div class="match">{selection.matchLabel}</div>
+			<div class="market">{selection.libelleFr}</div>
+		</div>
+		{#if selection.coteSaisie != null}<span class="cote">{formatCote(selection.coteSaisie)}</span>{/if}
 	</div>
-
-	<span class="icon" aria-hidden="true">
-		{#if selection.etatResolution === 'certain'}
-			<svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-		{:else if selection.etatResolution === 'ambigu'}
-			<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3l10 18H2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12 10v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="12" cy="18" r="1" fill="currentColor" /></svg>
-		{:else}
-			<svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
-		{/if}
-	</span>
-</div>
+{:else if selection.etatResolution === 'ambigu'}
+	<div class="line amber col">
+		<div class="head">
+			<span class="idx">{index}</span>
+			<span class="ic oc">▲</span>
+			<div class="mid">
+				<div class="match">{selection.matchLabel}</div>
+				<div class="q">{question}</div>
+			</div>
+		</div>
+		<div class="choices">
+			{#each selection.candidateLabels ?? [] as c (c.market)}
+				<form method="POST" action="?/corriger">
+					<input type="hidden" name="ordre" value={selection.ordre} />
+					<button class="choice" name="marche" value={c.market}>{c.label}</button>
+				</form>
+			{/each}
+		</div>
+	</div>
+{:else}
+	<div class="line red">
+		<span class="idx">{index}</span>
+		<span class="ic rg">✕</span>
+		<div class="mid">
+			<div class="match">{selection.matchLabel}</div>
+			<div class="nonc">non analysée — non facturée</div>
+		</div>
+		<form method="POST" action="?/retirer">
+			<input type="hidden" name="ordre" value={selection.ordre} />
+			<button class="retirer">Retirer</button>
+		</form>
+	</div>
+{/if}
 
 <style>
 	.line {
-		position: relative;
-		display: grid;
-		grid-template-columns: 24px 1fr 20px;
+		display: flex;
+		align-items: center;
 		gap: var(--s-3);
-		align-items: start;
+		min-height: 64px;
+		padding: var(--s-3) var(--s-4);
 		background: var(--c-surface);
 		border: 1px solid var(--c-line);
 		border-radius: var(--r-md);
-		padding: var(--s-3) var(--s-4);
-		padding-left: var(--s-4);
-		margin-bottom: var(--s-3);
-		min-height: 64px;
+		box-sizing: border-box;
 	}
-	/* Filet gauche 3 px sémantique, arrondi (§7.9) */
-	.line::before {
-		content: '';
-		position: absolute;
-		left: 0;
-		top: 8px;
-		bottom: 8px;
-		width: 3px;
-		border-radius: var(--r-xs);
+	.line.col {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--s-3);
 	}
-	.line[data-state='certain']::before {
-		background: var(--c-vert);
+	.green {
+		border-left: 3px solid var(--c-vert);
 	}
-	.line[data-state='ambigu'] {
+	.amber {
 		background: var(--c-ocre-wash);
 		border-color: var(--c-ocre-line);
+		border-left: 3px solid var(--c-ocre);
 	}
-	.line[data-state='ambigu']::before {
-		background: var(--c-ocre);
-	}
-	.line[data-state='inconnu'] {
+	.red {
 		background: var(--c-rouge-wash);
-		border-color: var(--c-rouge);
+		border-left: 3px solid var(--c-rouge);
 	}
-	.line[data-state='inconnu']::before {
-		background: var(--c-rouge);
+	.head {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
 	}
 	.idx {
+		flex: 0 0 24px;
+		font-family: var(--font-mono);
+		font-weight: 500;
+		font-size: 16px;
 		color: var(--c-ink-3);
 	}
-	.match {
-		margin: 0;
-		color: var(--c-ink);
-	}
-	.l2 {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--s-3);
-		margin-top: var(--s-1);
-	}
-	.marche {
-		color: var(--c-ink-2);
-	}
-	.cote {
-		color: var(--c-ink-3);
-	}
-	.question {
-		color: var(--c-ocre);
-		margin: var(--s-1) 0 var(--s-2);
-	}
-	.nonc {
-		color: var(--c-rouge);
-		margin: var(--s-1) 0 var(--s-2);
-	}
-	.chips {
-		display: flex;
-		gap: var(--s-2);
-		flex-wrap: wrap;
-	}
-	.chip {
-		min-height: 48px;
-		padding: 0 var(--s-4);
-		border-radius: var(--r-pill);
-		background: var(--c-surface);
-		color: var(--c-ink);
-		border: 1px solid var(--c-line-strong);
+	.ic {
+		flex: 0 0 16px;
+		font-size: 16px;
 		font-weight: 600;
-		cursor: pointer;
-	}
-	.chip:active {
-		transform: scale(0.98);
-	}
-	.btn-ghost {
-		min-height: 48px;
-		padding: 0 var(--s-4);
-		border: none;
-		background: transparent;
-		color: var(--c-ink-2);
-		font-weight: 600;
-		cursor: pointer;
-		text-decoration: underline;
-		text-decoration-color: var(--c-line-strong);
-		text-underline-offset: 2px;
-	}
-	.icon {
-		display: inline-flex;
-		justify-content: center;
-		padding-top: 2px;
-	}
-	.line[data-state='certain'] .icon {
+		line-height: 1;
 		color: var(--c-vert);
 	}
-	.line[data-state='ambigu'] .icon {
+	.ic.oc {
+		color: var(--c-ocre);
+		font-weight: 400;
+	}
+	.ic.rg {
+		color: var(--c-rouge);
+	}
+	.mid {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.match {
+		font-size: 16px;
+		color: var(--c-ink);
+	}
+	.market {
+		font-size: 14px;
+		color: var(--c-ink-2);
+	}
+	.q {
+		font-size: 14px;
 		color: var(--c-ocre);
 	}
-	.line[data-state='inconnu'] .icon {
-		color: var(--c-rouge);
+	.nonc {
+		font-size: 14px;
+		color: var(--c-ink-3);
+	}
+	.cote {
+		flex: 0 0 44px;
+		text-align: right;
+		font-family: var(--font-mono);
+		font-weight: 500;
+		font-size: 16px;
+		color: var(--c-ink);
+		font-feature-settings: 'tnum' 1;
+	}
+	.choices {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+	.choice {
+		width: 100%;
+		height: 48px;
+		padding: 0 var(--s-4);
+		background: var(--c-surface);
+		border: 1px solid var(--c-line-strong);
+		border-radius: var(--r-pill);
+		font-family: var(--font-body);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink);
+		text-align: left;
+		cursor: pointer;
+	}
+	.choice:active {
+		transform: scale(0.99);
+	}
+	.retirer {
+		flex: 0 0 auto;
+		height: 48px;
+		padding: 0 var(--s-3);
+		background: transparent;
+		border: none;
+		font-family: var(--font-body);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink-2);
+		cursor: pointer;
 	}
 </style>

@@ -6,16 +6,15 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-<svelte:head>
-	<title>Vérifie ta lecture — Muscle Ton Jeu</title>
-</svelte:head>
+<svelte:head><title>Validation de lecture — Muscle Ton Jeu</title></svelte:head>
 
-<FlowHeader title="Vérifie ta lecture" back="/analyser" />
+<FlowHeader title="Validation de lecture" back="/analyser" />
 
 <main class="container">
-	<p class="t-body intro measure">
-		On a lu ton ticket. Corrige les lignes marquées avant de lancer l'analyse.
-	</p>
+	<div class="intro">
+		<h1 class="t-h1">Vérifie ta lecture</h1>
+		<p class="t-body sub">Tape sur une ligne pour la corriger. Aucune saisie au clavier.</p>
+	</div>
 
 	<div class="lignes">
 		{#each data.selections as s (s.ordre)}
@@ -41,18 +40,33 @@
 	main {
 		padding-top: var(--s-6);
 		padding-bottom: var(--s-12);
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-5);
 	}
 	.intro {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+	.intro h1 {
+		margin: 0;
+	}
+	.sub {
 		color: var(--c-ink-2);
-		margin: 0 0 var(--s-5);
+		margin: 0;
+	}
+	.lignes {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
 	}
 	.action {
-		margin-top: var(--s-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
 	}
 	.btn-dark {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
 		width: 100%;
 		height: 52px;
 		border: none;
@@ -62,6 +76,7 @@
 		font-family: var(--font-body);
 		font-weight: 600;
 		font-size: 16px;
+		font-feature-settings: 'tnum' 1;
 		cursor: pointer;
 	}
 	.btn-dark:active {
@@ -75,6 +90,6 @@
 	.compteur {
 		color: var(--c-ink-3);
 		text-align: center;
-		margin: var(--s-3) 0 0;
+		margin: 0;
 	}
 </style>

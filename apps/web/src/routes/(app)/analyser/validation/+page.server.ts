@@ -12,18 +12,31 @@ function counts(selections: Selection[]) {
 	return { total, analysables, cout: creditCost(analysables) };
 }
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	const id = cookies.get('ticketId');
-	const ticket = id ? getTicket(id) : undefined;
-	if (!ticket) redirect(303, '/analyser');
-	return { selections: ticket.selections, ...counts(ticket.selections) };
-};
-
 /** Découpe « Home – Away » pour reconstruire le libellé après correction. */
 function teamsOf(matchLabel: string): [string, string] {
 	const [home, away] = matchLabel.split(' – ');
 	return [home ?? '', away ?? ''];
 }
+
+export interface ValidationLineVM extends Selection {
+	/** Libellés français des marchés proposés pour une ligne ambiguë. */
+	candidateLabels?: { market: Market; label: string }[];
+}
+
+export const load: PageServerLoad = async ({ cookies }) => {
+	const id = cookies.get('ticketId');
+	const ticket = id ? getTicket(id) : undefined;
+	if (!ticket) redirect(303, '/analyser');
+	const selections: ValidationLineVM[] = ticket.selections.map((s) => {
+		if (s.etatResolution !== 'ambigu' || !s.candidates) return s;
+		const [home, away] = teamsOf(s.matchLabel);
+		return {
+			...s,
+			candidateLabels: s.candidates.map((m) => ({ market: m, label: marketLabelFr(m, home, away) }))
+		};
+	});
+	return { selections, ...counts(ticket.selections) };
+};
 
 export const actions: Actions = {
 	// Résout une ligne ambiguë avec le marché choisi par l'utilisateur (jamais deviné).
