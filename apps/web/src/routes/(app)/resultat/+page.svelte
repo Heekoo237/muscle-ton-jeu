@@ -129,6 +129,14 @@
 
 	<a class="btn-primary" href={`/partage/${data.ticketId}`} target="_blank" rel="noopener">Partager</a>
 
+	{#if data.montreRecharge}
+		<!-- Invitation à recharger : après l'analyse offerte, sans pression avant. -->
+		<div class="recharge-invite">
+			<p class="t-body">Pour continuer à muscler tes tickets, recharge à partir de 500 F.</p>
+			<a class="btn-outline" href="/recharge">Recharger</a>
+		</div>
+	{/if}
+
 	<!-- Rétention : opt-in notifications (PRD §10) -->
 	<div class="notif">
 		{#if form?.notifie}
@@ -397,6 +405,19 @@
 	}
 	.btn-primary:active {
 		transform: scale(0.98);
+	}
+	.recharge-invite {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+		align-items: flex-start;
+		background: var(--c-canvas-sunk);
+		border-radius: var(--r-md);
+		padding: var(--s-4);
+	}
+	.recharge-invite .t-body {
+		color: var(--c-ink-2);
+		margin: 0;
 	}
 	.notif {
 		padding-top: var(--s-4);

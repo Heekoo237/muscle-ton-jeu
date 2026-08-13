@@ -5,5 +5,5 @@
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 </script>
 
-<CreditsBar credits={data.credits} />
+<CreditsBar credits={data.credits} show={data.montreCredits} />
 {@render children()}

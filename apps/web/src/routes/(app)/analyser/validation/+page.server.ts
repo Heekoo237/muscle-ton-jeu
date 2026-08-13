@@ -18,21 +18,27 @@ function teamsOf(matchLabel: string): [string, string] {
 	return [home ?? '', away ?? ''];
 }
 
+export interface MarketOption {
+	market: Market;
+	label: string;
+}
+
 export interface ValidationLineVM extends Selection {
-	/** Libellés français des marchés proposés pour une ligne ambiguë. */
-	candidateLabels?: { market: Market; label: string }[];
+	/** Tous les paris possibles du match, pour la feuille de correction. */
+	options: MarketOption[];
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
 	const ticket = id ? getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
+	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
+	// libellés en français avec les noms d'équipes, pour la feuille de correction.
 	const selections: ValidationLineVM[] = ticket.selections.map((s) => {
-		if (s.etatResolution !== 'ambigu' || !s.candidates) return s;
 		const [home, away] = teamsOf(s.matchLabel);
 		return {
 			...s,
-			candidateLabels: s.candidates.map((m) => ({ market: m, label: marketLabelFr(m, home, away) }))
+			options: COVERED_MARKETS.map((m) => ({ market: m, label: marketLabelFr(m, home, away) }))
 		};
 	});
 	return { selections, ...counts(ticket.selections) };

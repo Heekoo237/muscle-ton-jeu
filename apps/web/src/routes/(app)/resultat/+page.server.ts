@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
-import { getUser, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
+import { getUser, hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
 import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
@@ -119,7 +119,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		rienARetirer: r.rienARetirer,
 		conflitMemeMatch: r.conflitMemeMatch
 	};
-	return { ticketId: ticket.id, vm, gratuit: billing.gratuit };
+	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
+	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
+	return { ticketId: ticket.id, vm, gratuit: billing.gratuit, montreRecharge: !hasRecharged() };
 };
 
 export const actions: Actions = {

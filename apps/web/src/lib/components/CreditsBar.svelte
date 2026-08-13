@@ -1,18 +1,23 @@
 <script lang="ts">
-	// Barre de crédits (DESIGN.md §7.2) — fixe en haut, présente sur tous les
-	// écrans. Le solde reste toujours visible : aucun blocage n'est une surprise.
-	let { credits = 0 }: { credits?: number } = $props();
+	// Barre de crédits (DESIGN.md §7.2). Le solde et « Recharger » n'apparaissent
+	// qu'une fois l'utilisateur devenu client crédits (`show`). Pendant l'essai
+	// gratuit, la barre reste sobre — juste le wordmark, aucune pression commerciale.
+	let { credits = 0, show = false }: { credits?: number; show?: boolean } = $props();
 
 	const low = $derived(credits === 1);
 </script>
 
 <header class="credits-bar">
 	<div class="container inner">
-		<span class="solde">
-			<span class="t-chiffre-md num" class:low>{credits}</span>
-			<span class="t-body mot">crédits</span>
-		</span>
-		<a class="btn-primary-sm" href="/recharge">Recharger</a>
+		{#if show}
+			<span class="solde">
+				<span class="t-chiffre-md num" class:low>{credits}</span>
+				<span class="t-body mot">crédits</span>
+			</span>
+			<a class="btn-primary-sm" href="/recharge">Recharger</a>
+		{:else}
+			<a class="wordmark" href="/dashboard" aria-label="Muscle Ton Jeu — accueil">MTJ</a>
+		{/if}
 	</div>
 </header>
 
@@ -41,9 +46,16 @@
 	}
 	.num.low {
 		color: var(--c-ocre);
-	} /* variante -low : le bouton reste accent, seul le nombre passe en ocre */
+	}
 	.mot {
 		color: var(--c-ink-2);
+	}
+	.wordmark {
+		font-family: var(--font-title);
+		font-size: 22px;
+		letter-spacing: -0.5px;
+		color: var(--c-ink);
+		text-decoration: none;
 	}
 	.btn-primary-sm {
 		display: inline-flex;

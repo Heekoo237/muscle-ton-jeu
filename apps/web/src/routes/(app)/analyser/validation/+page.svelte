@@ -1,24 +1,27 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import type { ValidationLineVM } from './+page.server';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import ValidationLine from '$lib/components/ValidationLine.svelte';
+	import CorrectionSheet from '$lib/components/CorrectionSheet.svelte';
 
 	let { data }: { data: PageData } = $props();
+	let open = $state<ValidationLineVM | null>(null);
 </script>
 
-<svelte:head><title>Validation de lecture — Muscle Ton Jeu</title></svelte:head>
+<svelte:head><title>Vérifie ton ticket — Muscle Ton Jeu</title></svelte:head>
 
-<FlowHeader title="Validation de lecture" back="/analyser" />
+<FlowHeader title="Ton ticket" back="/analyser" />
 
 <main class="container">
 	<div class="intro">
-		<h1 class="t-h1">Vérifie ta lecture</h1>
-		<p class="t-body sub">Tape sur une ligne pour la corriger. Aucune saisie au clavier.</p>
+		<h1 class="t-h1">Vérifie ton ticket</h1>
+		<p class="t-body sub">Tape sur une ligne pour changer le pari. Aucune saisie au clavier.</p>
 	</div>
 
 	<div class="lignes">
 		{#each data.selections as s (s.ordre)}
-			<ValidationLine selection={s} />
+			<ValidationLine selection={s} onOpen={(sel) => (open = sel)} />
 		{/each}
 	</div>
 
@@ -27,14 +30,14 @@
 			Analyser {data.analysables} match{data.analysables > 1 ? 's' : ''} sur {data.total}
 		</button>
 		<p class="t-small compteur">
-			{#if data.cout && data.cout > 0}
-				{data.cout} crédit{data.cout > 1 ? 's' : ''} · les lignes rouges ne sont pas comptées
-			{:else}
-				Les lignes rouges ne sont pas comptées
-			{/if}
+			Les lignes rouges ne sont pas comptées
 		</p>
 	</form>
 </main>
+
+{#if open}
+	<CorrectionSheet selection={open} onClose={() => (open = null)} />
+{/if}
 
 <style>
 	main {
