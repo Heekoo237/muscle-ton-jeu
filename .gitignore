@@ -30,3 +30,6 @@ packages/model/data/*.csv
 # Test artifacts
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Supabase (local)
+.env.local
