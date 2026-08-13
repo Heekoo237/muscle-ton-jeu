@@ -14,9 +14,13 @@ export const load: PageServerLoad = async ({ url }) => {
 
 export const actions: Actions = {
 	// Connexion Google. Réel via Supabase Auth ; factice en local.
+	// `retour` vient du champ caché du formulaire (la query de l'URL est perdue
+	// quand on poste vers ?/google).
 	google: async (event) => {
 		const { url, locals, cookies } = event;
-		const retour = safeReturn(url);
+		const form = await event.request.formData();
+		const retourRaw = String(form.get('retour') ?? '');
+		const retour = retourRaw.startsWith('/') ? retourRaw : '/dashboard';
 
 		if (locals.supabase) {
 			const redirectTo = `${url.origin}/auth/callback?next=${encodeURIComponent(retour)}`;
