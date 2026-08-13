@@ -51,29 +51,37 @@
 		a.click();
 	}
 
+	const waUrl = () => `https://wa.me/?text=${encodeURIComponent(`${TEXTE} ${shareUrl}`)}`;
+
 	async function partagerWhatsApp() {
 		if (busy) return;
-		busy = true;
 		consigne = '';
+		const nav = navigator as Navigator & {
+			canShare?: (d: ShareData) => boolean;
+			share?: (d: ShareData) => Promise<void>;
+		};
+
+		// Desktop sans partage natif : ouvrir WhatsApp directement (appel synchrone,
+		// non bloqué). Le lien y affiche l'image en aperçu.
+		if (!nav.share) {
+			window.open(waUrl(), '_blank', 'noopener');
+			return;
+		}
+
+		// Mobile : partage natif (image + texte) ; l'utilisateur choisit contact ou
+		// statut. Sans partage de fichier : au moins le texte + le lien.
+		busy = true;
 		try {
 			const png = await toPng();
 			const file = new File([png], 'muscle-ton-jeu.png', { type: 'image/png' });
-			const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-			if (nav.canShare?.({ files: [file] }) && nav.share) {
+			if (nav.canShare?.({ files: [file] })) {
 				await nav.share({ files: [file], text: TEXTE, url: shareUrl });
-				busy = false;
-				return;
+			} else {
+				await nav.share({ text: TEXTE, url: shareUrl });
 			}
-			// Repli : image téléchargée + texte copié.
-			download(png);
-			try {
-				await navigator.clipboard.writeText(`${TEXTE} ${shareUrl}`);
-			} catch {
-				/* presse-papier indisponible : l'image suffit */
-			}
-			consigne = 'Image enregistrée. Ouvre WhatsApp et envoie-la.';
-		} catch {
-			consigne = 'Le partage a échoué. Réessaie ou télécharge l’image.';
+		} catch (e) {
+			// Annulation volontaire : on ne fait rien. Autre échec : repli WhatsApp.
+			if ((e as Error)?.name !== 'AbortError') window.open(waUrl(), '_blank', 'noopener');
 		}
 		busy = false;
 	}
