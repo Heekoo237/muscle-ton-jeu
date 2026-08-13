@@ -3,6 +3,7 @@ import { getAppSession } from '$lib/server/session';
 import { listAnalysedTickets } from '$lib/server/fixtures/ticketStore';
 import { settleMarket } from '$lib/server/fixtures/historyStore';
 import { sports } from '$lib/server/services';
+import { DEMO_MODE, demoHistoLignes } from '$lib/server/demo';
 import type { Market } from '$lib/types';
 
 export interface HistoLine {
@@ -81,5 +82,7 @@ export const load: PageServerLoad = async (event) => {
 		};
 	});
 
-	return { lignes };
+	// DÉMO (convention) : coupons fictifs pour voir la liste peuplée. Voir demo.ts.
+	const toutes = DEMO_MODE ? [...lignes, ...demoHistoLignes(Date.now())] : lignes;
+	return { lignes: toutes };
 };

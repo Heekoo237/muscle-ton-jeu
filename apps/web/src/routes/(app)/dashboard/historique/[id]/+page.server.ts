@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
+import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
 import type { LineVM } from '$lib/types';
 
 /**
@@ -11,6 +12,12 @@ import type { LineVM } from '$lib/types';
  */
 export const load: PageServerLoad = async (event) => {
 	const session = (await getAppSession(event))!;
+
+	// DÉMO (convention) : les coupons fictifs s'ouvrent en lecture seule. Voir demo.ts.
+	if (DEMO_MODE && isDemoId(event.params.id)) {
+		return demoTicketDetail(event.params.id, Date.now());
+	}
+
 	const ticket = await getTicket(event.params.id);
 
 	if (!ticket || ticket.statut !== 'analyse') redirect(303, '/dashboard/historique');

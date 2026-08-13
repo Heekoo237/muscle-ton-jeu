@@ -17,6 +17,11 @@
 
 	// Le 3e bloc n'apparaît qu'à partir de 3 tickets analysés.
 	const montreTombes = $derived(data.stats.ticketsAnalyses >= 3);
+
+	// Analyse du jour : ouverte d'emblée le premier jour, sinon repliée avec un
+	// bouton « Ouvrir » pour la revoir.
+	let openedManually = $state(false);
+	const dailyOpen = $derived(!data.dailyVue || openedManually);
 </script>
 
 <svelte:head><title>Accueil — Muscle Ton Jeu</title></svelte:head>
@@ -55,13 +60,13 @@
 	{#if data.daily}
 		<section class="bloc">
 			<h2 class="t-h2">L'analyse du jour</h2>
-			{#if data.dailyVue}
+			{#if !dailyOpen}
 				<div class="daily vue">
 					<div class="row1">
 						<span class="t-body">{data.daily.matchLabel}</span>
-						<span class="badge">vue</span>
+						<button class="ouvrir" type="button" onclick={() => (openedManually = true)}>Ouvrir</button>
 					</div>
-					<p class="t-small dim">Prochaine analyse offerte demain matin.</p>
+					<p class="t-small dim">Déjà consultée aujourd'hui · prochaine analyse offerte demain matin.</p>
 				</div>
 			{:else}
 				<div class="daily">
@@ -73,6 +78,9 @@
 						<span class="t-small dim">{data.daily.marche} · chances réelles</span>
 						<span class="t-chiffre-md">{pct(data.daily.probabilitePct)}</span>
 					</div>
+					{#if data.dailyVue}
+						<p class="t-small dim">Prochaine analyse offerte demain matin.</p>
+					{/if}
 					<LegalNote />
 				</div>
 			{/if}
@@ -251,8 +259,24 @@
 		color: var(--c-ink-3);
 		font-size: 14px;
 	}
-	.daily.vue .badge {
-		background: var(--c-surface);
+	.ouvrir {
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		height: 36px;
+		padding: 0 var(--s-4);
+		border-radius: var(--r-pill);
+		background: transparent;
+		border: 1px solid var(--c-line-strong);
+		color: var(--c-ink);
+		font-family: var(--font-body);
+		font-weight: 600;
+		font-size: 14px;
+		cursor: pointer;
+		transition: transform 100ms ease-out;
+	}
+	.ouvrir:active {
+		transform: scale(0.97);
 	}
 
 	@media (min-width: 600px) {

@@ -1,0 +1,153 @@
+/**
+ * demo.ts — Données FICTIVES de démonstration (phase convention).
+ *
+ * Objectif : rendre les interfaces dynamiques pour voir leur comportement
+ * (bandeau animé, historique, statistiques) tant que le pipeline n'alimente pas
+ * encore la base. Rien ici n'est réel.
+ *
+ * ⚠️ TEMPORAIRE — pour revenir aux vraies données uniquement, passer
+ *    DEMO_MODE à false (ou supprimer les branches `if (DEMO_MODE)` des loaders).
+ *    Aucune de ces valeurs ne doit survivre en production.
+ *
+ * Les règles d'or tiennent quand même : aucun nom de personne, aucune promesse
+ * de gain, les résultats défavorables à nos analyses sont montrés aussi.
+ */
+import type { HistoryItem, LineVM } from '$lib/types';
+
+export const DEMO_MODE = true;
+
+/* ---- Bandeau d'historique (≥ 20 pour s'afficher) ---- */
+export function demoHistoryItems(): HistoryItem[] {
+	// fragile+TOMBÉ / solide+PASSÉ = nos appels justes ; fragile+PASSÉ /
+	// solide+TOMBÉ = nos appels ratés, montrés sans filtre.
+	return [
+		{ matchLabel: 'LENS – NICE', fragile: true, passe: false },
+		{ matchLabel: 'REAL – SEVILLA', fragile: false, passe: true },
+		{ matchLabel: 'MILAN – TORINO', fragile: true, passe: false },
+		{ matchLabel: 'LYON – RENNES', fragile: false, passe: true },
+		{ matchLabel: 'PORTO – BRAGA', fragile: true, passe: true },
+		{ matchLabel: 'AJAX – FEYENOORD', fragile: false, passe: false },
+		{ matchLabel: 'CELTIC – RANGERS', fragile: true, passe: false },
+		{ matchLabel: 'BENFICA – SPORTING', fragile: false, passe: true },
+		{ matchLabel: 'NAPOLI – ROMA', fragile: true, passe: false },
+		{ matchLabel: 'DORTMUND – LEIPZIG', fragile: false, passe: true },
+		{ matchLabel: 'VILLARREAL – BETIS', fragile: true, passe: true },
+		{ matchLabel: 'MONACO – LILLE', fragile: false, passe: true },
+		{ matchLabel: 'ATALANTA – FIORENTINA', fragile: true, passe: false },
+		{ matchLabel: 'VALENCIA – OSASUNA', fragile: false, passe: false },
+		{ matchLabel: 'WOLFSBURG – MAINZ', fragile: true, passe: false },
+		{ matchLabel: 'NANTES – BREST', fragile: false, passe: true },
+		{ matchLabel: 'SEVILLA – GETAFE', fragile: true, passe: true },
+		{ matchLabel: 'LAZIO – UDINESE', fragile: false, passe: true },
+		{ matchLabel: 'PSV – AZ ALKMAAR', fragile: true, passe: false },
+		{ matchLabel: 'FRANKFURT – KÖLN', fragile: false, passe: true },
+		{ matchLabel: 'TWENTE – UTRECHT', fragile: true, passe: false },
+		{ matchLabel: 'BOLOGNA – GENOA', fragile: false, passe: true }
+	];
+}
+
+/* ---- Statistiques d'accueil ---- */
+export function demoStats() {
+	return { ticketsAnalyses: 18, fragilesMarques: 47, fragilesTombes: 31 };
+}
+
+/* ---- Tickets en cours (matchs à venir) ---- */
+export interface DemoEnCours {
+	id: string;
+	dateMs: number;
+	nbMatchs: number;
+	kickoffMs: number;
+}
+export function demoTicketsEnCours(nowMs: number): DemoEnCours[] {
+	const h = 3600 * 1000;
+	return [
+		{ id: 'demo-a', dateMs: nowMs - 2 * h, nbMatchs: 6, kickoffMs: nowMs + 5 * h },
+		{ id: 'demo-b', dateMs: nowMs - 26 * h, nbMatchs: 9, kickoffMs: nowMs + 20 * h }
+	];
+}
+
+/* ---- Historique : lignes de liste ---- */
+export interface DemoHistoLine {
+	id: string;
+	dateMs: number;
+	nbMatchs: number;
+	nbFragiles: number;
+	statut: 'attente' | 'passe' | 'tombe';
+	kickoffMs: number | null;
+	tombeSur: string | null;
+	verdictRenforce: boolean;
+}
+export function demoHistoLignes(nowMs: number): DemoHistoLine[] {
+	const d = 24 * 3600 * 1000;
+	return [
+		{ id: 'demo-a', dateMs: nowMs - 2 * 3600 * 1000, nbMatchs: 6, nbFragiles: 2, statut: 'attente', kickoffMs: nowMs + 5 * 3600 * 1000, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-b', dateMs: nowMs - 26 * 3600 * 1000, nbMatchs: 9, nbFragiles: 3, statut: 'attente', kickoffMs: nowMs + 20 * 3600 * 1000, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-1', dateMs: nowMs - 2 * d, nbMatchs: 7, nbFragiles: 2, statut: 'tombe', kickoffMs: null, tombeSur: 'LENS – NICE', verdictRenforce: true },
+		{ id: 'demo-2', dateMs: nowMs - 4 * d, nbMatchs: 5, nbFragiles: 1, statut: 'passe', kickoffMs: null, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-3', dateMs: nowMs - 6 * d, nbMatchs: 9, nbFragiles: 3, statut: 'tombe', kickoffMs: null, tombeSur: 'AJAX – FEYENOORD', verdictRenforce: false },
+		{ id: 'demo-4', dateMs: nowMs - 9 * d, nbMatchs: 4, nbFragiles: 0, statut: 'passe', kickoffMs: null, tombeSur: null, verdictRenforce: false }
+	];
+}
+
+/* ---- Détail d'un ticket de démonstration (lecture seule) ---- */
+export interface DemoDetail {
+	dateMs: number;
+	nbMatchs: number;
+	lignes: LineVM[];
+	probaTotalePct: number;
+	probaRenforceePct: number;
+	nbRetirees: number;
+	texte: string;
+}
+
+function line(
+	ordre: number,
+	matchLabel: string,
+	libelleFr: string,
+	cote: number,
+	probabilitePct: number,
+	fragile = false,
+	retiree = false
+): LineVM {
+	return {
+		ordre,
+		index: String(ordre).padStart(2, '0'),
+		matchLabel,
+		libelleFr,
+		cote,
+		fragile,
+		retiree,
+		analysable: true,
+		probabilitePct
+	};
+}
+
+export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
+	// Un détail soigné, réutilisé pour tout ticket de démonstration.
+	const lignes: LineVM[] = [
+		line(1, 'REAL – SEVILLA', 'Real gagne', 1.55, 63),
+		line(2, 'LENS – NICE', 'Plus de 2,5 buts', 1.95, 41, true, true),
+		line(3, 'LYON – RENNES', 'Les deux marquent', 1.72, 55),
+		line(4, 'MILAN – TORINO', 'Milan gagne', 2.1, 38, true, true),
+		line(5, 'PORTO – BRAGA', 'Porto ou match nul', 1.28, 74),
+		line(6, 'BENFICA – SPORTING', 'Moins de 3,5 buts', 1.4, 68),
+		line(7, 'MONACO – LILLE', 'Double chance Monaco', 1.33, 71)
+	];
+	const known = id === 'demo-a' || id === 'demo-b';
+	return {
+		dateMs: nowMs - (known ? 2 * 3600 * 1000 : 2 * 24 * 3600 * 1000),
+		nbMatchs: lignes.length,
+		lignes,
+		probaTotalePct: 4.2,
+		probaRenforceePct: 12.6,
+		nbRetirees: 2,
+		texte:
+			'Deux sélections tiraient tes chances vers le bas. En les retirant, ton ' +
+			'ticket renforcé devient nettement plus solide. Les cotes restent lisibles ' +
+			'pour que tu vérifies notre lecture.'
+	};
+}
+
+export function isDemoId(id: string): boolean {
+	return id.startsWith('demo-');
+}

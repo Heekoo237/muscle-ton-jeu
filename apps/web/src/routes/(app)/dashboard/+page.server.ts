@@ -4,6 +4,7 @@ import { sports, predictions } from '$lib/server/services';
 import { marketLabelFr } from '$lib/server/domain/market-map';
 import { dashboardStats, ticketsEnCours } from '$lib/server/fixtures/dashboardStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
+import { DEMO_MODE, demoStats, demoTicketsEnCours, demoHistoryItems } from '$lib/server/demo';
 
 export interface DailyMatch {
 	matchLabel: string;
@@ -57,13 +58,20 @@ export const load: PageServerLoad = async (event) => {
 		listHistoryMarquee(40)
 	]);
 
+	// DÉMO (convention) : on garnit les vues pour les rendre dynamiques tant que
+	// la base n'a pas de résultats réels. Voir lib/server/demo.ts (DEMO_MODE).
+	const now = Date.now();
+	const statsFinal = DEMO_MODE ? demoStats() : stats;
+	const enCoursFinal = DEMO_MODE ? [...enCours, ...demoTicketsEnCours(now)] : enCours;
+	const marquee = histo.length >= 20 ? histo : DEMO_MODE ? demoHistoryItems() : [];
+
 	return {
 		prenom: session.prenom,
 		credits: session.credits,
-		stats,
+		stats: statsFinal,
 		daily,
 		dailyVue,
-		ticketsEnCours: enCours,
-		historique: histo.length >= 20 ? histo : []
+		ticketsEnCours: enCoursFinal,
+		historique: marquee
 	};
 };
