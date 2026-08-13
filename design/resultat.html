@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Geist:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#EFE5D3; -webkit-font-smoothing:antialiased; }
+  a { color:#24201B; text-decoration-color:#C9B79A; text-underline-offset:2px; }
+  a:hover { text-decoration-color:#24201B; }
+</style>
+</helmet>
+
+<section style="min-height:100vh;background:#EFE5D3;padding:56px 40px;box-sizing:border-box;font-family:Geist, system-ui, sans-serif">
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:44px;max-width:70ch">
+    <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Muscle Ton Jeu · écran de résultat · 360 px</div>
+    <h1 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:44px;line-height:1;letter-spacing:-1.2px;color:#24201B;text-transform:uppercase">Trois façons de garder<br>les deux chiffres ensemble</h1>
+    <div style="font-size:18px;line-height:1.45;color:#4A4238">Même contenu, même ticket, mêmes tokens. Seul le dispositif qui maintient la comparaison lisible une fois les blocs empilés change. <a href="#1a">1a</a> bandeau collant · <a href="#1b">1b</a> synthèse en tête · <a href="#1c">1c</a> bascule.</div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:44px;align-items:flex-start">
+
+    <!-- ════════ 1a — BANDEAU RÉCAPITULATIF COLLANT ════════ -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:14px;width:360px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#24201B;color:#F8F1E4;border-radius:999px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:14px">1a</span>
+        <span style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Bandeau collant</span>
+      </div>
+
+      <div data-screen-label="Résultat 1a" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">10</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:14px;height:48px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</span>
+          <span style="font-size:16px;color:#6E6357">→</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</span>
+        </div>
+
+        <div style="padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:32px;line-height:1;letter-spacing:-0.8px;color:#24201B;text-transform:uppercase">Ton ticket, lu</h2>
+
+          <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket</span>
+              <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">9 sélections</span>
+            </div>
+            <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts · fragile" odds="1.85" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne · fragile" odds="2.10" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts · fragile" odds="1.45" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+            <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</div>
+              <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 43,43</div>
+            </div>
+          </div>
+
+          <div style="background:#FFFFFF;border:1px solid #C9B79A;border-top:3px solid #E8B9A8;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket renforcé</span>
+              <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">6 sur 9</span>
+            </div>
+            <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts" odds="1.85" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne" odds="2.10" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts" odds="1.45" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+            <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</div>
+              <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 7,71</div>
+            </div>
+          </div>
+
+          <div style="background:#FBEAE3;border:1px solid #E8B9A8;border-radius:14px;padding:20px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:18px;line-height:1.45;color:#24201B">3 matchs retirés. Tes chances passent de <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">1,3 %</span> à <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">7,5 %</span>.</div>
+            <div style="font-size:14px;line-height:1.4;color:#6E6357">Une probabilité n'est pas une garantie. Joue de façon responsable · 18+</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button style="width:100%;height:52px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Voir le détail</button>
+            <button style="width:100%;height:52px;background:#24201B;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Partager</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#F8F1E4;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Le compromis</div>
+        <div style="font-size:16px;line-height:1.5;color:#4A4238">Les deux chiffres sont visibles <strong style="font-weight:400;color:#24201B">100 % du temps</strong>, à n'importe quelle position de scroll — c'est le seul dispositif qui garantit ça.<br><br>Prix payé : 48 px de hauteur perdus en permanence (108 px avec la barre de crédits, sur un écran de 640 px utiles), un chiffre-md réduit au lieu du chiffre-xl, et l'accent est dépensé par le bandeau — le bouton de partage doit donc passer en sombre.</div>
+      </div>
+    </div>
+
+    <!-- ════════ 1b — SYNTHÈSE EN TÊTE ════════ -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:14px;width:360px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#24201B;color:#F8F1E4;border-radius:999px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:14px">1b</span>
+        <span style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Synthèse en tête</span>
+      </div>
+
+      <div data-screen-label="Résultat 1b" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">10</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+        </div>
+
+        <div style="padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:32px;line-height:1;letter-spacing:-0.8px;color:#24201B;text-transform:uppercase">Ton ticket, lu</h2>
+
+          <div style="background:#FFFFFF;border:1px solid #C9B79A;border-top:3px solid #E8B9A8;border-radius:20px;padding:20px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:flex-end;gap:12px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:14px;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Ton ticket</div>
+                <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</div>
+              </div>
+              <div style="flex:0 0 1px;align-self:stretch;background:#E2D6C0"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:14px;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Renforcé</div>
+                <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</div>
+              </div>
+            </div>
+            <div style="height:1px;background:#E2D6C0"></div>
+            <div style="font-size:18px;line-height:1.45;color:#24201B">3 matchs retirés. Tes chances passent de 1,3 % à 7,5 %.</div>
+            <div style="font-size:14px;line-height:1.4;color:#6E6357">Une probabilité n'est pas une garantie. Joue de façon responsable · 18+</div>
+          </div>
+
+          <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket</span>
+              <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">9 sélections</span>
+            </div>
+            <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts · fragile" odds="1.85" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne · fragile" odds="2.10" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts · fragile" odds="1.45" state="fragile" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+          </div>
+
+          <div style="background:#FFFFFF;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket renforcé</span>
+              <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">6 sur 9</span>
+            </div>
+            <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts" odds="1.85" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne" odds="2.10" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts" odds="1.45" state="removed" hint-size="100%,64px"></dc-import>
+            <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button style="width:100%;height:52px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Voir le détail</button>
+            <button style="width:100%;height:52px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Partager</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#F8F1E4;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Le compromis</div>
+        <div style="font-size:16px;line-height:1.5;color:#4A4238">Les deux <strong style="font-weight:400;color:#24201B">chiffre-xl 52 px côte à côte dès l'ouverture</strong>, sans rien voler à l'écran, et la réponse est donnée avant l'effort de lecture. Les listes deviennent la preuve, pas la découverte.<br><br>Prix payé : dès qu'on descend dans les listes, la synthèse est partie — plus aucun rappel. Les en-têtes de bloc reprennent donc le % en small, ce qui reste un chiffre secondaire. Et le pourcentage n'apparaît plus en pied de colonne : on perd le lien « cette liste → ce chiffre ».</div>
+      </div>
+    </div>
+
+    <!-- ════════ 1c — BASCULE ════════ -->
+    <div id="1c" style="display:flex;flex-direction:column;gap:14px;width:360px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#24201B;color:#F8F1E4;border-radius:999px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:14px">1c</span>
+        <span style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Bascule entre les deux vues</span>
+      </div>
+
+      <div data-screen-label="Résultat 1c" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">10</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+        </div>
+
+        <div style="padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:32px;line-height:1;letter-spacing:-0.8px;color:#24201B;text-transform:uppercase">Ton ticket, lu</h2>
+
+          <div style="display:flex;gap:8px;padding:6px;background:#EFE5D3;border-radius:999px">
+            <button onClick="{{ showOriginal }}" style="flex:1;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:{{ leftBg }};border:{{ leftBorder }};border-radius:999px;font-family:inherit;cursor:pointer;transition:opacity 150ms ease-out">
+              <span style="font-size:14px;font-weight:600;color:{{ leftInk }}">Ton ticket</span>
+              <span style="font-size:16px;font-weight:600;color:{{ leftInk }};font-variant-numeric:tabular-nums">1,3 %</span>
+            </button>
+            <button onClick="{{ showRenforce }}" style="flex:1;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:{{ rightBg }};border:{{ rightBorder }};border-radius:999px;font-family:inherit;cursor:pointer;transition:opacity 150ms ease-out">
+              <span style="font-size:14px;font-weight:600;color:{{ rightInk }}">Renforcé</span>
+              <span style="font-size:16px;font-weight:600;color:{{ rightInk }};font-variant-numeric:tabular-nums">7,5 %</span>
+            </button>
+          </div>
+
+          <sc-if value="{{ isOriginal }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:20px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+                <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket</span>
+                <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">9 sélections</span>
+              </div>
+              <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts · fragile" odds="1.85" state="fragile" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne · fragile" odds="2.10" state="fragile" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts · fragile" odds="1.45" state="fragile" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+              <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</div>
+                <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 43,43</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isRenforce }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#FFFFFF;border:1px solid #C9B79A;border-top:3px solid #E8B9A8;border-radius:20px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 16px;gap:12px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+                <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B;white-space:nowrap">Ton ticket renforcé</span>
+                <span style="flex:0 0 auto;font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums;white-space:nowrap">6 sur 9</span>
+              </div>
+              <dc-import name="TicketRow" idx="01" match="Arsenal – Liverpool" market="Arsenal ou match nul" odds="1.42" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="02" match="Marseille – Lyon" market="Plus de 2,5 buts" odds="1.85" state="removed" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="03" match="Napoli – Roma" market="Napoli gagne" odds="2.10" state="removed" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="04" match="Bayern – Dortmund" market="Les deux marquent" odds="1.55" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="05" match="Real – Sevilla" market="Real gagne" odds="1.38" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="06" match="PSG – Nice" market="Plus de 1,5 but" odds="1.22" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="07" match="Chelsea – Everton" market="Chelsea ou nul" odds="1.30" state="solid" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="08" match="Inter – Lazio" market="Moins de 3,5 buts" odds="1.45" state="removed" hint-size="100%,64px"></dc-import>
+              <dc-import name="TicketRow" idx="09" match="Ajax – PSV" market="Les deux marquent" odds="1.60" state="solid" hint-size="100%,64px"></dc-import>
+              <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</div>
+                <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 7,71</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="background:#FBEAE3;border:1px solid #E8B9A8;border-radius:14px;padding:20px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:18px;line-height:1.45;color:#24201B">3 matchs retirés. Tes chances passent de <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">1,3 %</span> à <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">7,5 %</span>.</div>
+            <div style="font-size:14px;line-height:1.4;color:#6E6357">Une probabilité n'est pas une garantie. Joue de façon responsable · 18+</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button style="width:100%;height:52px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Voir le détail</button>
+            <button style="width:100%;height:52px;background:#24201B;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Partager</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#F8F1E4;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#6E6357">Le compromis</div>
+        <div style="font-size:16px;line-height:1.5;color:#4A4238">Écran <strong style="font-weight:400;color:#24201B">deux fois plus court</strong> : une seule liste à la fois, et les deux % sont inscrits dans la bascule elle-même — donc toujours lisibles, sans bandeau supplémentaire. La bascule fait 48 px et sert de cible tactile.<br><br>Prix payé : la comparaison devient une action, plus une lecture. Il faut mémoriser une liste pour la comparer à l'autre, et le tap est un coût réel. La bascule contenant déjà 7,5 %, l'accent y est neutralisé (encre et crème) et le bouton de partage passe en sombre.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { view: 'original' };
+  renderVals() {
+    const o = this.state.view === 'original';
+    return {
+      isOriginal: o,
+      isRenforce: !o,
+      showOriginal: () => this.setState({ view: 'original' }),
+      showRenforce: () => this.setState({ view: 'renforce' }),
+      leftBg: o ? '#24201B' : '#FFFFFF',
+      rightBg: o ? '#FFFFFF' : '#24201B',
+      leftInk: o ? '#F8F1E4' : '#24201B',
+      rightInk: o ? '#24201B' : '#F8F1E4',
+      leftBorder: o ? 'none' : '1px solid #C9B79A',
+      rightBorder: o ? '1px solid #C9B79A' : 'none'
+    };
+  }
+}
+
+</script>
+</body>
+</html>

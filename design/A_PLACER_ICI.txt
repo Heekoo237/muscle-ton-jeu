@@ -1,8 +1,0 @@
-Place ici les fichiers produits par Claude Design :
-
-  DESIGN.md        -> a placer a la RACINE du depot, pas dans ce dossier
-  landing.html     -> ici, sous le nom exact landing.html
-  resultat.html    -> ici, sous le nom exact resultat.html
-  captures/        -> tes captures d'ecran des maquettes
-
-Ces noms sont ceux referencies dans le tableau d'autorite du CLAUDE.md.

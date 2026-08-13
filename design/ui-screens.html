@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Geist:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#EFE5D3; -webkit-font-smoothing:antialiased; }
+  a { color:#24201B; text-decoration-color:#C9B79A; text-underline-offset:2px; }
+  a:hover { text-decoration-color:#24201B; }
+  * { text-wrap:pretty; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#EFE5D3;padding:56px 40px;font-family:Geist, system-ui, sans-serif;box-sizing:border-box">
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:48px">
+    <div style="font-family:Anton, Impact, sans-serif;font-size:44px;line-height:1;letter-spacing:-1.2px;color:#C93A1A;text-transform:uppercase">Muscle Ton Jeu</div>
+    <div style="font-size:16px;line-height:1.5;color:#4A4238;max-width:60ch">Design system v1.0 — trois écrans à la largeur de référence de 360 px. Crème chaud, un seul accent brûlant par écran, aucune ombre, aucun angle vif.</div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start">
+
+    <!-- ══════════ ÉCRAN 1 — ACCUEIL ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">01</div>
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#4A4238">Accueil · dashboard</div>
+      </div>
+      <div data-screen-label="Accueil" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <!-- credits-bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">12</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Recharger</button>
+        </div>
+
+        <!-- hero -->
+        <div style="padding:48px 16px;background:linear-gradient(180deg,#FBEAE3 0%,#F8F1E4 100%);display:flex;flex-direction:column;gap:20px">
+          <h1 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:44px;line-height:1;letter-spacing:-1.2px;color:#24201B;text-transform:uppercase;text-wrap:balance">Ton ticket<br>tient-il<br>debout ?</h1>
+          <div style="font-size:18px;line-height:1.45;color:#4A4238">Envoie la capture de ton ticket. On te montre les sélections fragiles et ton ticket renforcé, côte à côte.</div>
+          <button style="width:100%;height:52px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Analyser mon ticket</button>
+          <div style="font-size:14px;line-height:1.4;color:#6E6357">Outil d'analyse et d'aide à la décision — pas un pronostic garanti · 18+</div>
+        </div>
+
+        <!-- analyse du matin -->
+        <div style="padding:40px 16px;background:#F8F1E4;border-top:1px solid #E2D6C0;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:24px;line-height:1.05;letter-spacing:-0.5px;color:#24201B;text-transform:uppercase">L'analyse du matin</h2>
+          <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+              <div style="font-size:16px;color:#24201B">Lens – Nice</div>
+              <div style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357;font-variant-numeric:tabular-nums">20:45</div>
+            </div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+              <div style="font-size:14px;color:#4A4238">Lens gagne · cote proposée</div>
+              <div style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">2,40</div>
+            </div>
+            <div style="height:1px;background:#E2D6C0"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="font-size:14px;color:#6E6357">Chances réelles</div>
+              <div style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">31,0 %</div>
+            </div>
+            <div style="font-size:14px;line-height:1.4;color:#6E6357">Une probabilité n'est pas une garantie. Joue de façon responsable · 18+</div>
+          </div>
+        </div>
+
+        <!-- mes tickets -->
+        <div style="padding:48px 16px;background:#EFE5D3;border-top:1px solid #E2D6C0;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:24px;line-height:1.05;letter-spacing:-0.5px;color:#24201B;text-transform:uppercase">Mes tickets</h2>
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Sam. 14 · 9 matchs</div>
+                <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#EFE5D3;border-radius:999px;font-size:14px;color:#6E6357">En attente</span>
+              </div>
+              <div style="font-size:14px;color:#4A4238">3 marqués fragiles</div>
+              <div style="font-size:16px;color:#24201B">Ce soir <span style="font-family:'JetBrains Mono', monospace;font-weight:500;font-variant-numeric:tabular-nums">20:45</span></div>
+            </div>
+
+            <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Jeu. 12 · 6 matchs</div>
+              <div style="font-size:14px;color:#4A4238">1 marqué fragile</div>
+              <div style="font-size:16px;color:#24201B">Ton ticket est passé</div>
+            </div>
+
+            <div style="background:#EFE5D3;border:1px solid #E2D6C0;border-left:3px solid #8C6309;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Mar. 10 · 11 matchs</div>
+              <div style="font-size:14px;color:#4A4238">4 marqués fragiles</div>
+              <div style="font-size:16px;color:#24201B">Tombé sur Milan – Roma</div>
+              <div style="font-size:14px;color:#8C6309">La version renforcée serait passée</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- bilan -->
+        <div style="padding:40px 16px;background:#F8F1E4;border-top:1px solid #E2D6C0;display:flex;flex-direction:column;gap:16px">
+          <h2 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:24px;line-height:1.05;letter-spacing:-0.5px;color:#24201B;text-transform:uppercase">Bilan</h2>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);background:#EFE5D3;border-radius:14px;padding:24px 16px">
+            <div style="display:flex;flex-direction:column;gap:4px;padding-right:12px">
+              <div style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">18</div>
+              <div style="font-size:14px;line-height:1.4;color:#4A4238">tickets analysés</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;padding:0 12px;border-left:1px solid #E2D6C0">
+              <div style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">47</div>
+              <div style="font-size:14px;line-height:1.4;color:#4A4238">matchs marqués fragiles</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;padding-left:12px;border-left:1px solid #E2D6C0">
+              <div style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">31</div>
+              <div style="font-size:14px;line-height:1.4;color:#4A4238">sont effectivement tombés</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- footer -->
+        <div style="padding:32px 16px;background:#24201B;display:flex;flex-direction:column;gap:20px">
+          <div style="font-family:Anton, Impact, sans-serif;font-size:24px;line-height:1;letter-spacing:-0.5px;color:#F8F1E4">MTJ</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <a href="#" style="font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Historique public</a>
+            <a href="#" style="font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Jeu responsable</a>
+            <a href="#" style="font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Aide</a>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border:1px solid rgba(248,241,228,0.35);border-radius:999px;font-size:14px;font-weight:600;letter-spacing:0.6px;color:#F8F1E4">18+</span>
+            <span style="font-size:14px;color:rgba(248,241,228,0.72)">Mentions légales · CGU</span>
+          </div>
+          <div style="font-size:14px;line-height:1.4;color:rgba(248,241,228,0.72)">Muscle Ton Jeu n'accepte aucune mise et ne verse aucun gain.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════ ÉCRAN 2 — VALIDATION DE LECTURE ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">02</div>
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#4A4238">Validation de lecture</div>
+      </div>
+      <div data-screen-label="Validation" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">12</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;background:#F8F1E4;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <button aria-label="Retour" style="width:48px;height:48px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;background:#FFFFFF;border:1px solid #E2D6C0;border-radius:999px;color:#24201B;font-family:inherit;font-size:18px;cursor:pointer">←</button>
+          <div style="flex:1;text-align:center;font-size:18px;font-weight:600;letter-spacing:-0.2px;color:#24201B">Validation de lecture</div>
+          <button aria-label="Aide" style="width:48px;height:48px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;background:#FFFFFF;border:1px solid #E2D6C0;border-radius:999px;color:#24201B;font-family:inherit;font-size:16px;cursor:pointer">?</button>
+        </div>
+
+        <div style="padding:24px 16px 48px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h1 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:32px;line-height:1;letter-spacing:-0.8px;color:#24201B;text-transform:uppercase;text-wrap:balance">Vérifie ta lecture</h1>
+            <div style="font-size:16px;line-height:1.5;color:#4A4238">Tape sur une ligne pour la corriger. Aucune saisie au clavier.</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+
+            <div style="display:flex;align-items:center;gap:12px;min-height:64px;padding:12px 16px;background:#FFFFFF;border:1px solid #E2D6C0;border-left:3px solid #2F6B41;border-radius:14px;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">01</span>
+              <span style="flex:0 0 16px;color:#2F6B41;font-size:16px;font-weight:600;line-height:1">✓</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;color:#24201B">Arsenal – Chelsea</div>
+                <div style="font-size:14px;color:#4A4238">Arsenal ou match nul</div>
+              </div>
+              <span style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums;text-align:right;flex:0 0 44px">1,45</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;min-height:64px;padding:12px 16px;background:#FFFFFF;border:1px solid #E2D6C0;border-left:3px solid #2F6B41;border-radius:14px;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">02</span>
+              <span style="flex:0 0 16px;color:#2F6B41;font-size:16px;font-weight:600;line-height:1">✓</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;color:#24201B">Real Madrid – Getafe</div>
+                <div style="font-size:14px;color:#4A4238">Plus de 1,5 but</div>
+              </div>
+              <span style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums;text-align:right;flex:0 0 44px">1,30</span>
+            </div>
+
+            <div style="padding:12px 16px;background:#F6E9CB;border:1px solid #D9BC72;border-left:3px solid #8C6309;border-radius:14px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">03</span>
+                <span style="flex:0 0 16px;color:#8C6309;font-size:16px;line-height:1">▲</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:16px;color:#24201B">Lens – Nice</div>
+                  <div style="font-size:14px;color:#8C6309">« 1X » — deux lectures possibles</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button style="height:48px;padding:0 16px;background:#FFFFFF;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;color:#24201B;text-align:left;cursor:pointer">Lens ou match nul</button>
+                <button style="height:48px;padding:0 16px;background:#FFFFFF;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;color:#24201B;text-align:left;cursor:pointer">Lens gagne</button>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;min-height:64px;padding:12px 16px;background:#F6E2DC;border:1px solid #E2D6C0;border-left:3px solid #8E241C;border-radius:14px;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">04</span>
+              <span style="flex:0 0 16px;color:#8E241C;font-size:16px;font-weight:600;line-height:1">✕</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;color:#24201B">Bayern – Leipzig</div>
+                <div style="font-size:14px;color:#6E6357">Mi-temps · non analysée — non facturée</div>
+              </div>
+              <button style="height:48px;padding:0 12px;background:transparent;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;color:#4A4238;cursor:pointer">Retirer</button>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;min-height:64px;padding:12px 16px;background:#FFFFFF;border:1px solid #E2D6C0;border-left:3px solid #2F6B41;border-radius:14px;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">05</span>
+              <span style="flex:0 0 16px;color:#2F6B41;font-size:16px;font-weight:600;line-height:1">✓</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;color:#24201B">PSG – Nantes</div>
+                <div style="font-size:14px;color:#4A4238">PSG gagne</div>
+              </div>
+              <span style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums;text-align:right;flex:0 0 44px">1,28</span>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:center;height:48px;background:#EFE5D3;border-radius:14px;font-size:14px;color:#6E6357">4 lignes vérifiées de plus</div>
+
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button style="width:100%;height:52px;background:#24201B;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums;transition:transform 150ms ease-out">Analyser 7 matchs sur 9</button>
+            <div style="font-size:14px;color:#6E6357;text-align:center">2 crédits · les lignes rouges ne sont pas comptées</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════ ÉCRAN 3 — RÉSULTAT ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">03</div>
+        <div style="font-size:14px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#4A4238">Résultat · module de comparaison empilé</div>
+      </div>
+      <div data-screen-label="Résultat" style="width:360px;background:#F8F1E4;border:1px solid #C9B79A;border-radius:20px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:22px;font-weight:600;line-height:1.1;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">10</span>
+            <span style="font-size:16px;color:#4A4238">crédits</span>
+          </div>
+          <button style="height:48px;padding:0 16px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+        </div>
+
+        <!-- compare-sticky -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;height:48px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</span>
+          <span style="font-size:16px;color:#6E6357">→</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</span>
+        </div>
+
+        <div style="padding:24px 16px 48px;display:flex;flex-direction:column;gap:16px">
+
+          <h1 style="margin:0;font-family:Anton, Impact, sans-serif;font-weight:400;font-size:32px;line-height:1;letter-spacing:-0.8px;color:#24201B;text-transform:uppercase;text-wrap:balance">Ton ticket, lu</h1>
+
+          <button style="align-self:flex-start;height:48px;padding:0 16px;background:#FFFFFF;border:1px solid #C9B79A;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;color:#24201B;cursor:pointer">Voir seulement ce qui change</button>
+
+          <!-- BLOC 1 — TON TICKET (E2) -->
+          <div style="background:#FFFFFF;border:1px solid #E2D6C0;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:44px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B">Ton ticket</span>
+              <span style="font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums">9 sélections</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">01</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Arsenal – Chelsea</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Arsenal ou match nul</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,45</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">02</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Real Madrid – Getafe</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Plus de 1,5 but</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,30</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#F6E9CB;border-bottom:1px solid #E2D6C0;border-left:3px solid #8C6309;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">03</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Lens – Nice</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#8C6309;white-space:nowrap;overflow:hidden"><span style="line-height:1">▲</span>Lens gagne · fragile</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">2,40</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">04</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bayern – Leipzig</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Les deux équipes marquent</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,72</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">05</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">PSG – Nantes</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">PSG gagne</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,28</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#F6E9CB;border-bottom:1px solid #E2D6C0;border-left:3px solid #8C6309;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">06</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Milan – Roma</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#8C6309;white-space:nowrap;overflow:hidden"><span style="line-height:1">▲</span>Plus de 2,5 buts · fragile</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">2,05</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">07</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ajax – Twente</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ajax ou match nul</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,35</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">08</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Séville – Cadix</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Séville gagne</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,55</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#F6E9CB;border-bottom:1px solid #E2D6C0;border-left:3px solid #8C6309;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">09</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Porto – Braga</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#8C6309;white-space:nowrap;overflow:hidden"><span style="line-height:1">▲</span>Braga ou match nul · fragile</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">3,10</span>
+            </div>
+
+            <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#24201B;font-variant-numeric:tabular-nums">1,3 %</div>
+              <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 61,20</div>
+            </div>
+          </div>
+
+          <!-- BLOC 2 — TON TICKET RENFORCÉ (E3) -->
+          <div style="background:#FFFFFF;border:1px solid #C9B79A;border-top:3px solid #E8B9A8;border-radius:20px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:44px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="font-size:18px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:#24201B">Ton ticket renforcé</span>
+              <span style="font-size:14px;color:#6E6357;font-variant-numeric:tabular-nums">6 sélections</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">01</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Arsenal – Chelsea</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Arsenal ou match nul</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,45</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">02</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Real Madrid – Getafe</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Plus de 1,5 but</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,30</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">03</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Lens – Nice</div>
+                <div style="font-size:14px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Lens gagne</div>
+              </div>
+              <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#F8F1E4;border-radius:999px;font-size:14px;color:#6E6357;flex:0 0 auto">retiré</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">04</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bayern – Leipzig</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Les deux équipes marquent</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,72</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">05</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">PSG – Nantes</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">PSG gagne</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,28</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">06</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Milan – Roma</div>
+                <div style="font-size:14px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Plus de 2,5 buts</div>
+              </div>
+              <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#F8F1E4;border-radius:999px;font-size:14px;color:#6E6357;flex:0 0 auto">retiré</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">07</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ajax – Twente</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ajax ou match nul</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,35</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">08</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#24201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Séville – Cadix</div>
+                <div style="font-size:14px;color:#4A4238;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Séville gagne</div>
+              </div>
+              <span style="flex:0 0 56px;text-align:right;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#24201B;font-variant-numeric:tabular-nums">1,55</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#EFE5D3;border-bottom:1px solid #E2D6C0;box-sizing:border-box">
+              <span style="flex:0 0 24px;font-family:'JetBrains Mono', monospace;font-weight:500;font-size:16px;color:#6E6357">09</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="font-size:16px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Porto – Braga</div>
+                <div style="font-size:14px;color:#6E6357;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Braga ou match nul</div>
+              </div>
+              <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#F8F1E4;border-radius:999px;font-size:14px;color:#6E6357;flex:0 0 auto">retiré</span>
+            </div>
+
+            <div style="padding:20px 16px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:52px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:#C93A1A;font-variant-numeric:tabular-nums">7,5 %</div>
+              <div style="font-size:14px;color:#6E6357">chances que le ticket passe · cote 8,05</div>
+            </div>
+          </div>
+
+          <!-- ligne de verdict -->
+          <div style="background:#FBEAE3;border:1px solid #E8B9A8;border-radius:14px;padding:20px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:18px;line-height:1.45;color:#24201B">3 matchs retirés. Tes chances passent de <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">1,3 %</span> à <span style="font-size:22px;font-weight:600;letter-spacing:-0.4px;font-variant-numeric:tabular-nums">7,5 %</span>.</div>
+            <div style="font-size:14px;line-height:1.4;color:#6E6357">Une probabilité n'est pas une garantie. Joue de façon responsable · 18+</div>
+          </div>
+
+          <button style="width:100%;height:52px;background:#C93A1A;color:#F8F1E4;border:none;border-radius:999px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:transform 150ms ease-out">Partager</button>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
