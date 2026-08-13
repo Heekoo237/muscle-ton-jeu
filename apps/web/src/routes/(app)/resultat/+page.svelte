@@ -1,47 +1,29 @@
 <script lang="ts">
-	// Écran de résultat — module de comparaison EMPILÉ (maquette ui-screens ÉCRAN 3).
-	// Bandeau collant avec les deux %, puis « Ton ticket » (E2) et « Ton ticket
-	// renforcé » (E3) en listes de lignes 64 px, chaque bloc terminé par son
-	// chiffre-xl. Le module papier côte à côte est réservé à la landing.
+	// Écran de résultat. La comparaison « Ton ticket » / « Ton ticket renforcé »
+	// est en vue PAPIER (même langage que la landing) ; tout le reste est conservé :
+	// analyse, verdict, lecture détaillée match par match, partage, recharge,
+	// notifications, bandeau d'historique.
 	import type { PageData, ActionData } from './$types';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
+	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
 
-	let onlyChanges = $state(false);
-
 	function pctBig(v: number): string {
 		return `${v.toString().replace('.', ',')} %`;
 	}
-	function cote(v: number): string {
-		return v.toFixed(2).replace('.', ',');
-	}
-	/** Cote totale = produit des cotes fournies. */
-	function coteTotale(lignes: { cote: number | null }[]): string {
-		const p = lignes.reduce((acc, l) => acc * (l.cote ?? 1), 1);
-		return cote(p);
-	}
 
 	const analysables = $derived(vm.lignes.filter((l) => l.analysable));
-	const gardees = $derived(analysables.filter((l) => !l.retiree));
-	const gaucheVisible = $derived(onlyChanges ? analysables.filter((l) => l.fragile) : analysables);
-	const droiteVisible = $derived(onlyChanges ? analysables.filter((l) => l.retiree) : analysables);
-	const inchangees = $derived(analysables.filter((l) => !l.fragile && !l.retiree).length);
-
-	// Révélation sobre, une fois, moins de 1,2 s (CSS pur, jeu de délais) :
-	// ticket gauche → ses lignes en cascade → son chiffre → ticket droit → traits
-	// sur les retirées → le chiffre accent en dernier. Les chiffres apparaissent,
-	// ils ne s'animent pas. Aucun compteur, aucun rebond, aucune célébration.
-	const STEP = 40; // ms entre deux lignes
-	const nL = $derived(gaucheVisible.length);
-	const nR = $derived(droiteVisible.length);
-	const dLeftPct = $derived(140 + nL * STEP + 40);
-	const dRightBase = $derived(dLeftPct + 140);
-	const dRightPct = $derived(dRightBase + nR * STEP + 60);
-	const leftRowDelay = (i: number) => 140 + i * STEP;
-	const rightRowDelay = (i: number) => dRightBase + i * STEP;
+	const paperLines = $derived(
+		analysables.map((l) => ({
+			matchLabel: l.matchLabel,
+			libelleFr: l.libelleFr,
+			fragile: l.fragile,
+			retiree: l.retiree
+		}))
+	);
 
 	// Lecture détaillée du coupon : match par match, repliée par défaut.
 	let showDetail = $state(false);
@@ -58,13 +40,6 @@
 
 <svelte:head><title>Ton ticket, lu — Muscle Ton Jeu</title></svelte:head>
 
-<!-- Bandeau collant : les deux % visibles à tout moment du scroll (§8.4) -->
-<div class="compare-sticky">
-	<span class="p ink">{pctBig(vm.probaTotalePct)}</span>
-	<span class="arrow">→</span>
-	<span class="p accent">{pctBig(vm.probaRenforceePct)}</span>
-</div>
-
 <main class="container">
 	<div class="tete">
 		<h1 class="t-h1">Ton ticket, lu</h1>
@@ -79,70 +54,14 @@
 
 	<p class="t-body-lg analyse">{vm.texte}</p>
 
-	<button class="chip" type="button" onclick={() => (onlyChanges = !onlyChanges)}>
-		{onlyChanges ? 'Voir tout le ticket' : 'Voir seulement ce qui change'}
-	</button>
-
-	<!-- BLOC 1 — TON TICKET (E2) -->
-	<section class="bloc e2 rvl-fade" style="animation-delay:60ms">
-		<header class="bloc-head">
-			<span class="titre">Ton ticket</span>
-			<span class="compte">{analysables.length} sélections</span>
-		</header>
-		{#each gaucheVisible as l, i (l.ordre)}
-			<div class="row rvl" class:fragile={l.fragile} style="animation-delay:{leftRowDelay(i)}ms">
-				<span class="idx">{l.index}</span>
-				<div class="mid">
-					<div class="match">{l.matchLabel}</div>
-					<div class="marche" class:oc={l.fragile}>
-						{#if l.fragile}<span class="tri">▲</span>{/if}{l.libelleFr}{l.fragile ? ' · fragile' : ''}
-					</div>
-				</div>
-				{#if l.cote != null}<span class="cote">{cote(l.cote)}</span>{/if}
-			</div>
-		{/each}
-		{#if onlyChanges && inchangees > 0}
-			<div class="inchange">{inchangees} sélections inchangées</div>
-		{/if}
-		<div class="pied rvl-fade" style="animation-delay:{dLeftPct}ms">
-			<div class="xl ink">{pctBig(vm.probaTotalePct)}</div>
-			<div class="sous">chances que le ticket passe · cote {coteTotale(analysables)}</div>
-		</div>
-	</section>
-
-	<!-- BLOC 2 — TON TICKET RENFORCÉ (E3) -->
-	<section class="bloc e3 rvl-fade" style="animation-delay:{dRightBase - 40}ms">
-		<header class="bloc-head">
-			<span class="titre">Ton ticket renforcé</span>
-			<span class="compte">{gardees.length} sélections</span>
-		</header>
-		{#each droiteVisible as l, i (l.ordre)}
-			<div class="row rvl" class:removed={l.retiree} style="animation-delay:{rightRowDelay(i)}ms">
-				<span class="idx">{l.index}</span>
-				<div class="mid">
-					<div class="match" class:strike={l.retiree}>
-						{l.matchLabel}
-						{#if l.retiree}
-							<span class="trace" style="animation-delay:{rightRowDelay(i) + 120}ms"></span>
-						{/if}
-					</div>
-					<div class="marche" class:strike={l.retiree}>{l.libelleFr}</div>
-				</div>
-				{#if l.retiree}
-					<span class="badge">retiré</span>
-				{:else if l.cote != null}
-					<span class="cote">{cote(l.cote)}</span>
-				{/if}
-			</div>
-		{/each}
-		{#if onlyChanges && inchangees > 0}
-			<div class="inchange">{inchangees} sélections inchangées</div>
-		{/if}
-		<div class="pied rvl-fade" style="animation-delay:{dRightPct}ms">
-			<div class="xl accent">{pctBig(vm.probaRenforceePct)}</div>
-			<div class="sous">chances que le ticket passe · cote {coteTotale(gardees)}</div>
-		</div>
-	</section>
+	<!-- Comparaison en tickets papier -->
+	<div class="paper rvl-fade">
+		<PaperTicketCompare
+			lines={paperLines}
+			probaTotalePct={vm.probaTotalePct}
+			probaRenforceePct={vm.probaRenforceePct}
+		/>
+	</div>
 
 	<!-- Ligne de verdict -->
 	<div class="verdict" aria-live="polite">
@@ -244,42 +163,12 @@
 </main>
 
 <style>
-	.compare-sticky {
-		position: sticky;
-		top: 60px;
-		z-index: 15;
-		height: 48px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-		background: var(--c-canvas-sunk);
-		border-bottom: 1px solid var(--c-line);
-	}
-	.compare-sticky .p {
-		font-family: var(--font-body);
-		font-weight: 600;
-		font-size: 22px;
-		letter-spacing: -0.4px;
-		font-feature-settings: 'tnum' 1;
-	}
-	.compare-sticky .ink {
-		color: var(--c-ink);
-	}
-	.compare-sticky .accent {
-		color: var(--c-accent);
-	}
-	.compare-sticky .arrow {
-		color: var(--c-ink-3);
-		font-size: 16px;
-	}
-
 	main {
 		padding-top: var(--s-6);
 		padding-bottom: var(--s-12);
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-4);
+		gap: var(--s-5);
 	}
 	.tete {
 		display: flex;
@@ -305,183 +194,13 @@
 		color: var(--c-ocre);
 		margin: 0;
 	}
-
-	.chip {
-		align-self: flex-start;
-		height: 48px;
-		padding: 0 var(--s-4);
-		background: var(--c-surface);
-		border: 1px solid var(--c-line-strong);
-		border-radius: var(--r-pill);
-		font-family: var(--font-body);
-		font-size: 16px;
-		font-weight: 600;
-		color: var(--c-ink);
-		cursor: pointer;
-	}
-
-	.bloc {
-		background: var(--c-surface);
-		border: 1px solid var(--c-line);
-		border-radius: var(--r-lg);
-		overflow: hidden;
-	}
-	.bloc.e3 {
-		border-color: var(--c-line-strong);
-		border-top: 3px solid var(--c-accent-line);
-	}
-	.bloc-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-2);
-		height: 44px;
-		padding: 0 var(--s-4);
-		background: var(--c-canvas-sunk);
-		border-bottom: 1px solid var(--c-line);
-	}
-	.bloc-head .titre {
-		font-family: var(--font-body);
-		font-size: 18px;
-		font-weight: 600;
-		letter-spacing: 0.6px;
-		text-transform: uppercase;
-		color: var(--c-ink);
-	}
-	.bloc-head .compte {
-		font-size: 14px;
-		color: var(--c-ink-3);
-		font-feature-settings: 'tnum' 1;
-	}
-
-	.row {
-		display: flex;
-		align-items: center;
-		gap: var(--s-3);
-		height: 64px;
-		padding: 0 var(--s-4);
-		border-bottom: 1px solid var(--c-line);
-		box-sizing: border-box;
-	}
-	.row.fragile {
-		background: var(--c-ocre-wash);
-		border-left: 3px solid var(--c-ocre);
-	}
-	.row.removed {
-		background: var(--c-canvas-sunk);
-	}
-	.idx {
-		flex: 0 0 24px;
-		font-family: var(--font-mono);
-		font-weight: 500;
-		font-size: 16px;
-		color: var(--c-ink-3);
-	}
-	.mid {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-	.match {
-		position: relative;
-		font-size: 16px;
-		color: var(--c-ink);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.marche {
-		font-size: 14px;
+	.analyse {
 		color: var(--c-ink-2);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: flex;
-		align-items: center;
-		gap: 5px;
+		margin: 0;
+		max-width: var(--measure);
 	}
-	.marche.oc {
-		color: var(--c-ocre);
-	}
-	.tri {
-		flex: 0 0 auto;
-		line-height: 1;
-		font-size: 13px;
-	}
-	/* Le match retiré est barré par un trait qui se trace (voir .trace) ;
-	   le marché garde son barré statique, toujours lisible (repli mouvement réduit). */
-	.match.strike {
-		color: var(--c-ink-3);
-	}
-	.marche.strike {
-		color: var(--c-ink-3);
-		text-decoration: line-through;
-	}
-	.trace {
-		position: absolute;
-		left: 0;
-		right: 0;
-		top: 50%;
-		height: 1px;
-		background: var(--c-ink-3);
-		transform: scaleX(0);
-		transform-origin: left center;
-		animation: trace-draw 200ms ease-out both;
-	}
-	.cote {
-		flex: 0 0 56px;
-		text-align: right;
-		font-family: var(--font-mono);
-		font-weight: 500;
-		font-size: 16px;
-		color: var(--c-ink);
-		font-feature-settings: 'tnum' 1;
-	}
-	.badge {
-		flex: 0 0 auto;
-		display: inline-flex;
-		align-items: center;
-		height: 28px;
-		padding: 0 var(--s-3);
-		background: var(--c-canvas);
-		border-radius: var(--r-pill);
-		font-size: 14px;
-		color: var(--c-ink-3);
-	}
-	.inchange {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 48px;
-		background: var(--c-canvas-sunk);
-		font-size: 14px;
-		color: var(--c-ink-3);
-	}
-	.pied {
-		padding: var(--s-5) var(--s-4);
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-1);
-	}
-	.xl {
-		font-family: var(--font-body);
-		font-weight: 600;
-		font-size: 52px;
-		line-height: 1;
-		letter-spacing: -1.5px;
-		font-feature-settings: 'tnum' 1;
-	}
-	.xl.ink {
-		color: var(--c-ink);
-	}
-	.xl.accent {
-		color: var(--c-accent);
-	}
-	.sous {
-		font-size: 14px;
-		color: var(--c-ink-3);
+	.paper {
+		padding: var(--s-2) 0;
 	}
 
 	.verdict {
@@ -496,10 +215,6 @@
 	.verdict .v {
 		font-weight: 600;
 		font-feature-settings: 'tnum' 1;
-	}
-	.analyse {
-		color: var(--c-ink-2);
-		margin: 0;
 	}
 
 	/* ---- Lecture détaillée (match par match) ---- */
@@ -715,33 +430,11 @@
 	.btn-outline:active {
 		transform: scale(0.98);
 	}
-	.chip {
-		transition: transform 100ms ease-out;
-	}
-	.chip:active {
-		transform: scale(0.98);
-	}
 
-	/* ---- Révélation sobre (CSS pur, une passe) ----
-	   Uniquement opacity et transform. Les blocs et les chiffres fondent (aucun
-	   déplacement des chiffres) ; les lignes montent d'un cheveu en cascade. */
-	.rvl {
-		opacity: 0;
-		animation: rvl-in 220ms ease-out both;
-	}
+	/* ---- Révélation sobre (opacity uniquement) ---- */
 	.rvl-fade {
 		opacity: 0;
 		animation: rvl-fade 220ms ease-out both;
-	}
-	@keyframes rvl-in {
-		from {
-			opacity: 0;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: none;
-		}
 	}
 	@keyframes rvl-fade {
 		from {
@@ -751,25 +444,9 @@
 			opacity: 1;
 		}
 	}
-	@keyframes trace-draw {
-		from {
-			transform: scaleX(0);
-		}
-		to {
-			transform: scaleX(1);
-		}
-	}
-
-	/* Mouvement réduit : tout est déjà en place, rien ne bouge, rien ne s'étale.
-	   Les traits sont tracés (fin d'animation), les blocs et lignes sont visibles. */
 	@media (prefers-reduced-motion: reduce) {
-		.rvl,
 		.rvl-fade {
 			opacity: 1;
-			animation: none;
-		}
-		.trace {
-			transform: scaleX(1);
 			animation: none;
 		}
 	}

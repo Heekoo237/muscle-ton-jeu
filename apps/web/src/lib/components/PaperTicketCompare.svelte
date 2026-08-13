@@ -12,12 +12,12 @@
 		lines,
 		probaTotalePct,
 		probaRenforceePct,
-		dateLabel
+		dateLabel = ''
 	}: {
 		lines: Line[];
 		probaTotalePct: number;
 		probaRenforceePct: number;
-		dateLabel: string;
+		dateLabel?: string;
 	} = $props();
 
 	function pct(v: number): string {
@@ -34,7 +34,7 @@
 			<div class="paper" style="font-family:{MONO}">
 				<div class="phead">
 					<div class="pname" style="font-family:{ANTON}">Muscle Ton Jeu</div>
-					<div class="pdate">{dateLabel}</div>
+					{#if dateLabel}<div class="pdate">{dateLabel}</div>{/if}
 				</div>
 				<div class="dash"></div>
 				<div class="plines">
@@ -67,7 +67,7 @@
 			<div class="paper" style="font-family:{MONO}">
 				<div class="phead">
 					<div class="pname" style="font-family:{ANTON}">Muscle Ton Jeu</div>
-					<div class="pdate">{dateLabel}</div>
+					{#if dateLabel}<div class="pdate">{dateLabel}</div>{/if}
 				</div>
 				<div class="dash"></div>
 				<div class="plines">
