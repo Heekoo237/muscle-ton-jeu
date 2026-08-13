@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket, saveAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
+import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
@@ -147,6 +148,11 @@ export const load: PageServerLoad = async (event) => {
 	const histo = await listHistoryMarquee(40);
 	const historique = histo.length >= 20 ? histo : [];
 
+	// Lien de partage court et unique (n'expose aucune donnée de compte).
+	const code = await getOrCreateShareCode(ticket.id);
+	const shareUrl = `${event.url.origin}/p/${code}`;
+	const shareImage = `${event.url.origin}/p/${code}/image`;
+
 	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
 	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
 	return {
@@ -154,7 +160,9 @@ export const load: PageServerLoad = async (event) => {
 		vm,
 		gratuit: billing.gratuit,
 		montreRecharge: !(await hasRecharged(session.userId)),
-		historique
+		historique,
+		shareUrl,
+		shareImage
 	};
 };
 

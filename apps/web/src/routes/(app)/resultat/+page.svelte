@@ -7,9 +7,12 @@
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
+	import ShareSheet from '$lib/components/ShareSheet.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
+
+	let shareOpen = $state(false);
 
 	function pctBig(v: number): string {
 		return `${v.toString().replace('.', ',')} %`;
@@ -128,9 +131,7 @@
 	     est faite. « Analyser un autre ticket » suit la logique de facturation
 	     habituelle (gratuit si éligible, sinon crédits, sinon blocage à l'affichage). -->
 	<div class="actions">
-		<a class="btn-primary" href={`/partage/${data.ticketId}`} target="_blank" rel="noopener">
-			Partager
-		</a>
+		<button class="btn-primary" type="button" onclick={() => (shareOpen = true)}>Partager</button>
 		<a class="btn-dark" href="/analyser">Analyser un autre ticket</a>
 	</div>
 
@@ -161,6 +162,10 @@
 		<HistoryMarquee items={data.historique} />
 	{/if}
 </main>
+
+{#if shareOpen}
+	<ShareSheet imageUrl={data.shareImage} shareUrl={data.shareUrl} onClose={() => (shareOpen = false)} />
+{/if}
 
 <style>
 	main {
@@ -376,11 +381,15 @@
 		justify-content: center;
 		width: 100%;
 		height: 52px;
+		border: none;
 		border-radius: var(--r-pill);
 		background: var(--c-accent);
 		color: var(--c-ink-inverse);
+		font-family: var(--font-body);
 		font-weight: 600;
+		font-size: 16px;
 		text-decoration: none;
+		cursor: pointer;
 		transition: transform 100ms ease-out;
 	}
 	.btn-primary:active {
