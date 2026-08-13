@@ -113,6 +113,8 @@ export interface LineVM {
 	fragile: boolean;
 	retiree: boolean;
 	analysable: boolean;
+	/** Probabilité de la sélection (table predictions), en % ; null si non analysée. */
+	probabilitePct: number | null;
 }
 
 export interface ResultVM {

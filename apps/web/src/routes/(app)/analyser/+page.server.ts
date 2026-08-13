@@ -1,9 +1,20 @@
 import { redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { vision, sports } from '$lib/server/services';
 import { resolveTicket } from '$lib/server/domain/resolve';
 import { createTicket } from '$lib/server/fixtures/ticketStore';
 import { getAppSession } from '$lib/server/session';
+
+/**
+ * On n'affiche « gratuitement » que si le ticket d'essai est encore disponible :
+ * visiteur anonyme (premier passage probable) ou connecté n'ayant pas encore
+ * utilisé son premier ticket. Un habitué qui a déjà consommé l'essai ne voit
+ * pas de promesse de gratuité (le coût est décidé à l'affichage du résultat).
+ */
+export const load: PageServerLoad = async (event) => {
+	const session = await getAppSession(event);
+	return { ticketOffert: !session || !session.premierTicketUtilise };
+};
 
 /**
  * Envoi des captures → lecture (vision) → résolution (code) → sauvegarde du

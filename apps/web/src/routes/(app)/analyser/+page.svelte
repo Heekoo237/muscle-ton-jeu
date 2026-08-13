@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { enhance, applyAction } from '$app/forms';
+	import type { PageData } from './$types';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
+
+	let { data }: { data: PageData } = $props();
 
 	// Écran de lecture : pendant l'analyse, on montre un état réel qui avance
 	// (on lit → on reconnaît → on calcule), sur fond de bandeau d'ambiance. Pas de
@@ -115,7 +118,11 @@
 		</p>
 
 		<button class="btn-primary" type="submit" disabled={reading}>
-			{reading ? 'Lecture en cours…' : 'Analyser mon ticket gratuitement'}
+			{reading
+				? 'Lecture en cours…'
+				: data.ticketOffert
+					? 'Analyser mon ticket gratuitement'
+					: 'Analyser mon ticket'}
 		</button>
 	</form>
 </main>

@@ -109,7 +109,10 @@ export const load: PageServerLoad = async (event) => {
 		cote: s.coteSaisie,
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
-		analysable: s.etatResolution === 'certain'
+		analysable: s.etatResolution === 'certain',
+		// Probabilité par ligne : lue en table (jamais calculée ici), affichée dans
+		// la lecture détaillée. null quand la sélection n'est pas analysable.
+		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null
 	}));
 
 	const vm: ResultVM = {
