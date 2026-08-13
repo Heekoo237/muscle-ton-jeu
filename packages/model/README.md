@@ -57,6 +57,28 @@ réserve que la source fournisse la ligue **avec cotes de clôture** :
   sélections (Champions League, Euro, CAN). À couvrir, il faudra une autre
   source — et un modèle adapté (Dixon‑Coles est fait pour du championnat).
 
+## Notes pour l'étape 4 (backtest / couverture)
+
+- **Critère de couverture A/B/C = la CALIBRATION, pas le gain sur le naïf.** Un
+  championnat déséquilibré est facile à prédire pour le naïf aussi, donc le gain
+  y paraît faible sans que le modèle soit mauvais. On classe les championnats sur
+  « quand on dit 60 %, ça arrive ~60 % » (courbes de calibration par tranche),
+  pas sur l'écart au naïf.
+
+- **Belgique (Jupiler Pro League) — candidat n°1 à l'exclusion, hypothèse à
+  confirmer.** La plus dure à prédire (1X2 log-loss 1,040) et le plus faible gain
+  (+0,040). Hypothèse : le format **playoffs à points divisés par deux** (top-6
+  qui ne s'affrontent qu'entre eux, ~20 % des matchs) casse le modèle standard.
+  À l'étape 4 : scinder la calibration **régulière vs playoffs**. Un modèle
+  séparé pour les playoffs n'est PAS retenu (≈ 60-70 matchs/saison, échantillon
+  trop mince, équipes déjà estimées) ; si seule la phase playoffs déraille, couvrir
+  la Belgique en **filtrant** ces journées.
+
+- **Bundesliga — 2ᵉ plus dure, hypothèse.** Le plus de buts (3,18/match) et la
+  plus forte variance de buts (3,14) des 11 → score et issues plus bruités. La
+  domination du Bayern joue peu (un favori dominant est facile à prédire). À
+  confirmer à l'étape 4.
+
 ## Commandes
 
 ```bash
