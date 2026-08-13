@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import os
 
-# 6 championnats couverts (code football-data → nom, pays).
+# Championnats couverts (code football-data → nom, pays).
+# Seuls les championnats que football-data.co.uk fournit AVEC cotes de clôture.
+# Non disponibles sur cette source : Saudi Pro League, Champions League, Euro,
+# CAN (sélections), Argentine et Brésil (présents seulement dans les « Extra
+# Leagues » de football-data, format différent et cotes réduites).
 LEAGUES: dict[str, tuple[str, str]] = {
     "E0": ("Premier League", "Angleterre"),
     "F1": ("Ligue 1", "France"),
@@ -22,6 +26,11 @@ LEAGUES: dict[str, tuple[str, str]] = {
     "I1": ("Serie A", "Italie"),
     "D1": ("Bundesliga", "Allemagne"),
     "P1": ("Liga Portugal", "Portugal"),
+    "B1": ("Jupiler Pro League", "Belgique"),
+    "N1": ("Eredivisie", "Pays-Bas"),
+    "T1": ("Süper Lig", "Turquie"),
+    "G1": ("Super League", "Grèce"),
+    "SC0": ("Scottish Premiership", "Écosse"),
 }
 
 # 3 saisons complètes. Pour chaque code de saison football-data (ex. "2324") :
