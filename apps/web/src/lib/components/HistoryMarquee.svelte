@@ -44,7 +44,15 @@
 	.hm-track {
 		display: flex;
 		width: max-content;
-		animation: hm-scroll 60s linear infinite;
+		animation: hm-scroll 45s linear infinite;
+	}
+	@keyframes hm-scroll {
+		from {
+			transform: translate3d(0, 0, 0);
+		}
+		to {
+			transform: translate3d(-50%, 0, 0);
+		}
 	}
 	.hm-track:hover,
 	.hm-track:active {
