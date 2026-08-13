@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
+import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
@@ -120,13 +121,20 @@ export const load: PageServerLoad = async (event) => {
 		rienARetirer: r.rienARetirer,
 		conflitMemeMatch: r.conflitMemeMatch
 	};
+	// Bandeau d'historique : sélections déjà marquées, matchs terminés, issue
+	// réelle. On ne l'affiche QUE s'il y a au moins 20 résultats en base — sinon,
+	// aucun remplissage de démonstration (le bandeau reste absent).
+	const histo = await listHistoryMarquee(40);
+	const historique = histo.length >= 20 ? histo : [];
+
 	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
 	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
 	return {
 		ticketId: ticket.id,
 		vm,
 		gratuit: billing.gratuit,
-		montreRecharge: !(await hasRecharged(session.userId))
+		montreRecharge: !(await hasRecharged(session.userId)),
+		historique
 	};
 };
 

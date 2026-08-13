@@ -2,6 +2,8 @@
 	// Landing — reconstruction fidèle de la maquette Claude Design (Landing.dc.html).
 	// Page autonome : bandeau défilant en haut, son propre pied de page en bas
 	// (donc hors du groupe (public) qui ajoute nav + footer).
+	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
+
 	const ANTON = "'Anton', Impact, sans-serif";
 	const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
@@ -304,6 +306,11 @@
 		</div>
 	</div>
 
+	<!-- ═══ 6 bis · BANDEAU D'AMBIANCE ═══ -->
+	<!-- Le mouvement d'ambiance, en bas de page : même aplat encre que le bandeau
+	     du haut, mais défile en sens inverse. Autorisé AVANT l'analyse. -->
+	<AmbianceBanner />
+
 	<!-- ═══ 7 · FAQ + PIED DE PAGE ═══ -->
 	<div style="background:#24201B">
 		<div style="max-width:1120px;margin:0 auto;padding:clamp(40px,5vw,80px) clamp(16px,3.5vw,40px);box-sizing:border-box;display:flex;flex-direction:column;gap:clamp(20px,2.5vw,32px)">
@@ -355,6 +362,11 @@
 	}
 	.marquee-track {
 		animation: mtj-marquee 42s linear infinite;
+	}
+	/* Les bandeaux se figent au survol ET au toucher (contrainte d'ambiance). */
+	.marquee-track:hover,
+	.marquee-track:active {
+		animation-play-state: paused;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.marquee-track {

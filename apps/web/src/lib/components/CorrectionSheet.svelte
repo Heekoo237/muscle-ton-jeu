@@ -137,6 +137,7 @@
 		font-weight: 600;
 		color: var(--c-ink);
 		cursor: pointer;
+		transition: transform 100ms ease-out;
 	}
 	.chip.sel {
 		background: var(--c-ink);

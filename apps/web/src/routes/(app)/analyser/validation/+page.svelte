@@ -81,6 +81,7 @@
 		font-size: 16px;
 		font-feature-settings: 'tnum' 1;
 		cursor: pointer;
+		transition: transform 100ms ease-out;
 	}
 	.btn-dark:active {
 		transform: scale(0.98);

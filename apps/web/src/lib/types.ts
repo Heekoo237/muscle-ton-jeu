@@ -124,3 +124,12 @@ export interface ResultVM {
 	rienARetirer: boolean;
 	conflitMemeMatch: boolean;
 }
+
+/* ---- Bandeau d'historique (écran de résultat) ---- */
+
+export interface HistoryItem {
+	matchLabel: string;
+	fragile: boolean;
+	/** true = la sélection est passée ; false = elle est tombée. */
+	passe: boolean;
+}

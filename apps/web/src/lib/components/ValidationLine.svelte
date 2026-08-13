@@ -47,9 +47,27 @@
 		font-family: var(--font-body);
 		text-align: left;
 		cursor: pointer;
+		/* Apparition en fondu (opacity). La bascule d'état ne déplace jamais la
+		   ligne. La pression rend un léger enfoncement (transform, 100 ms). On s'en
+		   tient à opacity + transform (DESIGN §7 : jamais de transition de couleur). */
+		animation: vl-in 200ms ease-out both;
+		transition: transform 100ms ease-out;
 	}
 	.line:active {
 		transform: scale(0.995);
+	}
+	@keyframes vl-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.line {
+			animation: none;
+		}
 	}
 	.line[data-state='certain'] {
 		border-left: 3px solid var(--c-vert);
