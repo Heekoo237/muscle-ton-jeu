@@ -1,37 +1,40 @@
 <script lang="ts">
-	// Carte ticket de l'historique (DESIGN.md §7.5). État factice : en attente
-	// (les matchs ne sont pas encore joués — le suivi arrive avec le pipeline).
+	// Carte ticket de l'historique (maquette ui-screens ÉCRAN 1, « Mes tickets »).
+	// État factice : en attente (les matchs ne sont pas joués — le suivi arrive
+	// avec le pipeline).
 	let {
-		id,
 		dateMs,
 		nbMatchs,
 		nbFragiles
-	}: { id: string; dateMs: number; nbMatchs: number; nbFragiles: number } = $props();
+	}: { dateMs: number; nbMatchs: number; nbFragiles: number } = $props();
 
 	const fmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' });
 	const dateLabel = $derived(fmt.format(new Date(dateMs)));
 </script>
 
-<a class="ticket-card" href={`/resultat`} aria-label={`Ticket du ${dateLabel}, ${nbMatchs} matchs`}>
-	<p class="l1 t-h3">{dateLabel} · {nbMatchs} match{nbMatchs > 1 ? 's' : ''}</p>
-	<p class="l2 t-small">
+<a class="ticket-card" href="/resultat" aria-label={`Ticket du ${dateLabel}, ${nbMatchs} matchs`}>
+	<div class="l1">
+		<span class="t-h3">{dateLabel} · {nbMatchs} match{nbMatchs > 1 ? 's' : ''}</span>
+		<span class="badge">En attente</span>
+	</div>
+	<span class="l2 t-small">
 		{#if nbFragiles > 0}
 			{nbFragiles} marqué{nbFragiles > 1 ? 's' : ''} fragile{nbFragiles > 1 ? 's' : ''}
 		{:else}
 			Rien à retirer
 		{/if}
-	</p>
-	<p class="l3 t-small"><span class="badge">En attente</span></p>
+	</span>
 </a>
 
 <style>
 	.ticket-card {
-		display: block;
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
 		background: var(--c-surface);
 		border: 1px solid var(--c-line);
 		border-radius: var(--r-md);
 		padding: var(--s-4);
-		min-height: 96px;
 		text-decoration: none;
 		color: var(--c-ink);
 	}
@@ -39,16 +42,16 @@
 		transform: scale(0.99);
 	}
 	.l1 {
-		margin: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
 	}
 	.l2 {
-		margin: var(--s-1) 0 var(--s-3);
 		color: var(--c-ink-2);
 	}
-	.l3 {
-		margin: 0;
-	}
 	.badge {
+		flex: 0 0 auto;
 		display: inline-flex;
 		align-items: center;
 		height: 28px;
@@ -56,5 +59,6 @@
 		border-radius: var(--r-pill);
 		background: var(--c-canvas-sunk);
 		color: var(--c-ink-3);
+		font-size: 14px;
 	}
 </style>

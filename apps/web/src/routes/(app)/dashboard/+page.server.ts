@@ -19,6 +19,8 @@ export interface DailyMatch {
 	dateMs: number;
 	marche: string;
 	probabilitePct: number;
+	/** Cote « proposée » (juste), déduite de la probabilité pour l'affichage. */
+	coteProposee: number;
 }
 
 export interface Bilan {
@@ -43,7 +45,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			matchLabel: `${f.teamHome} – ${f.teamAway}`,
 			dateMs: Date.parse(f.dateUtc),
 			marche: marketLabelFr(best.marche, f.teamHome, f.teamAway),
-			probabilitePct: Math.round(best.probabilite * 100 * 10) / 10
+			probabilitePct: Math.round(best.probabilite * 100 * 10) / 10,
+			coteProposee: Math.round((1 / best.probabilite) * 100) / 100
 		};
 	}
 
