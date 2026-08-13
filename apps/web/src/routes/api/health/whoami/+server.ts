@@ -1,19 +1,26 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { env } from '$env/dynamic/public';
 import { getAppSession } from '$lib/server/session';
 
 /**
- * Diagnostic d'authentification. À ouvrir après connexion Google :
+ * Diagnostic d'authentification. À ouvrir après (ou avant) connexion Google :
  *   /api/health/whoami
- * Renvoie si une session existe et l'email associé (rien de sensible).
+ * Indique le mode d'auth actif (supabase = réel, fake = factice), la présence des
+ * variables publiques, et l'état de session (rien de sensible).
  */
 export const GET: RequestHandler = async (event) => {
+	const authMode = event.locals.supabase ? 'supabase' : 'fake';
+	const publicEnv = {
+		hasPublicUrl: Boolean(env.PUBLIC_SUPABASE_URL),
+		hasPublicAnon: Boolean(env.PUBLIC_SUPABASE_ANON_KEY)
+	};
 	const session = await getAppSession(event);
-	if (!session) return json({ loggedIn: false });
 	return json({
-		loggedIn: true,
-		userId: session.userId,
-		email: session.email,
-		prenom: session.prenom
+		authMode,
+		...publicEnv,
+		loggedIn: session !== null,
+		email: session?.email ?? null,
+		prenom: session?.prenom ?? null
 	});
 };
