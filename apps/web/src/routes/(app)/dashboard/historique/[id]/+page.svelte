@@ -43,8 +43,22 @@
 		<p class="t-small sous">{dateLabel} · {data.nbMatchs} match{data.nbMatchs > 1 ? 's' : ''} · consultable à vie</p>
 	</div>
 
-	{#if data.texte}
-		<p class="t-body-lg analyse">{data.texte}</p>
+	{#if data.synthese}
+		<p class="t-body-lg analyse">{data.synthese}</p>
+	{/if}
+
+	{#if data.explications.length > 0}
+		<div class="explications">
+			{#each data.explications as e (e.ordre)}
+				<article class="exp" class:badge={e.avecBadge}>
+					<div class="exp-match">
+						{e.matchLabel}{#if e.avecBadge}&nbsp;<span class="tri" aria-hidden="true">▲</span>{/if}
+					</div>
+					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
+					<p class="exp-texte">{e.texte}</p>
+				</article>
+			{/each}
+		</div>
 	{/if}
 
 	<!-- Comparaison en tickets papier (même design que le résultat) -->
@@ -128,6 +142,50 @@
 	.analyse {
 		color: var(--c-ink-2);
 		margin: 0;
+		max-width: var(--measure);
+	}
+
+	/* Explications par sélection retirée (niveau 2) */
+	.explications {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+	}
+	.exp {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+		padding: var(--s-4);
+		background: var(--c-surface);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+	}
+	.exp.badge {
+		background: var(--c-ocre-wash);
+		border-color: var(--c-ocre-line);
+		border-left: 3px solid var(--c-ocre);
+	}
+	.exp-match {
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.exp-match .tri {
+		color: var(--c-ocre);
+		font-size: 13px;
+	}
+	.exp-marche {
+		font-size: 14px;
+		color: var(--c-ink-2);
+	}
+	.exp-marche.oc {
+		color: var(--c-ocre);
+	}
+	.exp-texte {
+		margin: var(--s-1) 0 0;
+		font-size: 15px;
+		line-height: 1.45;
+		color: var(--c-ink);
 		max-width: var(--measure);
 	}
 

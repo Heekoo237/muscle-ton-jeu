@@ -2,8 +2,9 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
+import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
-import type { LineVM } from '$lib/types';
+import type { ExplicationVM, LineVM } from '$lib/types';
 
 /**
  * Consultation d'une analyse passée, telle qu'elle a été rendue. Lecture seule,
@@ -36,7 +37,23 @@ export const load: PageServerLoad = async (event) => {
 		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null
 	}));
 
-	const texte = await getAnalysisText(ticket.id);
+	// Texte figé, relu tel quel (deux niveaux ; ancien texte plat toléré).
+	const analyse = parseAnalyse(await getAnalysisText(ticket.id));
+	const parLigne = new Map(lignes.map((l) => [l.ordre, l]));
+	const explications: ExplicationVM[] = (analyse?.parSelection ?? [])
+		.map((p) => {
+			const l = parLigne.get(p.ordre);
+			if (!l) return null;
+			return {
+				ordre: p.ordre,
+				matchLabel: l.matchLabel,
+				libelleFr: l.libelleFr,
+				avecBadge: l.fragile,
+				texte: p.texte
+			} satisfies ExplicationVM;
+		})
+		.filter((x): x is ExplicationVM => x !== null)
+		.sort((a, b) => a.ordre - b.ordre);
 
 	return {
 		dateMs: ticket.creeLeMs,
@@ -45,6 +62,7 @@ export const load: PageServerLoad = async (event) => {
 		probaTotalePct: ticket.result?.probaTotalePct ?? 0,
 		probaRenforceePct: ticket.result?.probaRenforceePct ?? 0,
 		nbRetirees: ticket.result?.nbRetirees ?? 0,
-		texte
+		synthese: analyse?.synthese ?? null,
+		explications
 	};
 };

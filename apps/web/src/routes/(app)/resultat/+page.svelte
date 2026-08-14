@@ -56,7 +56,24 @@
 		</p>
 	{/if}
 
-	<p class="t-body-lg analyse">{vm.texte}</p>
+	<!-- Niveau 1 : synthèse, une phrase sur le ticket entier. -->
+	<p class="t-body-lg analyse">{vm.synthese}</p>
+
+	<!-- Niveau 2 : une explication courte par sélection retirée. Visible sans
+	     déplier — c'est ce que le lecteur doit comprendre en dix secondes. -->
+	{#if vm.explications.length > 0}
+		<div class="explications">
+			{#each vm.explications as e, i (e.ordre)}
+				<article class="exp rvl-fade" class:badge={e.avecBadge} style="animation-delay:{i * 40}ms">
+					<div class="exp-match">
+						{e.matchLabel}{#if e.avecBadge}&nbsp;<span class="tri" aria-hidden="true">▲</span>{/if}
+					</div>
+					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
+					<p class="exp-texte">{e.texte}</p>
+				</article>
+			{/each}
+		</div>
+	{/if}
 
 	<!-- Comparaison en tickets papier -->
 	<div class="paper rvl-fade">
@@ -207,6 +224,50 @@
 	}
 	.paper {
 		padding: var(--s-2) 0;
+	}
+
+	/* ---- Explications par sélection retirée (niveau 2) ---- */
+	.explications {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+	}
+	.exp {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+		padding: var(--s-4);
+		background: var(--c-surface);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+	}
+	.exp.badge {
+		background: var(--c-ocre-wash);
+		border-color: var(--c-ocre-line);
+		border-left: 3px solid var(--c-ocre);
+	}
+	.exp-match {
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.exp-match .tri {
+		color: var(--c-ocre);
+		font-size: 13px;
+	}
+	.exp-marche {
+		font-size: 14px;
+		color: var(--c-ink-2);
+	}
+	.exp-marche.oc {
+		color: var(--c-ocre);
+	}
+	.exp-texte {
+		margin: var(--s-1) 0 0;
+		font-size: 15px;
+		line-height: 1.45;
+		color: var(--c-ink);
+		max-width: var(--measure);
 	}
 
 	.verdict {

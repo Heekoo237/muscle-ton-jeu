@@ -64,6 +64,44 @@ export function checkVocabulary(text: string): VocabularyResult {
 }
 
 /* ------------------------------------------------------------------------ */
+/*  CAUSALITÉ INTERDITE (brief §4.4 — règle de causalité non négociable)     */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Sur 1X2 et plus/moins de buts, la probabilité vient de la COTE. Le texte
+ * DÉCRIT des faits ; il n'affirme JAMAIS qu'un fait explique le retrait.
+ *   AUTORISÉ : « Napoli a perdu deux fois à domicile ce mois-ci. »
+ *   INTERDIT : « On a retiré ce match parce que Napoli est faible. »
+ * On refuse donc les tournures causales — « parce que », « car », « c'est
+ * pourquoi », « donc on a retiré », « ce qui explique », « à cause de ».
+ */
+const CAUSAL: { label: string; re: RegExp }[] = [
+	{ label: 'parce que', re: /parce\s+qu[e']/iu },
+	{ label: 'car', re: word('car') },
+	{ label: "c'est pourquoi", re: /c['’]est\s+pourquoi/iu },
+	{ label: "c'est pour ça", re: /c['’]est\s+pour\s+(?:ça|cela)/iu },
+	{ label: 'à cause de', re: /à\s+cause\s+d/iu },
+	{ label: 'ce qui explique', re: /ce\s+qui\s+explique/iu },
+	{ label: 'cela explique', re: /(?:ça|cela|ceci)\s+explique/iu },
+	{ label: 'donc … retiré', re: /donc\b[^.!?]*retir/iu },
+	{ label: 'raison pour laquelle', re: /raison\s+pour\s+laquelle/iu }
+];
+
+export interface CausalityResult {
+	ok: boolean;
+	/** Étiquettes des tournures causales rencontrées. */
+	hits: string[];
+}
+
+export function checkCausality(text: string): CausalityResult {
+	const hits: string[] = [];
+	for (const { label, re } of CAUSAL) {
+		if (re.test(text)) hits.push(label);
+	}
+	return { ok: hits.length === 0, hits };
+}
+
+/* ------------------------------------------------------------------------ */
 /*  NOMBRES DANS LE TEXTE (règle d'or n°1)                                   */
 /* ------------------------------------------------------------------------ */
 
@@ -152,12 +190,14 @@ export interface GuardResult {
 	ok: boolean;
 	vocabulary: VocabularyResult;
 	numbers: NumbersResult;
+	causality: CausalityResult;
 }
 
 /**
- * Contrôle complet à passer après CHAQUE génération de texte (brief §4.3/4.4).
- * `ok === false` → régénérer ; après 2 échecs, l'appelant bascule sur un
- * template sans chiffres.
+ * Contrôle complet à passer après CHAQUE génération de texte (brief §4.3/4.4) :
+ * nombres hors liste (règle d'or n°1), vocabulaire interdit (règle d'or n°2),
+ * tournure causale (règle de causalité). `ok === false` → régénérer ; après 2
+ * échecs, l'appelant bascule sur un template sans chiffres ni causalité.
  */
 export function checkGeneratedText(
 	text: string,
@@ -166,5 +206,6 @@ export function checkGeneratedText(
 ): GuardResult {
 	const vocabulary = checkVocabulary(text);
 	const numbers = checkNumbers(text, allowedNumbers, 0.05, maskNames);
-	return { ok: vocabulary.ok && numbers.ok, vocabulary, numbers };
+	const causality = checkCausality(text);
+	return { ok: vocabulary.ok && numbers.ok && causality.ok, vocabulary, numbers, causality };
 }

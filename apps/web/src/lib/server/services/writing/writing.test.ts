@@ -1,72 +1,170 @@
 import { describe, it, expect } from 'vitest';
 import { FakeWriting } from './fake';
 import { allowedNumbersFor } from './allowed';
-import type { WritingInput } from './index';
-import { checkGeneratedText } from '$lib/server/domain/guards';
-import { marketLabelFr } from '$lib/server/domain/market-map';
+import type { WritingInput, RetraitEnrichi } from './index';
+import { checkGeneratedText, checkCausality } from '$lib/server/domain/guards';
+import { chanceSur, chanceSurMot, faitsDescriptifs, enMots } from './enrich';
+import type { FaitsMatch } from '$lib/server/services/stats';
 
-function inputAvecFragile(libelleFr: string): WritingInput {
+function retrait(over: Partial<RetraitEnrichi> = {}): RetraitEnrichi {
 	return {
-		probaTotalePct: 1.4,
-		probaRenforceePct: 7.8,
-		nbRetirees: 1,
-		fragiles: [{ libelleFr }],
-		confiance: 'correcte',
-		rienARetirer: false
+		ordre: 2,
+		libelleFr: 'Napoli – Roma — Napoli gagne',
+		avecBadge: true,
+		chanceSur: 2,
+		chanceSurMot: 'une chance sur deux',
+		faits: ['Napoli a perdu deux fois à domicile.'],
+		...over
 	};
 }
 
-describe('rédaction — un fragile plus/moins ne dégrade plus vers le template', () => {
-	it('« Plus de 2,5 buts » produit un texte riche qui passe le garde-fou', async () => {
-		const libelle = `Real Madrid – Barcelone — ${marketLabelFr('OVER_2_5', 'Real Madrid', 'Barcelone')}`;
-		expect(libelle).toContain('2,5'); // le seuil est bien dans le libellé
-		const input = inputAvecFragile(libelle);
-		const texte = await new FakeWriting().writeAnalysis(input);
+function input(retraits: RetraitEnrichi[], over: Partial<WritingInput> = {}): WritingInput {
+	return {
+		probaTotalePct: 1.4,
+		probaRenforceePct: 7.8,
+		nbRetirees: retraits.length,
+		nbMatchs: 9,
+		nbFragiles: retraits.filter((r) => r.avecBadge).length,
+		retraits,
+		rienARetirer: false,
+		...over
+	};
+}
 
-		expect(texte).toContain('2,5'); // le texte riche nomme la sélection
-		const controle = checkGeneratedText(texte, allowedNumbersFor(input));
-		expect(controle.ok).toBe(true); // garde-fou OK → PAS de bascule template
+const texteComplet = (a: { synthese: string; parSelection: { texte: string }[] }): string =>
+	[a.synthese, ...a.parSelection.map((p) => p.texte)].join('\n');
+
+describe('rédaction — sortie deux niveaux, sous garde-fous', () => {
+	it('produit une synthèse et une explication par retrait, et passe le garde-fou', async () => {
+		const inp = input([retrait({ ordre: 2 }), retrait({ ordre: 4, avecBadge: false, chanceSur: 3, chanceSurMot: 'une chance sur trois' })]);
+		const a = await new FakeWriting().writeAnalysis(inp);
+		expect(a.synthese.length).toBeGreaterThan(0);
+		expect(a.parSelection.map((p) => p.ordre)).toEqual([2, 4]);
+		const controle = checkGeneratedText(texteComplet(a), allowedNumbersFor(inp), [
+			'Napoli – Roma',
+			'Napoli',
+			'Roma'
+		]);
+		expect(controle.ok).toBe(true);
 	});
 
-	it('les seuils du libellé sont bien dans les nombres autorisés', () => {
-		const input = inputAvecFragile('Lens – Nice — Plus de 3,5 buts');
-		const allowed = allowedNumbersFor(input);
-		expect(allowed).toContain(3.5); // seuil marché autorisé
-		expect(allowed).toContain(1.4); // proba totale toujours là
-		expect(allowed).toContain(7.8); // proba renforcée toujours là
+	it('« Rien à retirer » : synthèse sobre, aucune explication', async () => {
+		const a = await new FakeWriting().writeAnalysis(input([], { rienARetirer: true }));
+		expect(a.parSelection).toHaveLength(0);
+		expect(a.synthese).toContain('Rien à retirer');
+	});
+});
+
+describe('règle de causalité (brief §4.4)', () => {
+	it('rejette « parce que », « car », « c’est pourquoi », « donc … retiré »', () => {
+		expect(checkCausality('On retire ce match parce que Napoli est faible.').ok).toBe(false);
+		expect(checkCausality('Napoli est risqué car il perd souvent.').ok).toBe(false);
+		expect(checkCausality("Napoli perd. C'est pourquoi on l'écarte.").ok).toBe(false);
+		expect(checkCausality("Napoli perd souvent, donc on a retiré ce match.").ok).toBe(false);
 	});
 
-	it('jeu STRICT : un numéro de nom d’équipe (« Mainz 05 ») n’est PAS autorisé', () => {
-		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
-		const allowed = allowedNumbersFor(input);
-		expect(allowed).toContain(2.5); // seuil marché : oui
-		expect(allowed).not.toContain(5); // « 05 » du nom d’équipe : non
+	it('accepte une description sans causalité (faits côte à côte)', () => {
+		const ok = 'Napoli gagne, c’est risqué. Napoli a perdu deux fois à domicile. Une chance sur deux, pas plus.';
+		expect(checkCausality(ok).ok).toBe(true);
+		expect(checkGeneratedText(ok, [2]).causality.ok).toBe(true);
 	});
 
-	// Le vrai correctif : masquer les noms propres AVANT d'extraire les nombres.
-	const MASQUE_MAINZ = ['FSV Mainz 05 – Leverkusen', 'FSV Mainz 05', 'Leverkusen'];
-
-	it('1. « FSV Mainz 05 · Plus de 2,5 buts » → texte RICHE (nom masqué), pas le template', async () => {
-		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
-		const texte = await new FakeWriting().writeAnalysis(input);
-		expect(texte).toContain('FSV Mainz 05'); // le nom figure bien dans le texte
-		const controle = checkGeneratedText(texte, allowedNumbersFor(input), MASQUE_MAINZ);
-		expect(controle.ok).toBe(true); // « 05 » masqué → aucune bascule injustifiée
+	it('le texte factice n’emploie aucune tournure causale', async () => {
+		const a = await new FakeWriting().writeAnalysis(input([retrait()]));
+		expect(checkCausality(texteComplet(a)).ok).toBe(true);
 	});
+});
 
-	it('2. un nombre inventé (« 87 % ») reste rejeté même avec un nom d’équipe présent', () => {
-		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
+describe('badge rouge vs mention neutre', () => {
+	it('avecBadge → ton « risqué » ; sans badge → « la moins solide », jamais « fragile »', async () => {
+		const badge = await new FakeWriting().writeAnalysis(input([retrait({ avecBadge: true })]));
+		expect(badge.parSelection[0].texte).toContain('risqué');
+
+		const neutre = await new FakeWriting().writeAnalysis(
+			input([retrait({ avecBadge: false, libelleFr: 'Monaco – Lille — Double chance Monaco' })])
+		);
+		expect(neutre.parSelection[0].texte).toContain('la moins solide');
+		expect(neutre.parSelection[0].texte).not.toMatch(/fragile|risqué/i);
+	});
+});
+
+describe('« une chance sur X » déterministe', () => {
+	it('arrondit 1/proba, borné à deux, en toutes lettres', () => {
+		expect(chanceSur(0.5)).toBe(2);
+		expect(chanceSur(0.33)).toBe(3);
+		expect(chanceSur(0.28)).toBe(4);
+		expect(chanceSur(0.9)).toBe(2); // jamais « une chance sur une »
+		expect(chanceSur(null)).toBeNull();
+		expect(chanceSurMot(0.5)).toBe('une chance sur deux');
+		expect(enMots(3)).toBe('trois');
+	});
+});
+
+describe('garde-fou des nombres (règle d’or n°1)', () => {
+	it('un pourcentage inventé est rejeté, même avec un nom d’équipe présent', () => {
+		const inp = input([retrait({ libelleFr: 'FSV Mainz 05 – Leverkusen — Plus de 2,5 buts' })]);
 		const texte = 'FSV Mainz 05 est le maillon faible. Tes chances montent à 87 %.';
-		const controle = checkGeneratedText(texte, allowedNumbersFor(input), MASQUE_MAINZ);
+		const controle = checkGeneratedText(texte, allowedNumbersFor(inp), [
+			'FSV Mainz 05 – Leverkusen',
+			'FSV Mainz 05',
+			'Leverkusen'
+		]);
 		expect(controle.ok).toBe(false);
 		expect(controle.numbers.offending).toContain(87);
 	});
 
-	it('un nombre fabriqué reste rejeté (le garde-fou n’est pas désactivé)', () => {
-		const input = inputAvecFragile('Lens – Nice — Plus de 2,5 buts');
-		// 42 n’est ni une proba, ni un seuil du libellé : doit être refusé.
-		const controle = checkGeneratedText('Tes chances montent à 42 %.', allowedNumbersFor(input));
-		expect(controle.ok).toBe(false);
-		expect(controle.numbers.offending).toContain(42);
+	it('le « 05 » d’un nom d’équipe masqué n’est pas compté comme un nombre', () => {
+		const inp = input([retrait({ libelleFr: 'FSV Mainz 05 – Leverkusen — Plus de 2,5 buts' })]);
+		const controle = checkGeneratedText('FSV Mainz 05 joue gros ce soir.', allowedNumbersFor(inp), [
+			'FSV Mainz 05 – Leverkusen',
+			'FSV Mainz 05',
+			'Leverkusen'
+		]);
+		expect(controle.ok).toBe(true);
+	});
+
+	it('les seuils de marché (2,5) et « chance sur X » sont autorisés, pas les autres', () => {
+		const inp = input([retrait({ libelleFr: 'Lens – Nice — Plus de 3,5 buts', chanceSur: 4 })]);
+		const allowed = allowedNumbersFor(inp);
+		expect(allowed).toContain(3.5); // seuil marché
+		expect(allowed).toContain(4); // « une chance sur quatre »
+		expect(allowed).toContain(1.4); // proba totale
+		expect(allowed).not.toContain(87);
+	});
+});
+
+describe('faits descriptifs (qualitatifs, en toutes lettres)', () => {
+	const fait: FaitsMatch = {
+		fixtureId: 1,
+		home: {
+			nom: 'Napoli',
+			forme: ['D', 'D', 'D', 'V', 'N'],
+			butsMarquesDom: 0.8,
+			butsEncaissesDom: 1.9,
+			butsMarquesExt: 1.0,
+			butsEncaissesExt: 1.2,
+			joues: 10
+		},
+		away: {
+			nom: 'Roma',
+			forme: ['V', 'V', 'N', 'D', 'V'],
+			butsMarquesDom: 1.5,
+			butsEncaissesDom: 1.0,
+			butsMarquesExt: 0.9,
+			butsEncaissesExt: 0.7,
+			joues: 10
+		},
+		h2h: ['D', 'D', 'V']
+	};
+
+	it('rend des phrases qualitatives, sans chiffre extractible', () => {
+		const phrases = faitsDescriptifs(fait);
+		expect(phrases.length).toBeGreaterThan(0);
+		// Aucune phrase ne doit contenir de chiffre (tout est en toutes lettres).
+		for (const p of phrases) expect(p).not.toMatch(/\d/);
+	});
+
+	it('match inconnu → aucun fait (le rédacteur s’en tient au risque)', () => {
+		expect(faitsDescriptifs(undefined)).toEqual([]);
 	});
 });

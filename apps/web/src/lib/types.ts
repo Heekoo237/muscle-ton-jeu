@@ -127,12 +127,25 @@ export interface LineVM {
 	probabilitePct: number | null;
 }
 
+/** Explication d'une sélection retirée (texte deux niveaux, second niveau). */
+export interface ExplicationVM {
+	ordre: number;
+	matchLabel: string;
+	libelleFr: string;
+	/** Badge rouge (fragile) → ton « risqué » ; sinon mention neutre. */
+	avecBadge: boolean;
+	texte: string;
+}
+
 export interface ResultVM {
 	lignes: LineVM[];
 	probaTotalePct: number;
 	probaRenforceePct: number;
 	nbRetirees: number;
-	texte: string;
+	/** Niveau 1 : une phrase sur le ticket entier. */
+	synthese: string;
+	/** Niveau 2 : une explication par sélection retirée (peut être vide en repli). */
+	explications: ExplicationVM[];
 	rienARetirer: boolean;
 	conflitMemeMatch: boolean;
 }

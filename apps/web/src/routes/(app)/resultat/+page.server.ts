@@ -5,13 +5,15 @@ import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
-import { predictions, writing, notifications } from '$lib/server/services';
+import { predictions, writing, notifications, stats } from '$lib/server/services';
 import { buildReinforced } from '$lib/server/domain/ticket';
 import { computeCharge } from '$lib/server/domain/billing';
 import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
-import type { WritingInput } from '$lib/server/services/writing';
-import type { LineVM, ResultVM, Selection } from '$lib/types';
+import type { WritingInput, AnalyseTexte, RetraitEnrichi } from '$lib/server/services/writing';
+import { chanceSur, chanceSurMot, faitsDescriptifs } from '$lib/server/services/writing/enrich';
+import { serialiseAnalyse } from '$lib/server/services/writing/serialize';
+import type { ExplicationVM, LineVM, ResultVM, Selection } from '$lib/types';
 
 /** Arrondi au dixième de pour-cent, cohérent avec l'affichage et les garde-fous. */
 function pct1(prob: number): number {
@@ -24,18 +26,24 @@ function pct1(prob: number): number {
 let genTotal = 0;
 let genFallback = 0;
 
+/** Texte à soumettre au garde-fou : synthèse + toutes les explications, d'un bloc. */
+function textePlein(a: AnalyseTexte): string {
+	return [a.synthese, ...a.parSelection.map((p) => p.texte)].join('\n');
+}
+
 /**
  * Rédaction sous garde-fous (brief §4.3/4.4) : on régénère si un nombre est
- * fabriqué ou un terme interdit apparaît ; après 2 échecs, template sans chiffres.
+ * fabriqué, un terme interdit ou une tournure causale apparaît ; après 2 échecs,
+ * un template sobre sans chiffres ni explications par sélection.
  * `maskNames` : noms propres du ticket retirés du texte avant le contrôle des
  * nombres (un « 05 » de « Mainz 05 » n'est pas un chiffre analytique).
  */
-async function writeSafely(input: WritingInput, maskNames: string[]): Promise<string> {
+async function writeSafely(input: WritingInput, maskNames: string[]): Promise<AnalyseTexte> {
 	genTotal += 1;
 	let raison = 'echec_modele';
 	let detail = '';
 	for (let i = 0; i < 2; i++) {
-		let texte: string;
+		let texte: AnalyseTexte;
 		try {
 			texte = await writing.writeAnalysis(input);
 		} catch (e) {
@@ -43,11 +51,14 @@ async function writeSafely(input: WritingInput, maskNames: string[]): Promise<st
 			detail = String(e).slice(0, 120);
 			continue;
 		}
-		const controle = checkGeneratedText(texte, writing.allowedNumbers(input), maskNames);
+		const controle = checkGeneratedText(textePlein(texte), writing.allowedNumbers(input), maskNames);
 		if (controle.ok) return texte;
 		if (!controle.vocabulary.ok) {
 			raison = 'vocabulaire_interdit';
 			detail = controle.vocabulary.hits.join(',');
+		} else if (!controle.causality.ok) {
+			raison = 'formulation_causale';
+			detail = controle.causality.hits.join(',');
 		} else {
 			raison = 'nombre_hors_autorises';
 			detail = controle.numbers.offending.join(',');
@@ -59,9 +70,12 @@ async function writeSafely(input: WritingInput, maskNames: string[]): Promise<st
 		`[rédaction] bascule template ${genFallback}/${genTotal} (~${taux}%) ` +
 			`raison=${raison} détail=${detail || '—'}`
 	);
-	return input.rienARetirer
-		? 'Rien à retirer. Ton ticket tient debout.'
-		: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.';
+	return {
+		synthese: input.rienARetirer
+			? 'Rien à retirer. Ton ticket tient debout.'
+			: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.',
+		parSelection: []
+	};
 }
 
 /** Noms propres du ticket (libellés de match + équipes) à masquer au contrôle. */
@@ -102,24 +116,37 @@ export const load: PageServerLoad = async (event) => {
 
 	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 4).
 	const r = buildReinforced(withProbs);
+	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
 
-	// 3. Rédaction sous garde-fous.
-	const fragiles = r.selections
-		.filter((s) => s.fragile && s.retireeDuRenforce)
-		.map((s) => ({ libelleFr: `${s.matchLabel} — ${s.libelleFr}` }));
+	// 3. Rédaction sous garde-fous. On explique CHAQUE sélection retirée (badge
+	//    rouge ou mention neutre), enrichie de faits DESCRIPTIFS lus en base
+	//    (forme, buts domicile/extérieur, confrontations) — jamais recalculés ici.
+	const retirees = r.selections.filter((s) => s.retireeDuRenforce);
+	const fixtureIds = [
+		...new Set(retirees.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+	];
+	const faitsParMatch = await stats.forFixtures(fixtureIds);
+	const retraits: RetraitEnrichi[] = retirees.map((s) => ({
+		ordre: s.ordre,
+		libelleFr: `${s.matchLabel} — ${s.libelleFr}`,
+		avecBadge: s.fragile,
+		chanceSur: chanceSur(s.probabilite ?? null),
+		chanceSurMot: chanceSurMot(s.probabilite ?? null),
+		faits: s.fixtureId !== null ? faitsDescriptifs(faitsParMatch.get(s.fixtureId)) : []
+	}));
 	const writingInput: WritingInput = {
 		probaTotalePct: pct1(r.probaTotale),
 		probaRenforceePct: pct1(r.probaRenforcee),
 		nbRetirees: r.retirees.length,
-		fragiles,
-		confiance: 'correcte',
+		nbMatchs: nbAnalysables,
+		nbFragiles: r.selections.filter((s) => s.fragile).length,
+		retraits,
 		rienARetirer: r.rienARetirer
 	};
-	const texte = await writeSafely(writingInput, ticketNames(r.selections));
+	const analyse = await writeSafely(writingInput, ticketNames(r.selections));
 
 	// 4. Facturation (règle : débit à l'affichage réussi, jamais avant, une fois).
 	//    Idempotent : une fois `billing` posé, on ne recalcule ni ne redébite.
-	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
 	let billing = ticket.billing;
 	if (!billing) {
 		// Trois vérifications pour le ticket offert :
@@ -153,8 +180,9 @@ export const load: PageServerLoad = async (event) => {
 		}
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };
-		// Fige le texte rendu : l'historique le relira à vie, sans jamais refacturer.
-		await saveAnalysisText(ticket.id, texte);
+		// Fige le texte rendu (deux niveaux, sérialisé) : l'historique le relira à
+		// vie, à l'identique, sans jamais refacturer ni régénérer.
+		await saveAnalysisText(ticket.id, serialiseAnalyse(analyse));
 		await updateTicket(ticket.id, {
 			statut: 'analyse',
 			billing,
@@ -184,12 +212,31 @@ export const load: PageServerLoad = async (event) => {
 		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null
 	}));
 
+	// Explications par sélection retirée, rattachées à leur ligne (ordre, libellés,
+	// badge) pour l'affichage — dans l'ordre du ticket.
+	const parLigne = new Map(lignes.map((l) => [l.ordre, l]));
+	const explications: ExplicationVM[] = analyse.parSelection
+		.map((p) => {
+			const l = parLigne.get(p.ordre);
+			if (!l) return null;
+			return {
+				ordre: p.ordre,
+				matchLabel: l.matchLabel,
+				libelleFr: l.libelleFr,
+				avecBadge: l.fragile,
+				texte: p.texte
+			} satisfies ExplicationVM;
+		})
+		.filter((x): x is ExplicationVM => x !== null)
+		.sort((a, b) => a.ordre - b.ordre);
+
 	const vm: ResultVM = {
 		lignes,
 		probaTotalePct: writingInput.probaTotalePct,
 		probaRenforceePct: writingInput.probaRenforceePct,
 		nbRetirees: writingInput.nbRetirees,
-		texte,
+		synthese: analyse.synthese,
+		explications,
 		rienARetirer: r.rienARetirer,
 		conflitMemeMatch: r.conflitMemeMatch
 	};

@@ -12,7 +12,7 @@
  * Les règles d'or tiennent quand même : aucun nom de personne, aucune promesse
  * de gain, les résultats défavorables à nos analyses sont montrés aussi.
  */
-import type { HistoryItem, LineVM } from '$lib/types';
+import type { ExplicationVM, HistoryItem, LineVM } from '$lib/types';
 
 export const DEMO_MODE = true;
 
@@ -97,7 +97,8 @@ export interface DemoDetail {
 	probaTotalePct: number;
 	probaRenforceePct: number;
 	nbRetirees: number;
-	texte: string;
+	synthese: string | null;
+	explications: ExplicationVM[];
 }
 
 function line(
@@ -142,10 +143,25 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 		probaTotalePct: 4.2,
 		probaRenforceePct: 12.6,
 		nbRetirees: 2,
-		texte:
-			'Deux sélections tiraient tes chances vers le bas. En les retirant, ton ' +
-			'ticket renforcé devient nettement plus solide. Les cotes restent lisibles ' +
-			'pour que tu vérifies notre lecture.'
+		synthese: 'Ton ticket tient sur sept matchs. Deux sont fragiles, un seul suffit à tout faire tomber.',
+		explications: [
+			{
+				ordre: 2,
+				matchLabel: 'LENS – NICE',
+				libelleFr: 'Plus de 2,5 buts',
+				avecBadge: true,
+				texte:
+					'Plus de 2,5 buts, c’est risqué. Lens marque peu à domicile, et Nice ferme bien le jeu. Une chance sur deux, pas plus.'
+			},
+			{
+				ordre: 4,
+				matchLabel: 'MILAN – TORINO',
+				libelleFr: 'Milan gagne',
+				avecBadge: true,
+				texte:
+					'Milan gagne, c’est ton match le plus risqué. Milan a perdu deux fois à domicile ce mois-ci. Une chance sur trois, pas plus.'
+			}
+		]
 	};
 }
 
