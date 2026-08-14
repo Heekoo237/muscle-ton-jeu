@@ -111,6 +111,7 @@ function splitLine(texteBrut: string): { matchText: string; marketText: string; 
 type MatchDiag =
 	| { kind: 'ok'; fixture: Fixture; homeTeam: Team; awayTeam: Team }
 	| { kind: 'hors_fenetre'; homeTeam: Team; awayTeam: Team }
+	| { kind: 'commence'; homeTeam: Team; awayTeam: Team }
 	| { kind: 'non_resolu' }
 	| { kind: 'hors_couverture' }
 	| { kind: 'illisible' };
@@ -145,12 +146,23 @@ function diagnoseMatch(
 		// libellé m'avait induit en erreur ; il colle maintenant à la donnée.
 		if (fixture) {
 			const t = Date.parse(fixture.dateUtc);
-			const horizon = Date.now() + ANALYSIS_WINDOW_DAYS * 86_400_000;
-			if (Number.isNaN(t) || t <= horizon) return { kind: 'ok', fixture, homeTeam, awayTeam };
-			console.warn(
-				`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
-			);
-			return { kind: 'hors_fenetre', homeTeam, awayTeam };
+			const now = Date.now();
+			// Coup d'envoi PASSÉ → on n'analyse pas (une analyse d'avant-match n'a plus
+			// de sens, et laisserait croire qu'on prédit un résultat déjà en cours).
+			if (!Number.isNaN(t) && t <= now) {
+				console.warn(
+					`[résolution] DÉJÀ COMMENCÉ « ${matchText} » — coup d'envoi ${fixture.dateUtc}, passé`
+				);
+				return { kind: 'commence', homeTeam, awayTeam };
+			}
+			// Trouvé mais au-delà de la période analysée.
+			if (!Number.isNaN(t) && t > now + ANALYSIS_WINDOW_DAYS * 86_400_000) {
+				console.warn(
+					`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
+				);
+				return { kind: 'hors_fenetre', homeTeam, awayTeam };
+			}
+			return { kind: 'ok', fixture, homeTeam, awayTeam };
 		}
 		console.warn(
 			`[résolution] NON RETROUVÉ « ${matchText} » — équipes reconnues, mais aucun match entre elles en base`
@@ -258,11 +270,13 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 			const raison =
 				diag.kind === 'illisible'
 					? 'inconnu'
-					: diag.kind === 'hors_fenetre'
-						? 'hors_fenetre'
-						: diag.kind === 'non_resolu'
-							? 'non_resolu'
-							: 'hors_couverture';
+					: diag.kind === 'commence'
+						? 'commence'
+						: diag.kind === 'hors_fenetre'
+							? 'hors_fenetre'
+							: diag.kind === 'non_resolu'
+								? 'non_resolu'
+								: 'hors_couverture';
 			return {
 				ordre,
 				texteBrut: ligne.texteBrut,

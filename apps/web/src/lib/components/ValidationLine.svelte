@@ -18,7 +18,8 @@
 	const horsCouv = $derived(etat === 'inconnu' && raison === 'hors_couverture');
 	const nonResolu = $derived(etat === 'inconnu' && raison === 'non_resolu');
 	const horsFenetre = $derived(etat === 'inconnu' && raison === 'hors_fenetre');
-	const calme = $derived(nonCouvert || horsCouv || nonResolu || horsFenetre);
+	const commence = $derived(etat === 'inconnu' && raison === 'commence');
+	const calme = $derived(nonCouvert || horsCouv || nonResolu || horsFenetre || commence);
 	const dataState = $derived(calme ? 'noncouvert' : etat);
 	const icone = $derived(etat === 'certain' ? '✓' : calme ? '–' : etat === 'ambigu' ? '▲' : '✕');
 </script>
@@ -30,6 +31,8 @@
 		<div class="match">{selection.matchLabel}</div>
 		{#if etat === 'certain'}
 			<div class="market">{selection.libelleFr}</div>
+		{:else if commence}
+			<div class="hint">Ce match a déjà commencé — on ne l'analyse pas</div>
 		{:else if horsCouv}
 			<div class="hint">Championnat non couvert — gardé, non analysé, non facturé</div>
 		{:else if nonResolu}

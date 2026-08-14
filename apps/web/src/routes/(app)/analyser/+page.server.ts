@@ -3,7 +3,6 @@ import type { Actions, PageServerLoad } from './$types';
 import { vision, sports } from '$lib/server/services';
 import type { ImageInput } from '$lib/server/services/vision';
 import { resolveTicket } from '$lib/server/domain/resolve';
-import { RESOLUTION_HORIZON_DAYS } from '$lib/server/domain/window';
 import { createTicket } from '$lib/server/fixtures/ticketStore';
 import {
 	sha256Hex,
@@ -99,10 +98,10 @@ export const actions: Actions = {
 		console.log('[vision] lecture brute:', JSON.stringify(raw.lignes));
 
 		// 5. Résolution (code) + sauvegarde du ticket avant tout paiement.
-		// Horizon large pour la résolution : on charge au-delà de la fenêtre d'analyse
-		// afin de distinguer « match trouvé mais trop loin » de « match pas retrouvé ».
+		// Fenêtre de RÉSOLUTION : large ET incluant les matchs déjà commencés, pour
+		// distinguer « trop loin », « pas retrouvé » et « déjà commencé ».
 		const [fixtures, teams] = await Promise.all([
-			sports.upcomingFixtures(RESOLUTION_HORIZON_DAYS),
+			sports.resolutionFixtures(),
 			sports.teams()
 		]);
 		const selections = resolveTicket(raw, fixtures, teams);

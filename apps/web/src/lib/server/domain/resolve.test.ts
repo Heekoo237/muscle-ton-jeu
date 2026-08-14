@@ -194,7 +194,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 			{ id: 1377, nom: 'USL Dunkerque', aliases: [], leagueId: 2, clubId: 1377 }
 		];
 		const F2: Fixture[] = [
-			{ id: 400, dateUtc: '2026-08-14T18:45:00Z', teamHome: 'Stade de Reims', teamAway: 'USL Dunkerque', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 400, dateUtc: '', teamHome: 'Stade de Reims', teamAway: 'USL Dunkerque', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
 		];
 		const [s] = resolveTicket(raw('Reims - Dunkerque  Reims ou Nul - Double chance (t. rég)  1.19'), F2, T2);
 		expect(s.etatResolution).toBe('certain');
@@ -209,7 +209,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 			{ id: 1366, nom: 'Saint Etienne', aliases: [], leagueId: 2, clubId: 1366 }
 		];
 		const F3: Fixture[] = [
-			{ id: 401, dateUtc: '2026-08-14T18:45:00Z', teamHome: 'Saint Etienne', teamAway: 'Clermont', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 401, dateUtc: '', teamHome: 'Saint Etienne', teamAway: 'Clermont', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
 		];
 		const [s] = resolveTicket(raw('Saint Etienne - Clermont  1  2.0'), F3, T3);
 		expect(s.etatResolution).toBe('certain');
@@ -227,5 +227,40 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 		const [s] = resolveTicket(raw('Galatasaray - Corum Belediyespor  1  1.5'), F2, T2);
 		expect(s.etatResolution).toBe('certain');
 		expect(s.fixtureId).toBe(200);
+	});
+});
+
+/* ---- Match déjà commencé (coup d'envoi passé) — 5e cas de diagnostic ---- */
+
+describe('resolveTicket — un match déjà commencé n’est pas analysé', () => {
+	const T: Team[] = [
+		{ id: 1, nom: 'Reims', aliases: [], leagueId: 1 },
+		{ id: 2, nom: 'Dunkerque', aliases: [], leagueId: 1 },
+		{ id: 3, nom: 'Lyon', aliases: [], leagueId: 1 },
+		{ id: 4, nom: 'Rennes', aliases: [], leagueId: 1 }
+	];
+	const past = '2000-01-01T18:45:00Z';
+	const future = '';
+
+	it('coup d’envoi passé → raison « commence », gardé, non analysé', () => {
+		const F: Fixture[] = [
+			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const [s] = resolveTicket(raw('Reims - Dunkerque  1  1.25'), F, T);
+		expect(s.etatResolution).toBe('inconnu');
+		expect(s.raison).toBe('commence');
+		expect(s.fixtureId).toBeNull();
+	});
+
+	it('ticket MIXTE : le match à venir est analysé, le commencé seulement signalé', () => {
+		const F: Fixture[] = [
+			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null },
+			{ id: 501, dateUtc: future, teamHome: 'Lyon', teamAway: 'Rennes', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const out = resolveTicket(raw('Reims - Dunkerque  1  1.25', 'Lyon - Rennes  1  2.0'), F, T);
+		expect(out[0].raison).toBe('commence');
+		expect(out[0].fixtureId).toBeNull();
+		expect(out[1].etatResolution).toBe('certain');
+		expect(out[1].fixtureId).toBe(501);
 	});
 });

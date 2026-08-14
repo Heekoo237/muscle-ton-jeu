@@ -22,3 +22,11 @@ export const ANALYSIS_WINDOW_DAYS = 21;
  * généralement pas encore coté, donc pas en base → « pas retrouvé ».
  */
 export const RESOLUTION_HORIZON_DAYS = 60;
+
+/**
+ * Recul de RÉSOLUTION : on charge aussi les matchs dont le coup d'envoi est PASSÉ
+ * (en cours ou récemment terminés), pour distinguer « déjà commencé » de « pas
+ * retrouvé ». Un match en cours a `date_utc < now` : sans ce recul, il est filtré
+ * et la résolution dit à tort « on n'a pas retrouvé ce match ».
+ */
+export const RESOLUTION_LOOKBACK_HOURS = 48;

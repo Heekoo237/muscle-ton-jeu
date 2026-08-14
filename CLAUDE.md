@@ -93,6 +93,8 @@ Cette règle est juridique autant que produit. Proposer une sélection que l'uti
 | 4 | Après paiement, retour **exactement sur le ticket en cours**, jamais sur l'accueil |
 | 5 | Gratuit si : premier ticket, ticket entièrement solide, moins de 3 sélections analysables, même ticket sous 24 h |
 
+**Match déjà commencé.** Un match dont le coup d'envoi est passé est **gardé dans le ticket, jamais analysé, jamais facturé**, et l'utilisateur en est **informé explicitement** (« Ce match a déjà commencé — on ne l'analyse pas »). Une analyse d'avant-match n'a plus de sens une fois le coup d'envoi donné, et laisserait croire qu'on prédit un résultat déjà en cours. On le **dit** — on ne prétend jamais ne pas avoir retrouvé le match. Un ticket mixte (matchs à venir + un commencé) analyse normalement les matchs à venir et signale seulement le commencé.
+
 Paliers : 2-6 sélections = 1 crédit · 7-12 = 2 crédits · 13-20 = 3 crédits · au-delà de 20, blocage.
 
 ---

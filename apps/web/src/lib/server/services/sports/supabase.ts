@@ -10,7 +10,11 @@
 import type { SportsDataService } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
-import { ANALYSIS_WINDOW_DAYS } from '$lib/server/domain/window';
+import {
+	ANALYSIS_WINDOW_DAYS,
+	RESOLUTION_HORIZON_DAYS,
+	RESOLUTION_LOOKBACK_HOURS
+} from '$lib/server/domain/window';
 
 interface FixtureRow {
 	id: number;
@@ -47,6 +51,32 @@ export class SupabaseSportsData implements SportsDataService {
 			.eq('statut', 'scheduled')
 			.gte('date_utc', nowIso)
 			.lt('date_utc', horizonIso);
+		if (error) throw error;
+		const names = await this.teamNames();
+		return ((data ?? []) as FixtureRow[]).map((r) => ({
+			id: Number(r.id),
+			dateUtc: r.date_utc,
+			teamHome: names.get(Number(r.team_home_id)) ?? '',
+			teamAway: names.get(Number(r.team_away_id)) ?? '',
+			leagueId: Number(r.league_id),
+			statut: r.statut,
+			scoreHome: r.score_home,
+			scoreAway: r.score_away
+		}));
+	}
+
+	async resolutionFixtures(): Promise<Fixture[]> {
+		const now = Date.now();
+		const fromIso = new Date(now - RESOLUTION_LOOKBACK_HOURS * 3600 * 1000).toISOString();
+		const toIso = new Date(now + RESOLUTION_HORIZON_DAYS * 24 * 3600 * 1000).toISOString();
+		// On inclut les matchs en cours (scheduled, date passée) ET récemment terminés,
+		// pour pouvoir dire « déjà commencé » plutôt que « pas retrouvé ».
+		const { data, error } = await supabaseAdmin()
+			.from('fixtures')
+			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
+			.in('statut', ['scheduled', 'finished'])
+			.gte('date_utc', fromIso)
+			.lt('date_utc', toIso);
 		if (error) throw error;
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({

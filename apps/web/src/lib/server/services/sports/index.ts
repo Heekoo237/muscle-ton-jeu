@@ -6,8 +6,15 @@
 import type { Fixture, Team } from '$lib/types';
 
 export interface SportsDataService {
-	/** Calendrier des `days` prochains jours — restreint la résolution des matchs. */
+	/** Calendrier des `days` prochains jours (strictement À VENIR) — dashboard, etc. */
 	upcomingFixtures(days?: number): Promise<Fixture[]>;
+	/**
+	 * Matchs pour la RÉSOLUTION d'un ticket : fenêtre large qui inclut AUSSI les
+	 * matchs dont le coup d'envoi est passé (en cours / récemment terminés), pour
+	 * distinguer « déjà commencé » de « pas retrouvé ». À ne pas confondre avec
+	 * `upcomingFixtures` (strictement à venir).
+	 */
+	resolutionFixtures(): Promise<Fixture[]>;
 	/** Équipes connues, avec leurs alias (actif propriétaire). */
 	teams(): Promise<Team[]>;
 	/** Résultats terminés depuis une date, pour le règlement des tickets. */

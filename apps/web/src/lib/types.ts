@@ -111,7 +111,8 @@ export interface Selection {
 	 *  - 'non_couvert'     : marché hors couverture (buteur, mi-temps…) — gardé.
 	 *  - 'hors_couverture' : championnat vraiment absent du catalogue (aucun candidat) — gardé.
 	 *  - 'non_resolu'      : match pas retrouvé alors qu'un candidat existe (alias manquant).
-	 *  - 'hors_fenetre'    : équipes reconnues, mais match hors des 7 prochains jours.
+	 *  - 'hors_fenetre'    : match trouvé, mais au-delà de la période analysée.
+	 *  - 'commence'        : coup d'envoi passé — gardé, jamais analysé ni facturé.
 	 *  - 'ambigu'          : plusieurs lectures possibles (seuil de buts absent).
 	 *  - 'inconnu'         : on n'a pas su lire (match ou pari) — à corriger.
 	 */
@@ -120,6 +121,7 @@ export interface Selection {
 		| 'hors_couverture'
 		| 'non_resolu'
 		| 'hors_fenetre'
+		| 'commence'
 		| 'inconnu'
 		| 'ambigu';
 	/** Cas ambigu : marchés proposés au choix (jamais deviné). */

@@ -31,6 +31,7 @@
 	const horsCouverture = $derived(selection.raison === 'hors_couverture');
 	const nonResolu = $derived(selection.raison === 'non_resolu');
 	const horsFenetre = $derived(selection.raison === 'hors_fenetre');
+	const commence = $derived(selection.raison === 'commence');
 
 	const GROUPS: { titre: string; markets: Market[] }[] = [
 		{ titre: 'Résultat', markets: ['WIN_HOME', 'DRAW', 'WIN_AWAY'] },
@@ -65,6 +66,12 @@
 					<p class="nc-sous">
 						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas. Tu
 						n'as rien à corriger.
+					</p>
+				{:else if commence}
+					<p class="nc-titre">Ce match a déjà commencé.</p>
+					<p class="nc-sous">
+						Une analyse d'avant-match n'a plus de sens une fois le coup d'envoi donné. On le
+						garde dans ton ticket, sans l'analyser ni te le facturer.
 					</p>
 				{:else if horsFenetre}
 					<p class="nc-titre">Ce match n'est pas encore dans notre période d'analyse.</p>
