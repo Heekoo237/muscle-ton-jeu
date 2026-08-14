@@ -1,0 +1,35 @@
+/**
+ * team-aliases.ts — Carte d'alias CURÉE pour la RÉSOLUTION du ticket.
+ *
+ * La capture vient d'un BOOKMAKER (Betclic : « Paris SG », « Sporting Portugal ») ;
+ * la base vient d'un AUTRE référentiel, The Odds API (« Paris Saint-Germain »,
+ * « Sporting Lisbon »). Deux référentiels de noms — exactement le problème
+ * football-data ↔ Odds API du pipeline Python (team_aliases.py), côté app cette
+ * fois.
+ *
+ * MÊME DISCIPLINE, non négociable :
+ *  - carte EXPLICITE : chaque entrée est écrite et vérifiable à la main ;
+ *  - AUCUNE fusion automatique : une variante absente reste non résolue (et
+ *    JOURNALISÉE), jamais devinée ;
+ *  - garde-fou anti-fusion : deux clubs distincts ne se confondent jamais — la
+ *    résolution (`matchTeam`) exige une correspondance UNIQUE, un alias qui
+ *    pointe vers un nom ambigu ne résout donc rien (test `team-aliases.test.ts`).
+ *
+ * Clé = nom bookmaker NORMALISÉ (minuscule, sans accent ni ponctuation) ;
+ * valeur = nom de référence Odds API NORMALISÉ, tel qu'il apparaît en base.
+ *
+ * ⚠️ Provisoire : cette liste se COMPLÈTE à partir des logs `[résolution]` d'un
+ * vrai ticket (nom lu + clé + candidats en base). On n'ajoute une entrée qu'après
+ * avoir vu le nom exact côté base, jamais au jugé.
+ */
+export const TEAM_ALIASES: Record<string, string> = {
+	// Betclic → The Odds API. Confirmés par l'échantillon nocturne (Sporting Lisbon).
+	'paris sg': 'paris saint germain',
+	'sporting portugal': 'sporting lisbon'
+	// À compléter depuis les logs : « vitoria guimaraes » → ? , etc.
+};
+
+/** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */
+export function aliasFor(normalizedName: string): string {
+	return TEAM_ALIASES[normalizedName] ?? normalizedName;
+}

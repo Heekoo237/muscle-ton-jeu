@@ -12,14 +12,21 @@
 import type { Fixture, Selection, Team } from '$lib/types';
 import type { RawLine, RawTicketRead } from '$lib/server/services/vision';
 import { resolveMarket, marketLabelFr, splitResultMarket, type MarketResolution } from './market-map';
+import { aliasFor } from './team-aliases';
 
 function normalize(s: string): string {
 	return s
 		.toLowerCase()
 		.normalize('NFD')
-		.replace(/[̀-ͯ]/g, '')
+		.replace(/[̀-ͯ]/g, '') // accents
+		.replace(/[^a-z0-9 ]/g, ' ') // ponctuation → espace (aligne avec le pipeline Python)
 		.replace(/\s+/g, ' ')
 		.trim();
+}
+
+/** Mots « significatifs » d'un nom (≥ 4 lettres) — sert au diagnostic des candidats. */
+function significantTokens(n: string): string[] {
+	return n.split(' ').filter((t) => t.length >= 4);
 }
 
 /** Vrai si `needle` apparaît dans `hay` comme une suite de MOTS ENTIERS. */
@@ -39,8 +46,12 @@ function wordPhraseIn(needle: string, hay: string): boolean {
  * couverture élargie multiplie les clubs d'une même ville. On l'a retirée.
  */
 function matchTeam(name: string, teams: Team[]): Team | null {
-	const n = normalize(name);
-	if (!n) return null;
+	const raw = normalize(name);
+	if (!raw) return null;
+	// La capture parle bookmaker, la base parle Odds API : on cherche AUSSI sous le
+	// nom de référence si la carte curée en connaît un (« paris sg » → « paris saint
+	// germain »). Aucune fusion : le résultat doit rester UNIQUE (cf. plus bas).
+	const n = aliasFor(raw);
 	// 1) Exact (nom ou alias identique). Un seul club → certain ; plusieurs → ambigu.
 	const exact = teams.filter((t) => [t.nom, ...t.aliases].map(normalize).some((c) => c === n));
 	if (exact.length === 1) return exact[0];
@@ -50,6 +61,18 @@ function matchTeam(name: string, teams: Team[]): Team | null {
 		[t.nom, ...t.aliases].map(normalize).some((c) => wordPhraseIn(c, n) || wordPhraseIn(n, c))
 	);
 	return near.length === 1 ? near[0] : null;
+}
+
+/** Équipes en base partageant un mot significatif avec `name` (candidats probables
+ *  d'un alias manquant). Sert UNIQUEMENT au diagnostic — jamais à résoudre. */
+function candidatesFor(name: string, teams: Team[]): Team[] {
+	const toks = new Set(significantTokens(aliasFor(normalize(name))));
+	if (!toks.size) return [];
+	return teams
+		.filter((t) =>
+			[t.nom, ...t.aliases].some((c) => significantTokens(normalize(c)).some((tk) => toks.has(tk)))
+		)
+		.slice(0, 6);
 }
 
 /** Découpe une ligne brute « Match  Marché  Cote » sur les espaces multiples. */
@@ -67,29 +90,56 @@ function splitLine(texteBrut: string): { matchText: string; marketText: string; 
 	return { matchText, marketText, odds };
 }
 
-/** Trouve la fixture correspondant au texte « TeamA - TeamB », dans la fenêtre 7 j. */
-function matchFixture(
-	matchText: string,
-	fixtures: Fixture[],
-	teams: Team[]
-): { fixture: Fixture; home: string; away: string; homeTeam: Team; awayTeam: Team } | null {
-	const sides = matchText.split(/\s+[-–]\s+/); // « - » ou « – »
-	if (sides.length < 2) return null;
-	const home = matchTeam(sides[0], teams);
-	const away = matchTeam(sides[1], teams);
-	if (!home || !away) return null;
-	const fixture = fixtures.find(
-		(f) =>
-			normalize(f.teamHome) === normalize(home.nom) &&
-			normalize(f.teamAway) === normalize(away.nom)
-	);
-	if (!fixture) return null;
-	return { fixture, home: home.nom, away: away.nom, homeTeam: home, awayTeam: away };
-}
+/**
+ * Diagnostic de match — sépare les causes qu'on confondait toutes en « non
+ * couvert ». Un match non résolu peut vouloir dire quatre choses DIFFÉRENTES :
+ *  - `ok`             : les deux équipes ET un match dans les 7 jours ;
+ *  - `hors_fenetre`   : les deux équipes reconnues, mais aucun match sous 7 jours ;
+ *  - `non_resolu`     : au moins un nom non reconnu MAIS un candidat existe en base
+ *                       (alias manquant — c'est NOTRE lacune, pas une non-couverture) ;
+ *  - `hors_couverture`: aucun candidat en base pour un côté (championnat absent) ;
+ *  - `illisible`      : le texte n'est pas un « A - B » lisible.
+ * Chaque cas non-ok est JOURNALISÉ avec le nom lu, la clé, et les candidats.
+ */
+type MatchDiag =
+	| { kind: 'ok'; fixture: Fixture; homeTeam: Team; awayTeam: Team }
+	| { kind: 'hors_fenetre'; homeTeam: Team; awayTeam: Team }
+	| { kind: 'non_resolu' }
+	| { kind: 'hors_couverture' }
+	| { kind: 'illisible' };
 
-/** Le texte ressemble-t-il à un vrai match « A - B » (deux côtés lisibles) ? */
-function looksLikeMatch(matchText: string): boolean {
-	return matchText.split(/\s+[-–]\s+/).filter((s) => s.trim().length >= 2).length >= 2;
+function diagnoseMatch(matchText: string, fixtures: Fixture[], teams: Team[]): MatchDiag {
+	const sides = matchText.split(/\s+[-–]\s+/).map((s) => s.trim());
+	if (sides.filter((s) => s.length >= 2).length < 2) return { kind: 'illisible' };
+	const [rawHome, rawAway] = sides;
+	const homeTeam = matchTeam(rawHome, teams);
+	const awayTeam = matchTeam(rawAway, teams);
+
+	if (homeTeam && awayTeam) {
+		const fixture = fixtures.find(
+			(f) =>
+				normalize(f.teamHome) === normalize(homeTeam.nom) &&
+				normalize(f.teamAway) === normalize(awayTeam.nom)
+		);
+		if (fixture) return { kind: 'ok', fixture, homeTeam, awayTeam };
+		console.warn(
+			`[résolution] HORS FENÊTRE « ${matchText} » — équipes reconnues, aucun match dans les 7 jours`
+		);
+		return { kind: 'hors_fenetre', homeTeam, awayTeam };
+	}
+
+	// Au moins un côté non résolu : on diagnostique CHAQUE côté manquant.
+	const manquants = ([[rawHome, homeTeam], [rawAway, awayTeam]] as const)
+		.filter(([, t]) => !t)
+		.map(([raw]) => ({ raw, key: aliasFor(normalize(raw)), cands: candidatesFor(raw, teams) }));
+	const avecCandidat = manquants.some((m) => m.cands.length > 0);
+	const label = avecCandidat ? 'NON RÉSOLU (alias manquant probable)' : 'HORS COUVERTURE (aucun candidat)';
+	console.warn(`[résolution] ${label} « ${matchText} »`);
+	for (const m of manquants) {
+		const c = m.cands.length ? m.cands.map((t) => t.nom).join(', ') : '(aucun candidat en base)';
+		console.warn(`    côté « ${m.raw} » → clé « ${m.key} » → candidats : ${c}`);
+	}
+	return avecCandidat ? { kind: 'non_resolu' } : { kind: 'hors_couverture' };
 }
 
 const DRAW_WORDS = new Set(['nul', 'match nul', 'draw', 'x', 'egalite']);
@@ -164,18 +214,20 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 	return raw.lignes.map((ligne, i): Selection => {
 		const ordre = i + 1;
 		const { matchText, marketText, odds } = lineParts(ligne);
-		const fx = matchFixture(matchText, fixtures, teams);
+		const diag = diagnoseMatch(matchText, fixtures, teams);
 
-		// Match non reconnu. On distingue DEUX causes :
-		//  - le texte ressemble à un vrai match « A - B » mais les équipes ne sont
-		//    pas dans nos championnats couverts → HORS COUVERTURE (gardé, non
-		//    analysé, non facturé, RIEN à corriger) ;
-		//  - le texte n'est pas lisible comme un match → INCONNU (à corriger).
-		if (!fx) {
-			const raison = looksLikeMatch(matchText) ? 'hors_couverture' : 'inconnu';
-			if (raison === 'hors_couverture') {
-				console.warn(`[résolution] championnat NON COUVERT : « ${matchText} »`);
-			}
+		// Match non résolu : QUATRE causes distinctes, quatre messages honnêtes.
+		// « hors_couverture » n'est plus le fourre-tout — il est réservé au cas où
+		// AUCUN candidat n'existe en base (championnat vraiment absent du catalogue).
+		if (diag.kind !== 'ok') {
+			const raison =
+				diag.kind === 'illisible'
+					? 'inconnu'
+					: diag.kind === 'hors_fenetre'
+						? 'hors_fenetre'
+						: diag.kind === 'non_resolu'
+							? 'non_resolu'
+							: 'hors_couverture';
 			return {
 				ordre,
 				texteBrut: ligne.texteBrut,
@@ -193,7 +245,8 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 			};
 		}
 
-		const market = resolveMarketForFixture(marketText, fx.homeTeam, fx.awayTeam);
+		const fx = { fixture: diag.fixture, home: diag.homeTeam.nom, away: diag.awayTeam.nom };
+		const market = resolveMarketForFixture(marketText, diag.homeTeam, diag.awayTeam);
 
 		const matchLabel = `${fx.home} – ${fx.away}`;
 

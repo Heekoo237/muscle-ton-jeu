@@ -137,3 +137,43 @@ describe('resolveTicket — deux clubs distincts ne se confondent jamais', () =>
 		expect(s.fixtureId).toBe(301);
 	});
 });
+
+/* ---- Quatre causes DISTINCTES de non-résolution (fin du fourre-tout « non couvert ») ---- */
+
+describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas devinée', () => {
+	const T: Team[] = [
+		{ id: 1, nom: 'Paris Saint-Germain', aliases: ['paris saint germain'], leagueId: 1 },
+		{ id: 2, nom: 'Lens', aliases: ['lens'], leagueId: 1 },
+		{ id: 3, nom: 'Sporting Lisbon', aliases: ['sporting lisbon'], leagueId: 2 },
+		{ id: 4, nom: 'Braga', aliases: ['braga'], leagueId: 2 }
+	];
+	const F: Fixture[] = [
+		{ id: 100, dateUtc: '', teamHome: 'Paris Saint-Germain', teamAway: 'Lens', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		// PAS de fixture Sporting Lisbon - Braga → hors fenêtre
+	];
+
+	it('alias bookmaker « Paris SG » → « Paris Saint-Germain » (ponctuation ignorée) : résolu', () => {
+		const [s] = resolveTicket(raw('Paris SG - Lens  1  1.50'), F, T);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(100);
+	});
+
+	it('équipes reconnues mais aucun match sous 7 jours → hors_fenetre (pas « non couvert »)', () => {
+		const [s] = resolveTicket(raw('Sporting Lisbon - Braga  1  1.80'), F, T);
+		expect(s.etatResolution).toBe('inconnu');
+		expect(s.raison).toBe('hors_fenetre');
+		expect(s.fixtureId).toBeNull();
+	});
+
+	it('nom non reconnu MAIS un candidat existe → non_resolu (alias manquant, pas « non couvert »)', () => {
+		// « Sporting Charleroi » partage « sporting » avec Sporting Lisbon sans être
+		// ni exact ni contenu par mot entier → candidat trouvé, match non résolu.
+		const [s] = resolveTicket(raw('Sporting Charleroi - Lens  1  2.0'), F, T);
+		expect(s.raison).toBe('non_resolu');
+	});
+
+	it('aucun candidat en base → hors_couverture (championnat vraiment absent)', () => {
+		const [s] = resolveTicket(raw('Corum Belediyespor - Lens  1  2.0'), F, T);
+		expect(s.raison).toBe('hors_couverture');
+	});
+});

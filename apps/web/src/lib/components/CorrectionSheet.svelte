@@ -29,6 +29,8 @@
 	// un marché ne sert à rien : on n'affiche PAS la liste, seulement l'info + retrait.
 	const matchResolu = $derived(selection.fixtureId != null);
 	const horsCouverture = $derived(selection.raison === 'hors_couverture');
+	const nonResolu = $derived(selection.raison === 'non_resolu');
+	const horsFenetre = $derived(selection.raison === 'hors_fenetre');
 
 	const GROUPS: { titre: string; markets: Market[] }[] = [
 		{ titre: 'Résultat', markets: ['WIN_HOME', 'DRAW', 'WIN_AWAY'] },
@@ -63,6 +65,18 @@
 					<p class="nc-sous">
 						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas. Tu
 						n'as rien à corriger.
+					</p>
+				{:else if horsFenetre}
+					<p class="nc-titre">Ce match n'est pas dans les 7 prochains jours.</p>
+					<p class="nc-sous">
+						On analyse les matchs de la semaine à venir. On le garde, sans l'analyser ni te le
+						facturer.
+					</p>
+				{:else if nonResolu}
+					<p class="nc-titre">On n'a pas retrouvé ce match.</p>
+					<p class="nc-sous">
+						Le championnat est couvert, mais on n'a pas reconnu les équipes sous ce nom. On le
+						garde, sans l'analyser ni te le facturer.
 					</p>
 				{:else}
 					<p class="nc-titre">On n'a pas réussi à lire ce match.</p>
