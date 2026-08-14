@@ -23,7 +23,8 @@ from datetime import datetime, timezone
 
 from .db import connect, window_6h
 from .provider import NullProvider, get_provider
-from .sync import league_worklist, resolve_fixture
+from .quota import assert_quota_ok, planned_monthly_credits
+from .sync import league_worklist, resolve_fixture, slots_for
 
 
 def _margins(odds) -> dict:
@@ -95,7 +96,16 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
     total = 0
     with connect() as con:
         run_id = _open_run(con)
-        leagues = league_worklist(con)
+        full = league_worklist(con)
+        # GARDE-FOU DE PALIER : on lit le palier RÉEL via un appel GRATUIT (/sports)
+        # AVANT toute collecte payante, et on refuse de démarrer si le plan mensuel
+        # dépasse le palier détecté. Un palier gratuit (500) ne doit jamais recevoir
+        # un plan de 5 700 sans qu'on le voie s'arrêter net.
+        provider.sports()
+        assert_quota_ok(provider, full)
+        # Fréquence graduée : ce tour ne relève QUE les compétitions dont la fenêtre
+        # tombe maintenant (modèle 4/j → chaque fenêtre ; cote seule 1/j → une seule).
+        leagues = [lg for lg in full if fenetre.hour in slots_for(lg["releves_par_jour"])]
         for lg in leagues:
             # Un championnat qui échoue (clé de sport erronée, 404, réseau) ne doit
             # PAS faire tomber les autres. Point de reprise (savepoint) par ligue :
@@ -120,9 +130,12 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
         statut = "success" if not erreurs else ("failed" if len(erreurs) == len(leagues) else "partial")
         credits = getattr(provider, "credits_used", None)
         restants = getattr(provider, "credits_remaining", None)
+        palier = getattr(provider, "credits_quota", None)
+        plan_mensuel = planned_monthly_credits(full)
         journal = dict(detail) | {
             "fenetre": fenetre.isoformat(), "credits": credits,
-            "credits_restants": restants, "marges": marges,
+            "credits_restants": restants, "palier_detecte": palier,
+            "plan_mensuel": plan_mensuel, "marges": marges,
         }
         if erreurs:
             journal["erreurs"] = erreurs
@@ -137,11 +150,13 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
     for lg, e in sorted(erreurs.items()):
         print(f"  {lg:<5} ÉCHEC : {e}")
     if credits is not None:
-        # Projection mensuelle : 4 relevés/jour × 30 jours.
-        print(f"Crédits consommés ce run : {credits}  ·  restants : {restants}  "
-              f"·  projection ≈ {credits * 4 * 30} / mois")
+        # Plan mensuel = fréquence graduée réelle, pas une projection à plat.
+        print(f"Crédits ce run : {credits}  ·  restants : {restants}  ·  "
+              f"palier détecté : {palier if palier is not None else '?'}  ·  "
+              f"plan mensuel (fréquence graduée) ≈ {plan_mensuel} / mois")
     return {"fenetre": fenetre.isoformat(), "snapshots": total, "statut": statut,
-            "credits": credits, "erreurs": erreurs}
+            "credits": credits, "palier_detecte": palier, "plan_mensuel": plan_mensuel,
+            "erreurs": erreurs}
 
 
 def main() -> None:

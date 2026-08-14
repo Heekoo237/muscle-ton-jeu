@@ -434,10 +434,15 @@ Invisible pour la plomberie : même table `predictions`, `source` passe de
 `cote_seule` à `odds`/`model`, la confiance monte. Ce qui change, c'est le
 **travail d'onboarding** (jamais compressé — voir le callout ci-dessus) :
 
-| Lot | Championnats | Clés The Odds API attendues | Effort |
+Catalogue confirmé (run réel) : **11 modèle actif · 7 éligibles · 27 cote seule ·
+22 hors-saison.** Les 7 éligibles : Championship, League One, League Two, **Ligue 2**,
+2. Bundesliga, Serie B, La Liga 2.
+
+| Lot | Championnats | Clés The Odds API | Effort |
 |---|---|---|---|
-| **1** | 3 tiers anglais : Championship, League One, League Two | `soccer_efl_champ`, `soccer_england_league1`, `soccer_england_league2` | ~1 session — même pays, nommage cohérent, alias par lot |
-| **2** | 4 D2 continentales : 2. Bundesliga, Serie B, La Liga 2, Ligue 2 | `soccer_germany_bundesliga2`, `soccer_italy_serie_b`, `soccer_spain_segunda_division`, `soccer_france_ligue_two` | ~1 session — plus de diversité d'alias |
+| **1 — PRIORITÉ** | **Ligue 2 (France D2)** — très jouée chez nos utilisateurs, et c'est elle qui a fait échouer le ticket test | `soccer_france_ligue_two` | ~½ session — un seul championnat, mais le plus rentable |
+| **2** | 3 tiers anglais : Championship, League One, League Two | `soccer_efl_champ`, `soccer_england_league1`, `soccer_england_league2` | ~1 session — même pays, nommage cohérent, alias par lot |
+| **3** | 3 D2 continentales : 2. Bundesliga, Serie B, La Liga 2 | `soccer_germany_bundesliga2`, `soccer_italy_serie_b`, `soccer_spain_segunda_division` | ~1 session — plus de diversité d'alias |
 
 Chaque promotion passe par l'onboarding **obligatoire** : carte d'alias curée
 (divisions basses = clubs plus obscurs → souvent plus de curation manuelle),

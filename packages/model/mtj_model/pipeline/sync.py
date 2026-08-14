@@ -37,10 +37,28 @@ def normalize_team_name(raw: str) -> str:
     return " ".join(toks)
 
 
-def league_worklist(con) -> list[dict]:
-    """Les 11 championnats actifs, avec league_id, clé fournisseur et code modèle."""
+def slots_for(releves: int) -> set[int]:
+    """Fenêtres de 6 h (heures UTC 0/6/12/18) où une compétition est relevée, selon
+    sa fréquence graduée. 4/j (modèle) → toutes ; 2/j → 06 et 18 ; 1/j (cote seule)
+    → 06 seulement. On garde l'historique de mouvements dense là où on backteste,
+    léger ailleurs — c'est ce qui fait tomber le coût sous le palier."""
+    if releves >= 4:
+        return {0, 6, 12, 18}
+    if releves == 3:
+        return {0, 6, 18}
+    if releves == 2:
+        return {6, 18}
+    return {6}
+
+
+def league_worklist(con, window_hour: int | None = None) -> list[dict]:
+    """Championnats ACTIFS avec league_id, clé fournisseur, code, régime et fréquence.
+
+    Si `window_hour` est fourni (heure d'une fenêtre de 6 h), on ne renvoie que les
+    compétitions à relever DANS cette fenêtre (fréquence graduée). Sans lui, la
+    liste complète — utile pour chiffrer le plan mensuel (garde-fou de palier)."""
     sql = """
-        select l.id as league_id, c.odds_api_key, c.fd_code
+        select l.id as league_id, c.odds_api_key, c.fd_code, c.regime, c.releves_par_jour
           from leagues l
           join league_catalog c on c.fd_code = l.provider_ref
          where l.actif
@@ -48,7 +66,14 @@ def league_worklist(con) -> list[dict]:
     """
     with con.cursor() as cur:
         cur.execute(sql)
-        return [{"league_id": r[0], "odds_api_key": r[1], "fd_code": r[2]} for r in cur.fetchall()]
+        rows = [
+            {"league_id": r[0], "odds_api_key": r[1], "fd_code": r[2],
+             "regime": r[3], "releves_par_jour": r[4]}
+            for r in cur.fetchall()
+        ]
+    if window_hour is None:
+        return rows
+    return [lg for lg in rows if window_hour in slots_for(lg["releves_par_jour"])]
 
 
 class TeamMergeCollision(RuntimeError):

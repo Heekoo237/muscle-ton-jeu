@@ -227,6 +227,7 @@ class TheOddsApiProvider:
         self._key = api_key
         self.credits_used = 0            # crédits consommés cette session (somme des requêtes)
         self.credits_remaining: int | None = None  # crédits restants sur le palier
+        self.credits_used_period: int | None = None  # crédits déjà consommés sur le palier
 
     def _get(self, path: str, params: dict) -> list[dict]:
         params = {"apiKey": self._key, **params}
@@ -234,12 +235,24 @@ class TheOddsApiProvider:
         req = urllib.request.Request(url, headers={"User-Agent": "mtj-pipeline/1.0"})
         with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310 (URL maîtrisée)
             payload = json.loads(r.read())
-            # The Odds API facture par en-têtes : coût de CETTE requête + solde.
+            # The Odds API facture par en-têtes : coût de CETTE requête + solde + usage.
             self.credits_used += int(r.headers.get("x-requests-last") or 0)
             remaining = r.headers.get("x-requests-remaining")
             if remaining is not None:
                 self.credits_remaining = int(float(remaining))
+            used = r.headers.get("x-requests-used")
+            if used is not None:
+                self.credits_used_period = int(float(used))
         return payload
+
+    @property
+    def credits_quota(self) -> int | None:
+        """Taille du PALIER détectée = restants + déjà consommés. C'est le vrai
+        plafond mensuel (500 gratuit, 20 000 payant…), lu chez le fournisseur —
+        jamais supposé. None tant qu'aucun appel n'a renseigné les en-têtes."""
+        if self.credits_remaining is None or self.credits_used_period is None:
+            return None
+        return self.credits_remaining + self.credits_used_period
 
     def sports(self) -> list[dict]:
         return self._get("sports", {"all": "true"})
