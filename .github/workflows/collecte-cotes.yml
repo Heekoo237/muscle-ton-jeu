@@ -20,6 +20,7 @@ on:
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - migrer-base           # crée/complète les tables dans Supabase
           - backfill-historique   # charge 3 saisons football-data (une fois)
+          - verifier-carte        # TEST 1 co-occurrence de la carte d'alias (lecture)
           - lister-equipes        # dump des équipes en base (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
@@ -69,6 +70,12 @@ jobs:
         env:
           MTJ_DATA_SOURCE: footballdata   # officiel prioritaire ; miroir en repli (par fichier)
         run: python -m mtj_model.pipeline.backfill
+
+      - name: Vérifier la carte d'alias (TEST 1 co-occurrence)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-carte'
+        env:
+          MTJ_DATA_SOURCE: footballdata
+        run: python -m mtj_model.pipeline.checkmap
 
       - name: Lister les équipes en base (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'lister-equipes'

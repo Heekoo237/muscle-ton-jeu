@@ -238,6 +238,21 @@ def reset_backfill() -> None:
         nt = cur.rowcount
         print(f"Purge backfill : {nf} fixtures fd + {nt} équipes orphelines supprimées.")
     backfill()
+
+    # TEST 2 — volume après fusion (une entité au volume double = deux clubs mêlés).
+    from .checkmap import volume_outliers
+    with connect() as con:
+        outliers = volume_outliers(con)
+    print("\n" + "=" * 64)
+    print("TEST 2 — VOLUME DE MATCHS (après fusion)")
+    print("=" * 64)
+    if outliers:
+        print(f"⚠ {len(outliers)} équipe(s) au volume ANORMAL — fusion à revoir :")
+        for nom, season, n in outliers:
+            print(f"  {nom} — saison {season} : {n} matchs")
+    else:
+        print("  ✓ aucun volume anormal : aucune fusion n'a mêlé deux clubs.")
+
     manquantes = current_without_history()
     print("\n" + "=" * 64)
     print(f"CIBLE — équipes ACTUELLES sans historique : {len(manquantes)}")

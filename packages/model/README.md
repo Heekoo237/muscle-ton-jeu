@@ -31,6 +31,20 @@ MTJ_DATA_SOURCE=mirror        python -m mtj_model.data.load   # miroir (défaut 
 C'est **une ligne de configuration**, jamais du code. Éditer
 `config/leagues.toml` :
 
+> [!IMPORTANT]
+> **Réconciliation des noms — étape d'onboarding OBLIGATOIRE.** Les noms
+> d'équipes de football-data et de The Odds API diffèrent (« Man Utd » vs
+> « Manchester United »). Pour toute nouvelle ligue :
+> 1. Ajouter ses variantes à `pipeline/team_aliases.py` (`CURATED_ALIASES`),
+>    chaque entrée avec les deux noms en commentaire.
+> 2. Faire tourner les **deux tests mécaniques** (`checkmap.py`) :
+>    - TEST 1 co-occurrence — deux clubs d'une même saison ne fusionnent jamais ;
+>    - TEST 2 volume — aucune entité fusionnée n'a un nombre de matchs anormal.
+>
+> Une variante **absente** de la carte n'est **jamais** fusionnée : elle reste
+> une équipe distincte et apparaît dans le rapport des équipes non réconciliées.
+> Pas de repli automatique par jetons (il fusionnait des clubs distincts).
+
 ```toml
 [leagues]
 E0  = ["Premier League", "Angleterre"]
