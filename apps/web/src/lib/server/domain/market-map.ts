@@ -163,10 +163,33 @@ export function splitResultMarket(notation: string): ResultSplit | null {
 	return null;
 }
 
+/**
+ * Notations « plus/moins de buts » COMPLÈTES des bookmakers : le seuil ET la
+ * direction sont dans la phrase, pas dans une clé propre. Ex. Betclic :
+ *   « + de 1,5 - Nombre total de buts (t. rég) »  ·  « - de 2,5 buts »
+ * On extrait le seuil (1,5 / 2,5 / 3,5) et la direction (+ / plus vs − / moins).
+ * `normalize` NE retire PAS la ponctuation : les signes + / − portent la direction,
+ * on ne peut pas les perdre. Seuil absent, ou direction ambiguë/absente → null :
+ * on reste INCONNU, jamais deviné (règle d'archi n°3).
+ */
+function parseTotals(n: string): Market | null {
+	if (!/\bbuts?\b/.test(n) && !/nombre total/.test(n)) return null;
+	const seuil = n.match(/([123])[.,]5\b/);
+	if (!seuil) return null;
+	const over = /\bplus\b/.test(n) || /(^|\s)\+\s*de\b/.test(n) || /\bover\b/.test(n);
+	const under = /\bmoins\b/.test(n) || /(^|\s)-\s*de\b/.test(n) || /\bunder\b/.test(n);
+	if (over === under) return null; // ni l'un ni l'autre, ou les deux : on ne devine pas
+	return `${over ? 'OVER' : 'UNDER'}_${seuil[1]}_5` as Market;
+}
+
 export function resolveMarket(notation: string): MarketResolution {
 	const n = normalize(notation);
 	if (n in TABLE) {
 		return { state: 'certain', market: TABLE[n] };
+	}
+	const totals = parseTotals(n);
+	if (totals) {
+		return { state: 'certain', market: totals };
 	}
 	if (AMBIGUOUS_OVER.has(n)) {
 		return { state: 'ambigu', market: null, raison: 'ambigu', candidates: OVER_CANDIDATES };

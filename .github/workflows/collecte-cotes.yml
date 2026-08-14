@@ -27,6 +27,7 @@ on:
           - verifier-carte        # TEST 1 co-occurrence de la carte d'alias (lecture)
           - lister-equipes        # dump des équipes en base (lecture seule)
           - diag-fixtures         # que contient fixtures pour les matchs du ticket (lecture seule)
+          - diag-teams            # doublons d'équipes pour les clubs du ticket (lecture seule)
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
@@ -110,6 +111,10 @@ jobs:
       - name: Dry-run neutralisation d'affixes — fusions + collisions (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'dryrun-affixes'
         run: python -m mtj_model.pipeline.neutralize_dryrun
+
+      - name: Diagnostic équipes — doublons pour les clubs du ticket (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-teams'
+        run: python -m mtj_model.pipeline.diag_teams
 
       - name: Compter les lignes du backfill (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'compter-backfill'

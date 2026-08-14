@@ -32,6 +32,26 @@ describe('resolveMarket — table stricte (règle d’archi n°3)', () => {
 	});
 });
 
+describe('resolveMarket — notations « plus/moins de buts » complètes (Betclic)', () => {
+	it('« + de 1,5 - Nombre total de buts (t. rég) » → OVER_1_5', () => {
+		expect(resolveMarket('+ de 1,5 - Nombre total de buts (t. rég)')).toMatchObject({
+			state: 'certain',
+			market: 'OVER_1_5'
+		});
+	});
+	it('« - de 2,5 buts » → UNDER_2_5, et « + de 3,5 buts » → OVER_3_5', () => {
+		expect(resolveMarket('- de 2,5 buts')).toMatchObject({ state: 'certain', market: 'UNDER_2_5' });
+		expect(resolveMarket('+ de 3,5 buts')).toMatchObject({ state: 'certain', market: 'OVER_3_5' });
+	});
+	it('« moins de 2,5 buts » (mots) → UNDER_2_5', () => {
+		expect(resolveMarket('moins de 2,5 buts')).toMatchObject({ state: 'certain', market: 'UNDER_2_5' });
+	});
+	it('sans seuil visible → reste ambigu ou inconnu, jamais deviné', () => {
+		// « nombre total de buts » sans 1,5/2,5/3,5 ne doit pas inventer un seuil.
+		expect(resolveMarket('nombre total de buts')).not.toMatchObject({ market: 'OVER_1_5' });
+	});
+});
+
 describe('marketLabelFr — jamais de notation bookmaker', () => {
 	it('rend les marchés en français avec les noms d’équipes', () => {
 		expect(marketLabelFr('DC_HOME_DRAW', 'Arsenal', 'Liverpool')).toBe('Arsenal ou match nul');
