@@ -51,31 +51,45 @@ def league_worklist(con) -> list[dict]:
         return [{"league_id": r[0], "odds_api_key": r[1], "fd_code": r[2]} for r in cur.fetchall()]
 
 
-def upsert_team(con, league_id: int, nom: str) -> int:
-    """Renvoie le team_id, en dédupliquant sur la clé NORMALISÉE.
+def canonical_key(nom: str) -> str:
+    """Clé canonique d'un club : clé normalisée, remappée par la carte curée.
 
-    La clé normalisée est stockée comme alias : deux variantes d'un même club
-    (accents, « FC », abréviations connues) tombent sur la même équipe. Le nom
-    d'affichage reste la première forme rencontrée. Normalisation à l'écriture.
+    La carte curée (CURATED_ALIASES) ne sert QUE pour les cas que l'inclusion de
+    jetons ne peut pas deviner (abréviations internes : « Nott'm Forest » ≠
+    « Nottingham Forest »). Chaque entrée est vérifiable — voir team_aliases.py.
     """
+    from .team_aliases import CURATED_ALIASES
     key = normalize_team_name(nom)
+    return CURATED_ALIASES.get(key, key)
+
+
+def upsert_team(con, league_id: int, nom: str) -> int:
+    """Renvoie le team_id, en dédupliquant sur le club, pas sur la chaîne exacte.
+
+    Appariement, dans l'ordre :
+      1. carte curée + clé canonique (remappe les abréviations connues) ;
+      2. INCLUSION DE JETONS : « tottenham » ⊆ « tottenham hotspur » = même club.
+    Deux clubs distincts (Manchester United / City) n'ont aucune inclusion → OK.
+    Le nom d'affichage reste la première forme rencontrée ; les variantes sont
+    ajoutées en alias. Normalisation à l'écriture, jamais à la résolution.
+    """
+    ckey = canonical_key(nom)
+    ctoks = set(ckey.split())
     with con.cursor() as cur:
-        # Rapproche par clé normalisée (alias) OU par nom exact (équipes créées
-        # avant la normalisation) — et rétro-remplit la clé au passage.
-        cur.execute(
-            "select id, aliases from teams where league_id = %s and (%s = any(aliases) or nom = %s)",
-            (league_id, key, nom),
-        )
-        row = cur.fetchone()
-        if row:
-            tid, aliases = row
-            to_add = [a for a in (key, nom) if a not in (aliases or [])]
-            if to_add:
-                cur.execute("update teams set aliases = coalesce(aliases, '{}') || %s where id = %s", (to_add, tid))
-            return tid
+        cur.execute("select id, nom, aliases from teams where league_id = %s", (league_id,))
+        for tid, tnom, aliases in cur.fetchall():
+            for other in [tnom, *(aliases or [])]:
+                otoks = set(canonical_key(other).split())
+                if ctoks and otoks and (ctoks <= otoks or otoks <= ctoks):
+                    if nom not in (aliases or []):
+                        cur.execute(
+                            "update teams set aliases = coalesce(aliases, '{}') || %s where id = %s",
+                            ([nom], tid),
+                        )
+                    return tid
         cur.execute(
             "insert into teams (nom, league_id, aliases) values (%s, %s, %s) returning id",
-            (nom, league_id, [key, nom] if key != nom else [key]),
+            (nom, league_id, [ckey, nom] if ckey != nom else [ckey]),
         )
         return cur.fetchone()[0]
 

@@ -20,6 +20,9 @@ on:
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - migrer-base           # crée/complète les tables dans Supabase
           - backfill-historique   # charge 3 saisons football-data (une fois)
+          - lister-equipes        # dump des équipes en base (lecture seule)
+          - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
+          - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
           - collecter             # relève les cotes une fois
 
 concurrency:
@@ -66,6 +69,20 @@ jobs:
         env:
           MTJ_DATA_SOURCE: footballdata   # officiel prioritaire ; miroir en repli (par fichier)
         run: python -m mtj_model.pipeline.backfill
+
+      - name: Lister les équipes en base (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'lister-equipes'
+        run: python -m mtj_model.pipeline.backfill --list-teams
+
+      - name: Compter les lignes du backfill (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'compter-backfill'
+        run: python -m mtj_model.pipeline.backfill --count
+
+      - name: Purger le backfill et recharger (borné à fd:)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'reset-backfill'
+        env:
+          MTJ_DATA_SOURCE: footballdata
+        run: python -m mtj_model.pipeline.backfill --reset
 
       - name: Collecter les cotes
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')

@@ -14,6 +14,7 @@ Idempotent : matchs par référence stable, équipes dédupliquées par clé nor
 """
 from __future__ import annotations
 
+import argparse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -177,8 +178,91 @@ def _print_report(rapport: dict, frames: dict[str, pd.DataFrame]) -> None:
             print(f"    –  {t:<24} att {fit.attack[i]:+.2f}  déf {fit.defense[i]:+.2f}")
 
 
-def main() -> None:
+# --- Diagnostic & reset (réponse aux conditions : vérifiable, borné, compté) ---
+_SQL_CURRENT_NO_HISTORY = """
+    select l.provider_ref, t.nom
+      from teams t join leagues l on l.id = t.league_id
+     where exists (select 1 from fixtures f
+                    where (f.team_home_id = t.id or f.team_away_id = t.id)
+                      and f.provider_ref not like 'fd:%%')      -- a un match COLLECTÉ (équipe actuelle)
+       and not exists (select 1 from fixtures f
+                        where (f.team_home_id = t.id or f.team_away_id = t.id)
+                          and f.provider_ref like 'fd:%%')      -- mais AUCUN historique football-data
+     order by l.provider_ref, t.nom
+"""
+
+
+def current_without_history() -> list[tuple[str, str]]:
+    with connect() as con, con.cursor() as cur:
+        cur.execute(_SQL_CURRENT_NO_HISTORY)
+        return [(fd, nom) for fd, nom in cur.fetchall()]
+
+
+def list_teams() -> None:
+    """Dump des équipes par ligue (pour lire les VRAIS noms The Odds API)."""
+    with connect() as con, con.cursor() as cur:
+        cur.execute("""select l.provider_ref, t.nom from teams t
+                        join leagues l on l.id = t.league_id order by l.provider_ref, t.nom""")
+        rows = cur.fetchall()
+    by_lg: dict[str, list[str]] = {}
+    for fd, nom in rows:
+        by_lg.setdefault(fd, []).append(nom)
+    for fd, noms in by_lg.items():
+        print(f"\n{fd} ({len(noms)}) : " + " · ".join(noms))
+
+
+def count_fd() -> tuple[int, int]:
+    """Compte, SANS rien supprimer, les lignes issues du backfill (préfixe fd:)."""
+    with connect() as con, con.cursor() as cur:
+        cur.execute("select count(*) from fixtures where provider_ref like 'fd:%%'")
+        n_fixtures = cur.fetchone()[0]
+        # Équipes qui ne survivent que sur des matchs fd (aucun match collecté) → orphelines après purge.
+        cur.execute("""select count(*) from teams t where not exists (
+                         select 1 from fixtures f
+                          where (f.team_home_id = t.id or f.team_away_id = t.id)
+                            and f.provider_ref not like 'fd:%%')""")
+        n_teams = cur.fetchone()[0]
+    print(f"À supprimer (backfill uniquement) : fixtures fd: {n_fixtures}  ·  équipes orphelines : {n_teams}")
+    print("(Les matchs et cotes du collecteur ne sont PAS touchés.)")
+    return n_fixtures, n_teams
+
+
+def reset_backfill() -> None:
+    """Supprime UNIQUEMENT les données du backfill (fd:) puis recharge."""
+    with connect() as con, con.cursor() as cur:
+        cur.execute("delete from fixtures where provider_ref like 'fd:%%'")
+        nf = cur.rowcount
+        cur.execute("""delete from teams t where not exists (
+                         select 1 from fixtures f
+                          where (f.team_home_id = t.id or f.team_away_id = t.id))""")
+        nt = cur.rowcount
+        print(f"Purge backfill : {nf} fixtures fd + {nt} équipes orphelines supprimées.")
     backfill()
+    manquantes = current_without_history()
+    print("\n" + "=" * 64)
+    print(f"CIBLE — équipes ACTUELLES sans historique : {len(manquantes)}")
+    print("=" * 64)
+    if manquantes:
+        for fd, nom in manquantes:
+            print(f"  {fd}  {nom}")
+    else:
+        print("  (aucune) ✓  toutes les équipes actuelles ont leur historique.")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Backfill football-data + diagnostics.")
+    ap.add_argument("--list-teams", action="store_true", help="dump des équipes en base (lecture)")
+    ap.add_argument("--count", action="store_true", help="compte les lignes fd: à supprimer (lecture)")
+    ap.add_argument("--reset", action="store_true", help="purge fd: puis recharge")
+    args = ap.parse_args()
+    if args.list_teams:
+        list_teams()
+    elif args.count:
+        count_fd()
+    elif args.reset:
+        reset_backfill()
+    else:
+        backfill()
 
 
 if __name__ == "__main__":
