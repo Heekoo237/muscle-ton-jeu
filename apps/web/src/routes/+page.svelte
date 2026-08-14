@@ -3,9 +3,6 @@
 	// Page autonome : bandeau défilant en haut, son propre pied de page en bas
 	// (donc hors du groupe (public) qui ajoute nav + footer).
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
-	import type { PageData } from './$types';
-
-	let { data }: { data: PageData } = $props();
 
 	const ANTON = "'Anton', Impact, sans-serif";
 	const MONO = "'JetBrains Mono', ui-monospace, monospace";
@@ -75,11 +72,12 @@
 	     le seul accent au-dessus de la ligne de flottaison reste « Analyser mon ticket ». -->
 	<nav style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,3.5vw,40px);box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px">
 		<a href="/" style="font-family:{ANTON};font-size:20px;line-height:1;letter-spacing:-0.5px;text-transform:uppercase;color:#24201B;text-decoration:none">Muscle Ton Jeu</a>
-		{#if data.connecte}
-			<a class="authlink" href="/dashboard">Mon compte</a>
-		{:else}
-			<a class="authlink" href="/connexion">Se connecter</a>
-		{/if}
+		<!-- Page prérendue (statique, CDN) : le bon bouton est choisi côté client
+		     AVANT le premier affichage par le script en tête de app.html (cookie-
+		     indice non sensible mtj_hint). Défaut sans JS = « Se connecter ». Les
+		     deux occupent le même emplacement : aucun saut de mise en page. -->
+		<a class="authlink a-anon" href="/connexion">Se connecter</a>
+		<a class="authlink a-auth" href="/dashboard">Mon compte</a>
 	</nav>
 
 	<!-- ═══ 1 · BANDEAU DÉFILANT ═══ -->
@@ -388,6 +386,18 @@
 		color: #24201b;
 		text-decoration: none;
 		white-space: nowrap;
+	}
+	/* Bascule connexion/compte SANS scintillement : data-auth est posé sur <html>
+	   par le script de app.html, avant le premier affichage. Défaut (sans JS) :
+	   « Se connecter ». Un seul bouton visible à la fois, même emplacement. */
+	.a-auth {
+		display: none;
+	}
+	:global(html[data-auth='yes']) .a-anon {
+		display: none;
+	}
+	:global(html[data-auth='yes']) .a-auth {
+		display: inline-flex;
 	}
 	@media (max-width: 559px) {
 		.authlink {

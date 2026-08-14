@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ensureAppUserDetailed } from '$lib/server/fixtures/userStore';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
+import { setAuthHint } from '$lib/server/session';
 
 /**
  * Callback OAuth Google (Supabase Auth). Échange le code contre une session,
@@ -63,6 +64,8 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 			}
 		}
 
+		// Indice non sensible pour la nav des pages prérendues (aucun accès accordé).
+		setAuthHint(cookies);
 		destination = pending ? '/resultat' : isNew ? '/analyser?offert=1' : next;
 	} catch (e) {
 		// Cause technique lisible côté serveur (c'est elle qu'on lit au moment d'un 500)…

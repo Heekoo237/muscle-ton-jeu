@@ -10,6 +10,31 @@ import { ensureAppUser, memDemoUser } from '$lib/server/fixtures/userStore';
 
 export const SESSION_COOKIE = 'session';
 
+/**
+ * Cookie-INDICE d'authentification (non sensible, lisible côté client). Il ne
+ * contient qu'un « 1 » : un compte existe, pour afficher le bon bouton nav sur
+ * les pages prérendues, sans scintillement. AUCUNE identité, AUCUN jeton, AUCUN
+ * solde. Il ne donne accès à rien : les routes protégées restent vérifiées côté
+ * serveur (cookie de session httpOnly). Un indice périmé n'ouvre aucune porte.
+ */
+export const AUTH_HINT_COOKIE = 'mtj_hint';
+const AUTH_HINT_MAXAGE = 60 * 60 * 24 * 90; // 90 jours, aligné sur la session
+
+/** Pose l'indice « un compte existe » (à la connexion réussie). */
+export function setAuthHint(cookies: import('@sveltejs/kit').Cookies): void {
+	cookies.set(AUTH_HINT_COOKIE, '1', {
+		path: '/',
+		httpOnly: false, // lisible par le script client (non sensible)
+		sameSite: 'lax',
+		maxAge: AUTH_HINT_MAXAGE
+	});
+}
+
+/** Retire l'indice (à la déconnexion). */
+export function clearAuthHint(cookies: import('@sveltejs/kit').Cookies): void {
+	cookies.delete(AUTH_HINT_COOKIE, { path: '/' });
+}
+
 export interface AppSession {
 	userId: number;
 	prenom: string;

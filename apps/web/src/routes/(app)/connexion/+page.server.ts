@@ -1,6 +1,6 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { SESSION_COOKIE, getAppSession } from '$lib/server/session';
+import { SESSION_COOKIE, getAppSession, setAuthHint } from '$lib/server/session';
 import { getTicket } from '$lib/server/fixtures/ticketStore';
 import { supportLink } from '$lib/support';
 
@@ -68,6 +68,7 @@ export const actions: Actions = {
 			sameSite: 'lax',
 			maxAge: JOURS_90
 		});
+		setAuthHint(cookies); // indice nav (non sensible), cohérent avec le vrai flux
 		redirect(303, retour);
 	}
 };

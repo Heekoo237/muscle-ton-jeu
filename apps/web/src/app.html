@@ -10,6 +10,18 @@
 				background: #f8f1e4;
 			}
 		</style>
+		<!-- Indice d'auth AVANT le premier affichage (pages prérendues) : choisit le
+		     bon bouton nav sans scintillement. Le cookie mtj_hint ne contient qu'un
+		     « 1 » (un compte existe) — aucune identité, aucun jeton, aucun accès. -->
+		<script>
+			try {
+				document.documentElement.dataset.auth = /(?:^|;\s*)mtj_hint=1(?:;|$)/.test(
+					document.cookie
+				)
+					? 'yes'
+					: 'no';
+			} catch (e) {}
+		</script>
 		<link rel="preload" href="/fonts/anton-latin-fr.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="preload" href="/fonts/geist-variable-latin-fr.woff2" as="font" type="font/woff2" crossorigin />
 		%sveltekit.head%

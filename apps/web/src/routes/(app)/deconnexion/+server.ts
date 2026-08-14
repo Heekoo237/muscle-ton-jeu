@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { SESSION_COOKIE } from '$lib/server/session';
+import { SESSION_COOKIE, clearAuthHint } from '$lib/server/session';
 
 /**
  * Déconnexion. Réel : Supabase Auth signOut (efface le cookie de session Google).
@@ -11,5 +11,6 @@ export const POST: RequestHandler = async (event) => {
 		await event.locals.supabase.auth.signOut();
 	}
 	event.cookies.delete(SESSION_COOKIE, { path: '/' });
+	clearAuthHint(event.cookies); // l'indice nav disparaît aussi
 	redirect(303, '/');
 };
