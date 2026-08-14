@@ -186,6 +186,36 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 		expect(s.raison).toBe('hors_couverture');
 	});
 
+	it('club_id : « Reims » résout le match rattaché à l’entité « Stade de Reims »', () => {
+		// Deux entités du MÊME club (clubId commun), le match porte l'entité L2.
+		const T2: Team[] = [
+			{ id: 996, nom: 'Reims', aliases: [], leagueId: 1, clubId: 996 },
+			{ id: 1376, nom: 'Stade de Reims', aliases: [], leagueId: 2, clubId: 996 },
+			{ id: 1377, nom: 'USL Dunkerque', aliases: [], leagueId: 2, clubId: 1377 }
+		];
+		const F2: Fixture[] = [
+			{ id: 400, dateUtc: '2026-08-14T18:45:00Z', teamHome: 'Stade de Reims', teamAway: 'USL Dunkerque', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const [s] = resolveTicket(raw('Reims - Dunkerque  Reims ou Nul - Double chance (t. rég)  1.19'), F2, T2);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(400);
+		expect(s.marche).toBe('DC_HOME_DRAW');
+	});
+
+	it('club_id : deux entités « Clermont » d’un même club ne sont PAS ambiguës', () => {
+		const T3: Team[] = [
+			{ id: 992, nom: 'Clermont', aliases: [], leagueId: 1, clubId: 992 },
+			{ id: 1365, nom: 'Clermont', aliases: [], leagueId: 2, clubId: 992 },
+			{ id: 1366, nom: 'Saint Etienne', aliases: [], leagueId: 2, clubId: 1366 }
+		];
+		const F3: Fixture[] = [
+			{ id: 401, dateUtc: '2026-08-14T18:45:00Z', teamHome: 'Saint Etienne', teamAway: 'Clermont', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const [s] = resolveTicket(raw('Saint Etienne - Clermont  1  2.0'), F3, T3);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(401);
+	});
+
 	it('alias réel « Corum Belediyespor » → « Çorum FK » (issu des logs) : résolu', () => {
 		const T2: Team[] = [
 			{ id: 5, nom: 'Galatasaray', aliases: ['galatasaray'], leagueId: 1 },

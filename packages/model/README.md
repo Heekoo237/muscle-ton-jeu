@@ -407,6 +407,40 @@ testées sans réseau. `get_provider()` est le seul point de sélection
 > la confiance calibrée (`LEAGUE_CONFIDENCE`) et du ξ. `league_catalog` le relie
 > à la clé The Odds API — les deux référentiels ne se confondent jamais.
 
+### Réconciliation des clubs (`club_id`) — OBLIGATOIRE à chaque compétition ajoutée
+
+Les équipes sont enregistrées **par compétition** : « Reims » en Ligue 1 (backfill
+football-data) et « Stade de Reims » en Ligue 2 (collecteur Odds API) sont **deux
+lignes** du même club. C'est **correct pour Dixon-Coles** (la force se calibre par
+championnat, on ne mélange pas L1 et L2), mais ça casse la **résolution du ticket**
+si on ne regroupe pas. Le `club_id` regroupe les entités d'un même club **sans
+fusionner les lignes** : la compétition reste portée par le match (`fixtures`), le
+club par le `club_id`.
+
+**Ajouter une compétition passe donc par cette réconciliation — au même titre que
+l'onboarding d'un championnat modèle** (alias + co-occurrence + volume) :
+
+1. `reconcilier-dryrun` (lecture seule) — **rapport à relire avant d'écrire** :
+   - SECTION 1 : doublons **intra-championnat modèle** (bug de force d'équipe s'il
+     y en a — historique coupé) ; doit être vide.
+   - SECTION 2 : regroupements proposés (club → entités → clé de club).
+   - SECTION 3 : **co-occurrence bloquante** — deux adversaires ne partagent jamais
+     une clé ; les collisions sont refusées, jamais fusionnées.
+   - SECTION 4 : volume (repère une fusion abusive).
+2. `reconcilier` (écrit) — applique la SECTION 2 **moins** les collisions SECTION 3,
+   puis **re-teste sur l'état écrit** : co-occurrence (lève et annule si violée) +
+   volume. Idempotent.
+
+La clé de club (`sync.club_key`) = clé canonique + expansion (`st`→`saint`) +
+retrait d'affixes de club (`stade`, `usl`…). Jeu validé au dry-run. `upsert_team`
+assigne le `club_id` **dès la création** d'une nouvelle entité : le problème ne se
+reproduit donc pas à chaque nouvelle compétition. La résolution (app) cherche le
+match **par club_id**, quelle que soit l'entité (compétition) qui le porte.
+
+> `predictions` et `odds_snapshots` sont indexés par `fixture_id`, jamais par
+> `team_id` : la réconciliation `club_id` ne touche donc NI les probabilités NI
+> l'historique. Aucun recalcul nocturne nécessaire après réconciliation.
+
 ### Catalogue de couverture (`pipeline/catalogue.py`)
 
 `python -m mtj_model.pipeline.catalogue` liste **toutes** les compétitions

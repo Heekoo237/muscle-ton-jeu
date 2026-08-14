@@ -28,6 +28,7 @@ interface TeamRow {
 	nom: string;
 	aliases: string[] | null;
 	league_id: number;
+	club_id: number | null;
 }
 
 export class SupabaseSportsData implements SportsDataService {
@@ -63,13 +64,14 @@ export class SupabaseSportsData implements SportsDataService {
 	async teams(): Promise<Team[]> {
 		const { data, error } = await supabaseAdmin()
 			.from('teams')
-			.select('id, nom, aliases, league_id');
+			.select('id, nom, aliases, league_id, club_id');
 		if (error) throw error;
 		return ((data ?? []) as TeamRow[]).map((t) => ({
 			id: Number(t.id),
 			nom: t.nom,
 			aliases: t.aliases ?? [],
-			leagueId: Number(t.league_id)
+			leagueId: Number(t.league_id),
+			clubId: t.club_id != null ? Number(t.club_id) : null
 		}));
 	}
 

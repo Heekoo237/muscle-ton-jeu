@@ -46,22 +46,28 @@ function wordPhraseIn(needle: string, hay: string): boolean {
  * autre dès qu'un nom en contenait un autre — sans danger à 11 ligues, mais la
  * couverture élargie multiplie les clubs d'une même ville. On l'a retirée.
  */
+/** Identifiant de club d'une entité (son clubId, ou son id si non réconcilié). */
+function clubOf(t: Team): number {
+	return t.clubId ?? t.id;
+}
+
 function matchTeam(name: string, teams: Team[]): Team | null {
 	const raw = normalize(name);
 	if (!raw) return null;
 	// La capture parle bookmaker, la base parle Odds API : on cherche AUSSI sous le
 	// nom de référence si la carte curée en connaît un (« paris sg » → « paris saint
-	// germain »). Aucune fusion : le résultat doit rester UNIQUE (cf. plus bas).
+	// germain »). Plusieurs ENTITÉS d'un MÊME club (« Clermont » L1 + L2) ne sont
+	// PAS ambiguës — elles partagent un clubId. Seuls des CLUBS distincts le sont.
 	const n = aliasFor(raw);
-	// 1) Exact (nom ou alias identique). Un seul club → certain ; plusieurs → ambigu.
 	const exact = teams.filter((t) => [t.nom, ...t.aliases].map(normalize).some((c) => c === n));
-	if (exact.length === 1) return exact[0];
-	if (exact.length > 1) return null;
-	// 2) Contenance par mots entiers, dans un sens ou l'autre, mais UNIQUE.
+	if (exact.length >= 1) {
+		return new Set(exact.map(clubOf)).size === 1 ? exact[0] : null;
+	}
+	// Contenance par mots entiers, dans un sens ou l'autre, mais un seul CLUB.
 	const near = teams.filter((t) =>
 		[t.nom, ...t.aliases].map(normalize).some((c) => wordPhraseIn(c, n) || wordPhraseIn(n, c))
 	);
-	return near.length === 1 ? near[0] : null;
+	return near.length >= 1 && new Set(near.map(clubOf)).size === 1 ? near[0] : null;
 }
 
 /** Équipes en base partageant un mot significatif avec `name` (candidats probables
@@ -109,7 +115,12 @@ type MatchDiag =
 	| { kind: 'hors_couverture' }
 	| { kind: 'illisible' };
 
-function diagnoseMatch(matchText: string, fixtures: Fixture[], teams: Team[]): MatchDiag {
+function diagnoseMatch(
+	matchText: string,
+	fixtures: Fixture[],
+	teams: Team[],
+	clubByName: Map<string, number>
+): MatchDiag {
 	const sides = matchText.split(/\s+[-–]\s+/).map((s) => s.trim());
 	if (sides.filter((s) => s.length >= 2).length < 2) return { kind: 'illisible' };
 	const [rawHome, rawAway] = sides;
@@ -117,10 +128,16 @@ function diagnoseMatch(matchText: string, fixtures: Fixture[], teams: Team[]): M
 	const awayTeam = matchTeam(rawAway, teams);
 
 	if (homeTeam && awayTeam) {
+		// On cherche par CLUB, pas par entité : le match de ce soir peut être rattaché
+		// à « Stade de Reims » [L2] alors que le ticket a résolu « Reims » [L1] — même
+		// club, club_id commun. Sans réconciliation, clubOf = id propre → comportement
+		// d'avant (on ne casse rien tant que club_id n'est pas rempli).
+		const homeClub = clubOf(homeTeam);
+		const awayClub = clubOf(awayTeam);
 		const fixture = fixtures.find(
 			(f) =>
-				normalize(f.teamHome) === normalize(homeTeam.nom) &&
-				normalize(f.teamAway) === normalize(awayTeam.nom)
+				clubByName.get(normalize(f.teamHome)) === homeClub &&
+				clubByName.get(normalize(f.teamAway)) === awayClub
 		);
 		// « Hors fenêtre » N'EST vrai que si un match existe RÉELLEMENT entre ces deux
 		// équipes, à une date au-delà de la période analysée. Sinon (aucun match entre
@@ -224,10 +241,15 @@ function lineParts(ligne: RawLine): { matchText: string; marketText: string; odd
  * validation. L'index d'appariement (`ordre`) est attribué une fois, ici.
  */
 export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Team[]): Selection[] {
+	// Nom normalisé → club_id, construit une fois pour tout le ticket. Sert à
+	// retrouver un match par CLUB quelle que soit l'entité (compétition) qui le porte.
+	const clubByName = new Map<string, number>();
+	for (const t of teams) clubByName.set(normalize(t.nom), clubOf(t));
+
 	return raw.lignes.map((ligne, i): Selection => {
 		const ordre = i + 1;
 		const { matchText, marketText, odds } = lineParts(ligne);
-		const diag = diagnoseMatch(matchText, fixtures, teams);
+		const diag = diagnoseMatch(matchText, fixtures, teams, clubByName);
 
 		// Match non résolu : QUATRE causes distinctes, quatre messages honnêtes.
 		// « hors_couverture » n'est plus le fourre-tout — il est réservé au cas où

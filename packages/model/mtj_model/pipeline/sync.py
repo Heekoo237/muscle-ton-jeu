@@ -97,6 +97,42 @@ def assert_distinct_opponents(home: str, away: str) -> None:
         )
 
 
+# ── Clé de CLUB : regroupe les entités d'un même club à travers les compétitions ─
+# Le même club a une ligne par compétition (« Reims » L1 backfillé, « Stade de
+# Reims » L2 collecté). La clé de club les regroupe sous un club_id commun. Elle
+# est PLUS agressive que la clé canonique : elle retire aussi des affixes de club
+# (stade, usl…) et développe des abréviations (st→saint). Jeu VALIDÉ au dry-run
+# (reconcile_dryrun) : il regroupe Reims/Stade de Reims, St/Saint Etienne, garde
+# distincts Club Brugge/Cercle Brugge et AC/Inter Milan (aucune collision).
+#
+# ⚠️ Garde-fou : deux ADVERSAIRES ne doivent jamais partager une clé de club. Le
+# test de co-occurrence de `reconcile` le vérifie sur toute la base, à chaque
+# passage — c'est lui qui autorise ou refuse un regroupement.
+CLUB_AFFIXES = {"stade", "olympique", "racing", "us", "usl", "cs", "sk", "jk",
+                "fk", "ks", "nk", "calcio", "ssd", "ssc", "asd"}
+CLUB_EXPAND = {"st": "saint"}
+
+
+def club_key(nom: str) -> str:
+    """Clé de club : clé canonique + expansion d'abréviations + retrait d'affixes.
+    Sert au club_id (regroupement inter-compétitions).
+
+    JAMAIS vide : un nom entièrement fait d'affixes/bruit (« FC », « Stade »)
+    retomberait sur "" et ferait collisionner tous ces cas. On replie alors sur la
+    clé canonique, puis sur une normalisation basique (minuscule + accents/ponct)."""
+    base = normalize_team_name(nom)  # retire déjà le bruit (fc, cf, de, club…)
+    toks = [CLUB_EXPAND.get(t, t) for t in base.split()]
+    toks = [t for t in toks if t not in CLUB_AFFIXES]
+    key = " ".join(toks)
+    if key:
+        return key
+    if base:
+        return base
+    basic = unicodedata.normalize("NFD", nom.lower())
+    basic = "".join(c for c in basic if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9 ]", " ", basic).strip() or nom.strip().lower()
+
+
 def canonical_key(nom: str) -> str:
     """Clé canonique d'un club : clé normalisée, remappée par la carte curée.
 
@@ -135,7 +171,22 @@ def upsert_team(con, league_id: int, nom: str) -> int:
             "insert into teams (nom, league_id, aliases) values (%s, %s, %s) returning id",
             (nom, league_id, [ckey, nom] if ckey != nom else [ckey]),
         )
-        return cur.fetchone()[0]
+        tid = cur.fetchone()[0]
+        # Rattache la nouvelle ligne à son CLUB dès la création : si un club existe
+        # déjà pour cette clé de club (une autre compétition), on hérite de son
+        # club_id ; sinon ce club_id naît ici. Le problème ne se reproduit donc pas
+        # à chaque nouvelle compétition (exigence produit).
+        ck = club_key(nom)
+        cur.execute(
+            "select club_id from teams where club_key = %s and club_id is not null order by club_id limit 1",
+            (ck,),
+        )
+        row = cur.fetchone()
+        cur.execute(
+            "update teams set club_key = %s, club_id = %s where id = %s",
+            (ck, row[0] if row else tid, tid),
+        )
+        return tid
 
 
 def upsert_fixture(

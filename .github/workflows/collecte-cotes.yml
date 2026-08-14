@@ -29,6 +29,7 @@ on:
           - diag-fixtures         # que contient fixtures pour les matchs du ticket (lecture seule)
           - diag-teams            # doublons d'équipes pour les clubs du ticket (lecture seule)
           - reconcilier-dryrun    # RAPPORT réconciliation club_id : intra-modèle + groupes + collisions (lecture)
+          - reconcilier           # APPLIQUE club_id (écrit) : groupes − collisions, puis re-teste sur l'état final
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
@@ -84,7 +85,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client
           # Retire tout espace/retour à la ligne parasite de la chaîne collée.
           DBURL="${MTJ_DATABASE_URL//[$'\t\r\n ']/}"
-          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog 0007_prediction_bookmaker 0008_source_mode 0009_regime_cote_seule; do
+          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog 0007_prediction_bookmaker 0008_source_mode 0009_regime_cote_seule 0010_team_club_id; do
             echo "== migration $f =="
             psql "$DBURL" -v ON_ERROR_STOP=1 -f ../db/migrations/$f.sql
           done
@@ -120,6 +121,10 @@ jobs:
       - name: Rapport réconciliation club_id — dry-run, aucune écriture (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier-dryrun'
         run: python -m mtj_model.pipeline.reconcile_dryrun
+
+      - name: Appliquer la réconciliation club_id (écrit, re-teste l'état final)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier'
+        run: python -m mtj_model.pipeline.reconcile
 
       - name: Compter les lignes du backfill (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'compter-backfill'

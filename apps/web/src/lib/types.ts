@@ -49,6 +49,12 @@ export interface Team {
 	nom: string;
 	aliases: string[];
 	leagueId: number;
+	/**
+	 * Identifiant de CLUB, partagé par toutes les entités d'un même club à travers
+	 * les compétitions (« Reims » L1 + « Stade de Reims » L2 → même clubId). Rempli
+	 * par la réconciliation Python. Absent → l'entité est son propre club.
+	 */
+	clubId?: number | null;
 }
 
 export interface Fixture {
