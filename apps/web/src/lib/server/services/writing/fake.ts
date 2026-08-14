@@ -1,4 +1,5 @@
 import type { WritingService, WritingInput } from './index';
+import { allowedNumbersFor } from './allowed';
 
 /** Formatage français : virgule décimale, espace insécable avant %. */
 function pct(n: number): string {
@@ -29,6 +30,6 @@ export class FakeWriting implements WritingService {
 	}
 
 	allowedNumbers(input: WritingInput): number[] {
-		return [input.probaTotalePct, input.probaRenforceePct, input.nbRetirees];
+		return allowedNumbersFor(input);
 	}
 }

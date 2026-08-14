@@ -18,15 +18,31 @@ function pct1(prob: number): number {
 	return Math.round(prob * 100 * 10) / 10;
 }
 
+// Compteurs de bascule vers le template (par instance). Journalisés à chaque
+// bascule pour qu'un taux qui remonte se voie dans les logs, sans lire le code.
+let genTotal = 0;
+let genFallback = 0;
+
 /**
  * Rédaction sous garde-fous (brief §4.3/4.4) : on régénère si un nombre est
  * fabriqué ou un terme interdit apparaît ; après 2 échecs, template sans chiffres.
  */
 async function writeSafely(input: WritingInput): Promise<string> {
+	genTotal += 1;
+	let dernier: ReturnType<typeof checkGeneratedText> | null = null;
 	for (let i = 0; i < 2; i++) {
 		const texte = await writing.writeAnalysis(input);
-		if (checkGeneratedText(texte, writing.allowedNumbers(input)).ok) return texte;
+		const controle = checkGeneratedText(texte, writing.allowedNumbers(input));
+		if (controle.ok) return texte;
+		dernier = controle;
 	}
+	genFallback += 1;
+	const taux = Math.round((genFallback / genTotal) * 100);
+	console.warn(
+		`[rédaction] bascule template ${genFallback}/${genTotal} (~${taux}%) — ` +
+			`vocab: ${dernier?.vocabulary.hits.join(',') || '—'} · ` +
+			`nombres hors autorisés: ${dernier?.numbers.offending.join(',') || '—'}`
+	);
 	return input.rienARetirer
 		? 'Rien à retirer. Ton ticket tient debout.'
 		: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.';

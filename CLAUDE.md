@@ -45,6 +45,8 @@ Il n'a le droit de rien d'autre. Pas de calcul, pas d'estimation, pas de sélect
 
 **Contrôle automatique obligatoire** après chaque génération de texte : extraire tous les nombres du texte, vérifier que chacun figure dans le JSON d'entrée, régénérer sinon.
 
+**Exception unique et documentée : la cote transcrite depuis la capture de l'utilisateur.** Elle est affichée pour vérification (l'utilisateur regarde son propre ticket), jamais utilisée dans un calcul. Une cote mal lue est visible et contestable ; une probabilité inventée serait invisible et incontestable — ce n'est pas comparable. **Toute évolution qui ferait entrer `coteSaisie` dans un calcul viole la règle d'or n°1.** Un test (`no-cote-in-calc.test.ts`) échoue si `coteSaisie` apparaît dans un module de calcul.
+
 ---
 
 ## Règle d'or n°2 — Aucune promesse de gain

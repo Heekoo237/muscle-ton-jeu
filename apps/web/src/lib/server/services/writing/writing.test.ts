@@ -1,0 +1,46 @@
+import { describe, it, expect } from 'vitest';
+import { FakeWriting } from './fake';
+import { allowedNumbersFor } from './allowed';
+import type { WritingInput } from './index';
+import { checkGeneratedText } from '$lib/server/domain/guards';
+import { marketLabelFr } from '$lib/server/domain/market-map';
+
+function inputAvecFragile(libelleFr: string): WritingInput {
+	return {
+		probaTotalePct: 1.4,
+		probaRenforceePct: 7.8,
+		nbRetirees: 1,
+		fragiles: [{ libelleFr }],
+		confiance: 'correcte',
+		rienARetirer: false
+	};
+}
+
+describe('rédaction — un fragile plus/moins ne dégrade plus vers le template', () => {
+	it('« Plus de 2,5 buts » produit un texte riche qui passe le garde-fou', async () => {
+		const libelle = `Real Madrid – Barcelone — ${marketLabelFr('OVER_2_5', 'Real Madrid', 'Barcelone')}`;
+		expect(libelle).toContain('2,5'); // le seuil est bien dans le libellé
+		const input = inputAvecFragile(libelle);
+		const texte = await new FakeWriting().writeAnalysis(input);
+
+		expect(texte).toContain('2,5'); // le texte riche nomme la sélection
+		const controle = checkGeneratedText(texte, allowedNumbersFor(input));
+		expect(controle.ok).toBe(true); // garde-fou OK → PAS de bascule template
+	});
+
+	it('les seuils du libellé sont bien dans les nombres autorisés', () => {
+		const input = inputAvecFragile('Lens – Nice — Plus de 3,5 buts');
+		const allowed = allowedNumbersFor(input);
+		expect(allowed).toContain(3.5); // seuil marché autorisé
+		expect(allowed).toContain(1.4); // proba totale toujours là
+		expect(allowed).toContain(7.8); // proba renforcée toujours là
+	});
+
+	it('un nombre fabriqué reste rejeté (le garde-fou n’est pas désactivé)', () => {
+		const input = inputAvecFragile('Lens – Nice — Plus de 2,5 buts');
+		// 42 n’est ni une proba, ni un seuil du libellé : doit être refusé.
+		const controle = checkGeneratedText('Tes chances montent à 42 %.', allowedNumbersFor(input));
+		expect(controle.ok).toBe(false);
+		expect(controle.numbers.offending).toContain(42);
+	});
+});

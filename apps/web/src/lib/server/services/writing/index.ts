@@ -27,7 +27,15 @@ export interface WritingService {
 
 import { FakeWriting } from './fake';
 
-/** ← Point de bascule vers le vrai modèle de rédaction (Session 8). */
+/**
+ * ← Point de bascule vers le vrai modèle de rédaction.
+ *
+ * GARDE-FOU OBLIGATOIRE À BRANCHER EN MÊME TEMPS QUE LE VRAI RÉDACTEUR : quand un
+ * modèle réel existera, ajouter ici `assertRealInProduction('rédaction', realWriterConfigured())`
+ * — comme sports/predictions/vision/paiement — pour qu'un déploiement en
+ * production ne serve jamais le template plat à la place du vrai texte. Non
+ * activé aujourd'hui : il n'existe pas encore de version réelle à exiger.
+ */
 function createWritingService(): WritingService {
 	return new FakeWriting();
 }
