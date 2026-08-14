@@ -19,7 +19,7 @@ from ..constants import (
     REPLI_ALERT,
 )
 from .db import connect
-from .nightly import leagues_over_totals_margin
+from .nightly import NIGHTLY_SKIP_ALERT, leagues_over_totals_margin
 
 # Seuils de fraîcheur par job. La nocturne tourne 1×/jour → 36 h laisse rater une
 # nuit sans alerter, mais pas deux. Le collecteur tourne toutes les 6 h.
@@ -163,6 +163,38 @@ def _totals_escalation(cur, alerts: list[str]) -> None:
         print(f"escalade    OK — marge 2,5 sous le critère d'escalade sur {len(nights)} nuits")
 
 
+def _nightly_coverage(cur, alerts: list[str]) -> None:
+    """Alerte si le dernier nocturne a ABANDONNÉ une ligue en fenêtre ou sauté trop
+    de matchs. Sans ça, un « success » masquait 75 % de trous côté modèle — c'est ce
+    qui a laissé le problème durer invisible. Lit `couverture_resume` du dernier run.
+    """
+    cur.execute(
+        """select detail->'couverture_resume'
+             from pipeline_runs
+            where job = 'nightly' and detail ? 'couverture_resume'
+            order by demarre_le desc limit 1"""
+    )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return
+    resume = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+    abandons = resume.get("abandons") or []
+    taux = float(resume.get("taux_saut", 0))
+    if abandons:
+        alerts.append(
+            f"nocturne : ligue(s) ABANDONNÉE(s) (matchs en fenêtre, aucune ligne) : "
+            f"{', '.join(abandons)} — équipes inconnues du fit ou historique manquant."
+        )
+    if taux > NIGHTLY_SKIP_ALERT:
+        alerts.append(
+            f"nocturne : {taux:.0%} des matchs en fenêtre sautés (> {NIGHTLY_SKIP_ALERT:.0%}) "
+            f"— {resume.get('sautes')}/{resume.get('fenetre')} sans probabilité."
+        )
+    if not abandons and taux <= NIGHTLY_SKIP_ALERT:
+        print(f"couverture  OK — {resume.get('traites')}/{resume.get('fenetre')} matchs traités "
+              f"({taux:.0%} sautés)")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -172,6 +204,7 @@ def check() -> list[str]:
         _credit_budget(cur, alerts)
         _repli_coverage(cur, alerts)
         _totals_escalation(cur, alerts)
+        _nightly_coverage(cur, alerts)
     return alerts
 
 

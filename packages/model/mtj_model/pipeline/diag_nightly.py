@@ -51,6 +51,29 @@ _SQL_HISTORY = """
      where f.statut = 'finished'
 """
 
+# Les championnats attendus en régime MODÈLE (catalogue), pour voir ceux à ZÉRO
+# match dans la fenêtre (pré-saison, bénin) distincts de ceux abandonnés (grave).
+_SQL_MODEL_LEAGUES = "select fd_code from league_catalog where regime = 'modele'"
+
+# Couverture par championnat modèle : matchs en fenêtre vs matchs avec prédiction.
+# Une ligue à 0 en fenêtre = pas de match (pré-saison). Une ligue à N en fenêtre
+# mais 0 avec prédiction = abandonnée en silence (grave).
+_SQL_LEAGUE_COVERAGE = """
+    select l.provider_ref as fd,
+           count(*) as fenetre,
+           count(*) filter (
+               where exists (select 1 from predictions p where p.fixture_id = f.id)
+           ) as avec_pred
+      from fixtures f
+      join leagues l on l.id = f.league_id
+      join league_catalog c on c.fd_code = l.provider_ref
+     where c.regime = 'modele'
+       and f.statut = 'scheduled'
+       and f.date_utc >= now()
+       and f.date_utc <  now() + (%s * interval '1 day')
+     group by l.provider_ref
+"""
+
 # Matchs à venir en régime MODÈLE, dans la fenêtre, SANS aucune prédiction.
 _SQL_SKIPPED = """
     select l.provider_ref as fd, coalesce(c.nom, l.provider_ref) as champ,
@@ -75,12 +98,19 @@ def run() -> None:
     with connect() as con, con.cursor() as cur:
         cur.execute(_SQL_LAST_NIGHTLY)
         last = cur.fetchone()
+        cur.execute(_SQL_MODEL_LEAGUES)
+        model_codes = [r[0] for r in cur.fetchall()]
+        cur.execute(_SQL_LEAGUE_COVERAGE, (WINDOW_DAYS,))
+        coverage = {fd: (int(fen), int(av)) for fd, fen, av in cur.fetchall()}
         cur.execute(_SQL_HISTORY)
         history = cur.fetchall()
         cur.execute(_SQL_SKIPPED, (WINDOW_DAYS,))
         skipped = cur.fetchall()
 
-    # (b) Dernier nocturne : lignes par ligue et par source, erreurs.
+    # (b) Dernier nocturne : lignes par ligue et par source, erreurs. Le journal mêle
+    # des compteurs par ligue (dict de int) et des métadonnées (listes, dicts de
+    # listes) — on ne somme QUE les vrais compteurs par ligue.
+    META = {"repli_marches", "totals_2_5_books", "bascules", "couverture", "couverture_resume"}
     print("Dernier run nocturne :")
     if last:
         demarre, statut, erreur, detail = last
@@ -88,13 +118,30 @@ def run() -> None:
         if erreur:
             print(f"  ERREUR : {str(erreur)[:300]}")
         for fd in sorted(detail or {}):
+            if fd in META:
+                continue
             par_source = detail[fd]
-            if isinstance(par_source, dict):
+            if isinstance(par_source, dict) and all(isinstance(v, int) for v in par_source.values()):
                 total = sum(par_source.values())
                 parts = " ".join(f"{s}={n}" for s, n in sorted(par_source.items()))
                 print(f"    {fd:<8} {total:>4} lignes   ({parts})")
     else:
         print("  (aucun run nocturne enregistré)")
+
+    # (b bis) Couverture LIVE par championnat modèle — tranche (a) abandon vs (b)
+    # pré-saison, depuis l'état ACTUEL de la base (indépendant du vieux journal).
+    print(f"\nCouverture modèle LIVE (fenêtre {WINDOW_DAYS} j) — fenêtre / avec proba / sautés :")
+    for fd in sorted(model_codes):
+        fen, av = coverage.get(fd, (0, 0))
+        if fen == 0:
+            note = "aucun match en fenêtre (pré-saison ? pas encore collecté ?)"
+        elif av == 0:
+            note = "⚠ ABANDON : des matchs, AUCUNE proba"
+        elif av < fen:
+            note = "partiel"
+        else:
+            note = "complet"
+        print(f"  {fd:<8} {fen:>3} / {av:>3} / {fen - av:>3}   {note}")
 
     # Ensembles d'historique par championnat : noms bruts et identités de club.
     hist_names: dict[str, set] = defaultdict(set)

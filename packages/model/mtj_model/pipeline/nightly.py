@@ -226,6 +226,65 @@ def _sync_via_provider(con, days: int) -> None:
     refresh_scores(con, provider, days_from=3)
 
 
+# Au-delà de ce taux de matchs sautés (toutes ligues EN FENÊTRE confondues), le run
+# est signalé 'partial' : un statut vert ne doit jamais masquer une couverture trouée.
+NIGHTLY_SKIP_ALERT = 0.15
+
+
+def coverage_report(model_codes, groups) -> tuple[dict, bool, dict]:
+    """Couverture par championnat + verdict de dégradation. Fonction PURE (testable
+    sans base) : c'est ELLE qui décide si un run vert ment sur sa couverture.
+
+    `groups` : itérable de dict {fd, regime, fenetre, traites, hist_thin}.
+    `model_codes` : codes des championnats MODÈLE attendus (catalogue).
+
+    Retour `(couverture, degrade, resume)` :
+      - couverture[fd] = {regime, fenetre, traites, sautes, raison}. `raison` :
+          None                    → rien sauté ;
+          'aucun_match_fenetre'   → 0 match en fenêtre (pré-saison — BÉNIN) ;
+          'historique_insuffisant'→ modèle, fit non ajustable (ligue abandonnée) ;
+          'equipe_inconnue'       → modèle, équipe absente du fit (nom qui diverge) ;
+          'cote_absente'          → cote seule sans groupe de cotes dévigeable.
+      - degrade : True si une ligue MODÈLE a des matchs EN FENÊTRE mais 0 traité,
+                  ou si le taux global de matchs sautés dépasse NIGHTLY_SKIP_ALERT.
+      - resume : {fenetre, traites, sautes, taux_saut, abandons:[fd…]}.
+    """
+    couverture: dict = {}
+    vus: set = set()
+    tot_fen = tot_tr = 0
+    abandons: list = []
+    for g in groups:
+        fd = g["fd"]
+        vus.add(fd)
+        fenetre, traites = g["fenetre"], g["traites"]
+        sautes = max(0, fenetre - traites)
+        if sautes == 0:
+            raison = None
+        elif g["regime"] == "cote_seule":
+            raison = "cote_absente"
+        elif g.get("hist_thin"):
+            raison = "historique_insuffisant"
+        else:
+            raison = "equipe_inconnue"
+        couverture[fd] = {"regime": g["regime"], "fenetre": fenetre,
+                          "traites": traites, "sautes": sautes, "raison": raison}
+        tot_fen += fenetre
+        tot_tr += traites
+        if g["regime"] == "modele" and fenetre > 0 and traites == 0:
+            abandons.append(fd)
+    # Ligues modèle attendues SANS aucun match en fenêtre : bénin (pré-saison), mais
+    # tracé — pour que « pas de ligne » ne se confonde jamais avec « abandon ».
+    for fd in sorted(set(model_codes) - vus):
+        couverture[fd] = {"regime": "modele", "fenetre": 0, "traites": 0,
+                          "sautes": 0, "raison": "aucun_match_fenetre"}
+    tot_sautes = tot_fen - tot_tr
+    taux = round(tot_sautes / tot_fen, 3) if tot_fen else 0.0
+    degrade = bool(abandons) or taux > NIGHTLY_SKIP_ALERT
+    resume = {"fenetre": tot_fen, "traites": tot_tr, "sautes": tot_sautes,
+              "taux_saut": taux, "abandons": abandons}
+    return couverture, degrade, resume
+
+
 def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     jour = jour or datetime.now(timezone.utc).date()
     with connect() as con:
@@ -248,13 +307,22 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             # Taux de repli par marché coté ET par ligue (métrique permanente) :
             #   fd -> marché -> [repli, base(odds+repli)].
             repli: dict = defaultdict(lambda: defaultdict(lambda: [0, 0]))
+            # Couverture par ligue : {fd, regime, fenetre, traites, hist_thin}. On la
+            # mesure au fil du groupby pour qu'un statut vert ne masque jamais une
+            # ligue trouée (le problème qui a duré invisible).
+            groups: list[dict] = []
             for league_code, up in upcoming.groupby("league_code"):
                 fd = str(league_code)
-                if regimes.get(fd) == "cote_seule":
+                cote_seule = regimes.get(fd) == "cote_seule"
+                hist_thin = False
+                if cote_seule:
                     # Non backtesté : cote dé-vigée seule + double chance dérivée.
                     rows = league_predictions_cote_seule(up, fd, odds, books)
                 else:
                     hist = history[history["league_code"] == league_code]
+                    # Même garde que le fit (compute.league_predictions) : historique
+                    # trop mince → aucune ligne pour TOUTE la ligue. On le NOMME.
+                    hist_thin = hist.empty or hist["home"].nunique() < 4
                     rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
                 for r in rows:
                     detail[fd][r.source] += 1
@@ -263,11 +331,22 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                         if r.source == "repli":
                             repli[fd][r.marche][0] += 1
                 all_rows.extend(rows)
+                groups.append({
+                    "fd": fd, "regime": "cote_seule" if cote_seule else "modele",
+                    "fenetre": int(len(up)), "traites": len({r.fixture_id for r in rows}),
+                    "hist_thin": hist_thin,
+                })
 
             write_predictions(con, all_rows, jour)
             fixtures_done = len({r.fixture_id for r in all_rows})
-            statut = "success" if fixtures_done else "partial"
+            model_codes = [fd for fd, reg in regimes.items() if reg == "modele"]
+            couverture, degrade, resume_cv = coverage_report(model_codes, groups)
+            # Un run qui abandonne une ligue EN FENÊTRE, ou saute trop de matchs, n'est
+            # PAS 'success'. Le statut mesure enfin la couverture, pas juste « pas planté ».
+            statut = "partial" if (degrade or not fixtures_done) else "success"
             journal: dict = dict(detail)
+            journal["couverture"] = couverture
+            journal["couverture_resume"] = resume_cv
             repli_rates = _repli_rates(repli)
             if repli_rates:
                 journal["repli_marches"] = repli_rates
@@ -286,7 +365,21 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             _close_run(con, run_id, "failed", 0, {}, erreur=str(exc)[:2000])
             raise
 
-    print(f"Nocturne {jour} : {fixtures_done} matchs, {len(all_rows)} lignes predictions.")
+    print(f"Nocturne {jour} : {fixtures_done} matchs, {len(all_rows)} lignes predictions "
+          f"({statut}).")
+    # Couverture par ligue : matchs en fenêtre / traités / sautés + raison. C'est la
+    # ligne qui manquait — « success » ne dira plus jamais rien tout seul.
+    r = resume_cv
+    print(f"  couverture : {r['traites']}/{r['fenetre']} matchs traités "
+          f"(sautés {r['sautes']}, {r['taux_saut']:.0%}).")
+    if r["abandons"]:
+        print(f"  ⚠ LIGUES ABANDONNÉES (matchs en fenêtre, AUCUNE ligne) : {', '.join(r['abandons'])}")
+    for fd in sorted(couverture):
+        cv = couverture[fd]
+        if cv["fenetre"] == 0 and cv["regime"] == "modele":
+            continue  # pré-saison : bénin, on n'encombre pas la sortie
+        raison = f"  ⚠ {cv['raison']}" if cv["raison"] else ""
+        print(f"    {fd:<6} {cv['regime']:<10} {cv['traites']:>3}/{cv['fenetre']:>3}{raison}")
     for lg, c in sorted(detail.items()):
         print(f"  {lg:<5} cote {c['odds']:>3}  modèle {c['model']:>3}  repli {c['repli']:>3}  "
               f"cote_seule {c['cote_seule']:>3}  dérivée {c['cote_derivee']:>3}")
@@ -301,7 +394,8 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             parts = ", ".join(f"{r['book']}×{r['matchs']} {r['marge_pct']:.1f}%" for r in totals_books[lg])
             print(f"      {lg:<4} {parts}")
     return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows),
-            "detail": detail, "repli_marches": repli_rates, "totals_2_5_books": totals_books}
+            "statut": statut, "detail": detail, "repli_marches": repli_rates,
+            "totals_2_5_books": totals_books, "couverture_resume": resume_cv}
 
 
 def sample_predictions(limit: int = 30) -> None:
