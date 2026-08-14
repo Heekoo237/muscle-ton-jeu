@@ -189,6 +189,16 @@ export interface ResultVM {
 	explications: ExplicationVM[];
 	rienARetirer: boolean;
 	conflitMemeMatch: boolean;
+	/** Lignes analysables (résolues ET avec probabilité en base). */
+	nbAnalysables: number;
+	/** Total des lignes du ticket (analysées ou non — toutes restent affichées). */
+	nbTotal: number;
+	/**
+	 * Quand rien n'est retiré : la ligne analysable la plus serrée (probabilité la
+	 * plus basse), montrée en info NEUTRE. `null` si retrait, ou < 2 lignes analysables.
+	 * Calculé en code (min sur des probabilités lues) — jamais un conseil.
+	 */
+	laPlusSerree: { matchLabel: string; pct: number } | null;
 }
 
 /* ---- Bandeau d'historique (écran de résultat) ---- */

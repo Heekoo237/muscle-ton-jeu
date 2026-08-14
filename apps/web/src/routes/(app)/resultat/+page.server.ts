@@ -123,7 +123,29 @@ export const load: PageServerLoad = async (event) => {
 
 	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 4).
 	const r = buildReinforced(withProbs);
-	const nbAnalysables = withProbs.filter((s) => s.etatResolution === 'certain').length;
+	// « Analysable » = résolu ET dont la probabilité EXISTE en base. Une ligne
+	// résolue mais sans prédiction (match/marché absent de `predictions`) n'est PAS
+	// analysable : on ne la compte ni pour la facturation, ni dans « X matchs sur Y »,
+	// ni dans le pourcentage. On vérifie la disponibilité AVANT de compter, jamais après.
+	const nbAnalysables = withProbs.filter(
+		(s) => s.etatResolution === 'certain' && s.probabilite != null
+	).length;
+	const nbTotal = r.selections.length;
+
+	// « Ta sélection la plus serrée » : quand rien n'est retiré, on montre en INFO
+	// NEUTRE la ligne analysable à la probabilité la plus basse — un fait calculé en
+	// code (min sur des probabilités déjà affichées), jamais un conseil, jamais un
+	// verbe d'action. On ne l'affiche qu'avec ≥ 2 lignes analysables (avec une seule,
+	// « la plus serrée » n'a pas de sens). Aucun nombre nouveau : pct1 d'une proba lue.
+	const analysablesNonRetirees = r.selections.filter(
+		(s) => s.etatResolution === 'certain' && s.probabilite != null && !s.retireeDuRenforce
+	);
+	const laPlusSerree =
+		r.rienARetirer && analysablesNonRetirees.length >= 2
+			? analysablesNonRetirees.reduce((min, s) =>
+					(s.probabilite ?? 1) < (min.probabilite ?? 1) ? s : min
+				)
+			: null;
 
 	// 3. Rédaction sous garde-fous. On explique CHAQUE sélection retirée (badge
 	//    rouge ou mention neutre), enrichie de faits DESCRIPTIFS lus en base
@@ -264,7 +286,15 @@ export const load: PageServerLoad = async (event) => {
 		synthese: analyse.synthese,
 		explications,
 		rienARetirer: r.rienARetirer,
-		conflitMemeMatch: r.conflitMemeMatch
+		conflitMemeMatch: r.conflitMemeMatch,
+		nbAnalysables,
+		nbTotal,
+		laPlusSerree: laPlusSerree
+			? {
+					matchLabel: laPlusSerree.matchLabel || laPlusSerree.texteBrut,
+					pct: pct1(laPlusSerree.probabilite as number)
+				}
+			: null
 	};
 	// Bandeau d'historique : sélections déjà marquées, matchs terminés, issue
 	// réelle. On ne l'affiche QUE s'il y a au moins 20 résultats en base — sinon,

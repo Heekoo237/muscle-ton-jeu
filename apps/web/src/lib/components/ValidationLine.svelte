@@ -19,9 +19,16 @@
 	const nonResolu = $derived(etat === 'inconnu' && raison === 'non_resolu');
 	const horsFenetre = $derived(etat === 'inconnu' && raison === 'hors_fenetre');
 	const commence = $derived(etat === 'inconnu' && raison === 'commence');
-	const calme = $derived(nonCouvert || horsCouv || nonResolu || horsFenetre || commence);
+	// Match + marché RÉSOLUS mais sans prédiction en base : pas une erreur de lecture,
+	// pas une alerte — on n'a simplement pas de donnée pour cette ligne. État CALME,
+	// jamais coché vert (sinon on promet une analyse qui n'aura pas lieu).
+	const sansPrediction = $derived(etat === 'certain' && selection.analysable === false);
+	const certainOk = $derived(etat === 'certain' && !sansPrediction);
+	const calme = $derived(
+		nonCouvert || horsCouv || nonResolu || horsFenetre || commence || sansPrediction
+	);
 	const dataState = $derived(calme ? 'noncouvert' : etat);
-	const icone = $derived(etat === 'certain' ? '✓' : calme ? '–' : etat === 'ambigu' ? '▲' : '✕');
+	const icone = $derived(certainOk ? '✓' : calme ? '–' : etat === 'ambigu' ? '▲' : '✕');
 </script>
 
 <button class="line" data-state={dataState} type="button" onclick={() => onOpen(selection)}>
@@ -29,8 +36,10 @@
 	<span class="ic">{icone}</span>
 	<div class="mid">
 		<div class="match">{selection.matchLabel}</div>
-		{#if etat === 'certain'}
+		{#if certainOk}
 			<div class="market">{selection.libelleFr}</div>
+		{:else if sansPrediction}
+			<div class="hint">Pas encore de données pour ce match — gardé, non analysé</div>
 		{:else if commence}
 			<div class="hint">Ce match a déjà commencé — on ne l'analyse pas</div>
 		{:else if horsCouv}
@@ -49,7 +58,7 @@
 			<div class="hint">On n'a pas lu ce match — tape pour retirer</div>
 		{/if}
 	</div>
-	{#if etat === 'certain' && selection.coteSaisie != null}
+	{#if certainOk && selection.coteSaisie != null}
 		<span class="cote">{formatCote(selection.coteSaisie)}</span>
 	{:else}
 		<span class="chev" aria-hidden="true">›</span>

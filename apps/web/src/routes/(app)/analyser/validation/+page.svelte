@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { deserialize } from '$app/forms';
 	import type { PageData } from './$types';
 	import type { ValidationLineVM } from './+page.server';
 	import type { Market } from '$lib/types';
@@ -18,15 +19,26 @@
 	let open = $state<ValidationLineVM | null>(null);
 	let erreur = $state('');
 
-	const analysables = $derived(lignes.filter((s) => s.etatResolution === 'certain').length);
+	// Une ligne n'est analysable que si sa probabilité EXISTE en base (drapeau posé
+	// par le serveur, jamais deviné ici). Résolue ≠ analysable : un match reconnu
+	// dont la prédiction manque ne compte pas.
+	const analysables = $derived(lignes.filter((s) => s.analysable).length);
 	const total = $derived(lignes.length);
 
 	// Enregistrements en vol : on les attend AVANT de finaliser, pour ne jamais
 	// perdre une correction faite juste avant le tap « Analyser ».
 	let enVol = $state<Promise<unknown>[]>([]);
 
-	/** Enregistre en arrière-plan ; en cas d'échec, on revient en arrière et on prévient. */
-	function sauver(action: string, champs: Record<string, string>, revert: () => void) {
+	/**
+	 * Enregistre en arrière-plan ; en cas d'échec, on revient en arrière et on
+	 * prévient. Renvoie les données de l'action (désérialisées) en cas de succès,
+	 * `undefined` sinon — le client s'en sert pour réconcilier (ex. `analysable`).
+	 */
+	function sauver(
+		action: string,
+		champs: Record<string, string>,
+		revert: () => void
+	): Promise<Record<string, unknown> | undefined> {
 		erreur = '';
 		const p = (async () => {
 			try {
@@ -34,9 +46,15 @@
 				for (const [k, v] of Object.entries(champs)) body.set(k, v);
 				const res = await fetch(`?/${action}`, { method: 'POST', body });
 				if (!res.ok) throw new Error(String(res.status));
+				const result = deserialize(await res.text());
+				if (result.type === 'failure') throw new Error('failure');
+				return result.type === 'success'
+					? (result.data as Record<string, unknown> | undefined)
+					: undefined;
 			} catch {
 				revert();
 				erreur = 'Pas de réseau — ta modification n’a pas été enregistrée. Réessaie.';
+				return undefined;
 			}
 		})();
 		enVol.push(p);
@@ -66,6 +84,9 @@
 		const cible = open;
 		if (!cible) return;
 		const avant = lignes.map((s) => ({ ...s }));
+		// Optimiste : on résout la ligne tout de suite, mais on la marque NON analysable
+		// tant que le serveur n'a pas confirmé qu'une prédiction existe pour ce marché.
+		// Corriger le marché ne crée pas la donnée — on ne compte jamais au jugé.
 		lignes = lignes.map((s) =>
 			s.ordre === cible.ordre
 				? {
@@ -74,12 +95,21 @@
 						etatResolution: 'certain',
 						raison: undefined,
 						candidates: undefined,
-						libelleFr: label
+						libelleFr: label,
+						analysable: false
 					}
 				: s
 		);
 		open = null;
-		void sauver('corriger', { ordre: String(cible.ordre), marche }, () => (lignes = avant));
+		void sauver('corriger', { ordre: String(cible.ordre), marche }, () => (lignes = avant)).then(
+			(data) => {
+				// Réconciliation depuis le serveur : lui seul sait si la probabilité existe.
+				if (data && typeof data.analysable === 'boolean') {
+					const ok = data.analysable;
+					lignes = lignes.map((s) => (s.ordre === cible.ordre ? { ...s, analysable: ok } : s));
+				}
+			}
+		);
 	}
 
 	/** « Ce marché, on ne le couvre pas » : la ligne reste, marquée non analysée. */
@@ -97,7 +127,8 @@
 						candidates: undefined,
 						probabilite: null,
 						seuilFragile: null,
-						libelleFr: ''
+						libelleFr: '',
+						analysable: false
 					}
 				: s
 		);

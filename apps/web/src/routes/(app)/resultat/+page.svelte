@@ -71,19 +71,41 @@
 		</div>
 	{/if}
 
-	<!-- Comparaison en tickets papier -->
+	<!-- Comparaison en tickets papier. Un seul ticket quand rien n'est retiré :
+	     le renforcé serait identique à l'original, un doublon n'apporte rien. -->
 	<div class="paper rvl-fade">
 		<PaperTicketCompare
 			lines={paperLines}
 			probaTotalePct={vm.probaTotalePct}
 			probaRenforceePct={vm.probaRenforceePct}
+			single={vm.rienARetirer}
 		/>
+		<!-- Le pourcentage ne porte QUE sur les matchs analysés. Quand une partie du
+		     ticket n'est pas couverte, on le dit : sinon le chiffre laisserait croire
+		     qu'il couvre tout le ticket. On ne retire jamais les lignes non analysées. -->
+		{#if vm.nbAnalysables < vm.nbTotal && vm.nbAnalysables > 0}
+			<p class="couverture t-small">
+				<span class="cv-pct">{pctBig(vm.probaRenforceePct)}</span> — sur les {vm.nbAnalysables} match{vm.nbAnalysables
+					> 1
+					? 's'
+					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}. Les autres ne sont pas couverts, ton
+				ticket entier a moins de chances.
+			</p>
+		{/if}
 	</div>
 
 	<!-- Ligne de verdict -->
 	<div class="verdict" aria-live="polite">
 		{#if vm.rienARetirer}
 			<div class="t-body-lg">Rien à retirer. Ton ticket tient debout.</div>
+			<!-- Info NEUTRE, calculée en code : la ligne analysable la plus serrée
+			     (probabilité la plus basse). Un fait, pas un conseil — aucun badge,
+			     aucune couleur, aucun verbe d'action. Absente si < 2 lignes analysables. -->
+			{#if vm.laPlusSerree}
+				<div class="serree t-body">
+					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel} ({pctBig(vm.laPlusSerree.pct)})
+				</div>
+			{/if}
 		{:else}
 			<div class="t-body-lg">
 				{vm.nbRetirees} match{vm.nbRetirees > 1 ? 's' : ''} retiré{vm.nbRetirees > 1 ? 's' : ''}.
@@ -276,6 +298,24 @@
 		color: var(--c-ink);
 	}
 	.verdict .v {
+		font-weight: 600;
+		font-feature-settings: 'tnum' 1;
+	}
+	/* Ligne la plus serrée : info neutre, pas une alerte. Ton discret, aucun accent
+	   de couleur, aucun poids d'insistance — c'est un fait, pas un conseil. */
+	.serree {
+		margin-top: var(--s-2);
+		color: var(--c-ink-2);
+		font-feature-settings: 'tnum' 1;
+	}
+	/* Mention de couverture : le pourcentage ne porte que sur les matchs analysés.
+	   Neutre, sous le bloc de tickets, sans dramatiser. */
+	.couverture {
+		margin: var(--s-3) 0 0;
+		color: var(--c-ink-2);
+		max-width: var(--measure);
+	}
+	.couverture .cv-pct {
 		font-weight: 600;
 		font-feature-settings: 'tnum' 1;
 	}

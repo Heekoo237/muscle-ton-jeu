@@ -22,12 +22,17 @@
 		lines,
 		probaTotalePct,
 		probaRenforceePct,
-		dateLabel = ''
+		dateLabel = '',
+		single = false
 	}: {
 		lines: Line[];
 		probaTotalePct: number;
 		probaRenforceePct: number;
 		dateLabel?: string;
+		// Un seul ticket : quand rien n'est retiré, le ticket renforcé est identique
+		// à l'original — afficher deux fois la même chose serait un doublon inutile.
+		// On masque alors la colonne de droite et la flèche, on garde « Ton ticket ».
+		single?: boolean;
 	} = $props();
 
 	function pct(v: number): string {
@@ -68,6 +73,7 @@
 		</div>
 	</div>
 
+	{#if !single}
 	<div class="arrow" style="font-family:{MONO}" aria-hidden="true">→</div>
 
 	<!-- Ton ticket renforcé -->
@@ -105,6 +111,7 @@
 			<div class="edge bottom"></div>
 		</div>
 	</div>
+	{/if}
 </div>
 
 <style>

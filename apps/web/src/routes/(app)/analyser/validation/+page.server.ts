@@ -3,13 +3,22 @@ import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { marketLabelFr } from '$lib/server/domain/market-map';
 import { creditCost } from '$lib/server/domain/ticket';
+import { predictions } from '$lib/server/services';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
 
-function counts(selections: Selection[]) {
-	const total = selections.length;
-	const analysables = selections.filter((s) => s.etatResolution === 'certain').length;
-	return { total, analysables, cout: creditCost(analysables) };
+/**
+ * « Analysable » = ligne RÉSOLUE (match + marché reconnus) ET dont la probabilité
+ * EXISTE en base. Une ligne résolue sans prédiction (match/marché absent de la
+ * table `predictions`) n'est PAS analysable : on ne la compte ni comme « match sur
+ * Y », ni pour la facturation. On vérifie la disponibilité de la probabilité AVANT
+ * de compter, jamais après — sinon l'écran de validation promet une analyse que le
+ * résultat ne peut pas tenir. On lit la table, on ne devine rien (règle d'archi n°2).
+ */
+async function estAnalysable(s: Selection): Promise<boolean> {
+	if (s.etatResolution !== 'certain' || s.fixtureId === null || s.marche === null) return false;
+	const p = await predictions.get(s.fixtureId, s.marche);
+	return p?.probabilite != null;
 }
 
 /** Découpe « Home – Away » pour reconstruire le libellé après correction. */
@@ -26,22 +35,28 @@ export interface MarketOption {
 export interface ValidationLineVM extends Selection {
 	/** Tous les paris possibles du match, pour la feuille de correction. */
 	options: MarketOption[];
+	/** Résolue ET avec probabilité en base : seule une ligne analysable est comptée. */
+	analysable: boolean;
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
 	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
+	// Disponibilité de la probabilité vérifiée EN AMONT, une lecture par ligne.
+	const flags = await Promise.all(ticket.selections.map(estAnalysable));
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
-	const selections: ValidationLineVM[] = ticket.selections.map((s) => {
+	const selections: ValidationLineVM[] = ticket.selections.map((s, i) => {
 		const [home, away] = teamsOf(s.matchLabel);
 		return {
 			...s,
+			analysable: flags[i],
 			options: COVERED_MARKETS.map((m) => ({ market: m, label: marketLabelFr(m, home, away) }))
 		};
 	});
-	return { selections, ...counts(ticket.selections) };
+	const analysables = flags.filter(Boolean).length;
+	return { selections, total: ticket.selections.length, analysables, cout: creditCost(analysables) };
 };
 
 export const actions: Actions = {
@@ -69,9 +84,14 @@ export const actions: Actions = {
 			};
 		});
 		await updateTicket(ticket.id, { selections });
-		// Appelée en arrière-plan (fetch) depuis un affichage déjà à jour : simple
-		// succès, aucune redirection (l'écran ne se recharge jamais).
-		return { success: true };
+		// Le serveur SEUL sait si le marché corrigé a une prédiction en base : on
+		// renvoie le drapeau `analysable` pour que le client mette à jour son compteur
+		// sans le deviner. Corriger le marché ne garantit pas qu'on l'analyse.
+		const corrigee = selections.find((s) => s.ordre === ordre);
+		const analysable = corrigee ? await estAnalysable(corrigee) : false;
+		// Appelée en arrière-plan (fetch) depuis un affichage déjà à jour : succès +
+		// drapeau, aucune redirection (l'écran ne se recharge jamais).
+		return { success: true, analysable };
 	},
 
 	// « Ce marché, on ne le couvre pas » : la ligne RESTE dans le ticket, marquée
