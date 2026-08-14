@@ -19,6 +19,7 @@ on:
         options:
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - migrer-base           # crée/complète les tables dans Supabase
+          - backfill-historique   # charge 3 saisons football-data (une fois)
           - collecter             # relève les cotes une fois
 
 concurrency:
@@ -59,6 +60,12 @@ jobs:
             echo "== migration $f =="
             psql "$DBURL" -v ON_ERROR_STOP=1 -f ../db/migrations/$f.sql
           done
+
+      - name: Charger l'historique football-data (backfill)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'backfill-historique'
+        env:
+          MTJ_DATA_SOURCE: footballdata   # officiel prioritaire ; miroir en repli (par fichier)
+        run: python -m mtj_model.pipeline.backfill
 
       - name: Collecter les cotes
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')

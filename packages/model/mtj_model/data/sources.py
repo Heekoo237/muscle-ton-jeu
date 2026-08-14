@@ -49,6 +49,19 @@ def csv_url(div: str, season_code: str) -> str:
     return f"{_MIRROR_BASE}/{s['mirror']}/{div}.csv"
 
 
+def csv_urls(div: str, season_code: str) -> list[str]:
+    """URLs à tenter dans l'ordre : source OFFICIELLE d'abord, miroir en repli.
+
+    En production (réseau ouvert, ex. runner GitHub) l'officiel répond ; le miroir
+    ne sert que si l'officiel est injoignable.
+    """
+    s = SEASONS[season_code]
+    return [
+        f"{_FOOTBALLDATA_BASE}/{s['fd']}/{div}.csv",   # officiel prioritaire
+        f"{_MIRROR_BASE}/{s['mirror']}/{div}.csv",     # miroir (repli)
+    ]
+
+
 def all_targets() -> list[tuple[str, str]]:
     """Toutes les paires (championnat, saison) à charger."""
     return [(div, code) for code in SEASONS for div in LEAGUES]

@@ -226,6 +226,7 @@ les probabilités se figent une fois par nuit :
 | Job | Cadence | Écrit | Commande |
 |---|---|---|---|
 | `verify` | avant de payer | — (lit /sports) | `python -m mtj_model.pipeline.verify` |
+| `backfill` | une fois (amorçage) | `fixtures` (terminés) | `python -m mtj_model.pipeline.backfill` |
 | `collector` | toutes les 6 h | `odds_snapshots` | `python -m mtj_model.pipeline.collector` |
 | `nightly` | 1×/jour (~4 h) | `predictions` | `python -m mtj_model.pipeline.nightly` |
 | `health` | surveillance | — (lit `pipeline_runs`) | `python -m mtj_model.pipeline.health` |
@@ -268,6 +269,14 @@ nom, idempotent) : il est autosuffisant, pas besoin d'attendre le nocturne.
 > Les clés `ODDS_API_KEYS` sont un point de départ ; `verify` les réconcilie avec
 > la liste /sports réelle. Une clé fausse (ex. Turquie) se corrige en une ligne
 > dans `constants.py` **et** la migration 0006.
+
+**Backfill de l'historique (amorçage, une fois).** Le modèle de production DOIT
+s'ajuster sur le MÊME historique que celui qui a produit la calibration (ECE,
+seuils, paliers) — sinon la confiance affichée ne correspond plus à ce qu'on
+montre. `backfill` charge 3 saisons football-data (officiel prioritaire, miroir en
+repli) dans `fixtures`, réconciliées aux équipes du fournisseur de cotes par la
+clé normalisée. Idempotent. Il rapporte les matchs par ligue, les équipes NON
+réconciliées (la liste, pas le compte), et un échantillon de forces d'équipe.
 
 **Historiser, ne pas écraser.** `predictions` a pour clé `(fixture, marché, jour
 de calcul)` : une ligne par jour. On reconstruit exactement ce qu'on annonçait un
