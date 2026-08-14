@@ -7,6 +7,7 @@ import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixt
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications, stats } from '$lib/server/services';
 import { buildReinforced } from '$lib/server/domain/ticket';
+import { regimeOf } from '$lib/server/domain/regime';
 import { computeCharge } from '$lib/server/domain/billing';
 import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
@@ -110,7 +111,13 @@ export const load: PageServerLoad = async (event) => {
 			const p = await predictions.get(s.fixtureId, s.marche);
 			// Match/marché absent de predictions → probabilité null : non analysé,
 			// non facturé, jamais retiré (règles d'archi). On lit, on ne devine pas.
-			return { ...s, probabilite: p?.probabilite ?? null, seuilFragile: p?.seuilFragile ?? null };
+			// `source` décide le régime (mesure vs cote) : le texte et les faits en dépendent.
+			return {
+				...s,
+				probabilite: p?.probabilite ?? null,
+				seuilFragile: p?.seuilFragile ?? null,
+				source: p?.source ?? null
+			};
 		})
 	);
 
@@ -122,8 +129,18 @@ export const load: PageServerLoad = async (event) => {
 	//    rouge ou mention neutre), enrichie de faits DESCRIPTIFS lus en base
 	//    (forme, buts domicile/extérieur, confrontations) — jamais recalculés ici.
 	const retirees = r.selections.filter((s) => s.retireeDuRenforce);
+	// On ne lit des FAITS que pour les sélections en régime MESURE (championnat
+	// backtesté, historique football-data présent). En régime COTE, aucun historique :
+	// on n'interroge même pas le service de stats, pour qu'il ne puisse renvoyer
+	// aucune donnée partielle (CLAUDE.md, § deux régimes). Le rédacteur tombe alors
+	// sur l'aveu honnête « d'après les cotes ».
 	const fixtureIds = [
-		...new Set(retirees.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+		...new Set(
+			retirees
+				.filter((s) => regimeOf(s.source) === 'mesure')
+				.map((s) => s.fixtureId)
+				.filter((x): x is number => x !== null)
+		)
 	];
 	const faitsParMatch = await stats.forFixtures(fixtureIds);
 	const retraits: RetraitEnrichi[] = retirees.map((s) => ({
@@ -132,8 +149,12 @@ export const load: PageServerLoad = async (event) => {
 		avecBadge: s.fragile,
 		chanceSur: chanceSur(s.probabilite ?? null),
 		chanceSurMot: chanceSurMot(s.probabilite ?? null),
-		// Faits ORIENTÉS : seulement ceux qui jouent contre la sélection jouée.
-		faits: s.fixtureId !== null ? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche) : []
+		// Faits ORIENTÉS : seulement ceux qui jouent contre la sélection jouée, et
+		// SEULEMENT en régime mesure. En régime cote, faits vides → aveu honnête.
+		faits:
+			regimeOf(s.source) === 'mesure' && s.fixtureId !== null
+				? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche)
+				: []
 	}));
 	const writingInput: WritingInput = {
 		probaTotalePct: pct1(r.probaTotale),

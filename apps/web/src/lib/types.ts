@@ -62,6 +62,23 @@ export interface Fixture {
 	scoreAway: number | null;
 }
 
+/**
+ * D'où vient une probabilité, du plus au moins mesuré :
+ *  - 'odds' / 'model' / 'repli' / 'model_marge_excessive' : RÉGIME MODÈLE, championnat
+ *    backtesté — on a mesuré la calibration, le texte peut l'évoquer.
+ *  - 'cote_seule'  : championnat que le fournisseur price mais qu'on n'a PAS backtesté —
+ *    cote dé-vigée seule, confiance basse, « d'après les cotes », aucune mesure.
+ *  - 'cote_derivee': dérivée arithmétiquement d'une cote (double chance = P(1)+P(X)…).
+ *    Distincte de 'cote_seule' pour SÉPARER, à la calibration, le coté du déduit.
+ */
+export type PredictionSource =
+	| 'odds'
+	| 'model'
+	| 'repli'
+	| 'model_marge_excessive'
+	| 'cote_seule'
+	| 'cote_derivee';
+
 /** Probabilité lue dans la table `predictions` — jamais calculée en temps réel. */
 export interface Prediction {
 	fixtureId: number;
@@ -70,8 +87,8 @@ export interface Prediction {
 	confiance: number; // 0..1
 	/** Seuil de fragilité applicable à ce marché (calibré, stocké en table). */
 	seuilFragile: number | null;
-	/** D'où vient la probabilité : cote dé-vigée, modèle, ou repli modèle. */
-	source?: 'odds' | 'model' | 'repli';
+	/** D'où vient la probabilité — voir PredictionSource. Décide le régime du texte. */
+	source?: PredictionSource;
 }
 
 export interface Selection {
@@ -97,6 +114,8 @@ export interface Selection {
 	probabilite: number | null; // copiée depuis predictions
 	/** Seuil de fragilité du marché (copié depuis predictions) ; null si non lu. */
 	seuilFragile: number | null;
+	/** Source de la probabilité (copiée depuis predictions) — décide le régime du texte. */
+	source?: PredictionSource | null;
 	/** Marquée fragile ET badge rouge autorisé sur ce marché (1X2, plus/moins 2,5, etc.). */
 	fragile: boolean;
 	retireeDuRenforce: boolean;

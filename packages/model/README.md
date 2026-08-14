@@ -423,6 +423,31 @@ marchés × régions`, soit **240 crédits/mois/compétition** au rythme actuel 
 2 marchés, 1 région). Se lance depuis GitHub Actions
 (`Collecte des cotes` → action `catalogue-competitions`).
 
+### Feuille de route modèle — 11 → 18, APRÈS le lancement
+
+Le lancement se fait avec **toutes** les compétitions du catalogue en **cote
+seule** (le ticket d'août passe entièrement, chaque ligne étiquetée). La montée en
+valeur, ensuite, c'est **promouvoir** des championnats cote seule vers le régime
+**modèle** — là où football-data fournit un historique avec cotes de clôture.
+
+Invisible pour la plomberie : même table `predictions`, `source` passe de
+`cote_seule` à `odds`/`model`, la confiance monte. Ce qui change, c'est le
+**travail d'onboarding** (jamais compressé — voir le callout ci-dessus) :
+
+| Lot | Championnats | Clés The Odds API attendues | Effort |
+|---|---|---|---|
+| **1** | 3 tiers anglais : Championship, League One, League Two | `soccer_efl_champ`, `soccer_england_league1`, `soccer_england_league2` | ~1 session — même pays, nommage cohérent, alias par lot |
+| **2** | 4 D2 continentales : 2. Bundesliga, Serie B, La Liga 2, Ligue 2 | `soccer_germany_bundesliga2`, `soccer_italy_serie_b`, `soccer_spain_segunda_division`, `soccer_france_ligue_two` | ~1 session — plus de diversité d'alias |
+
+Chaque promotion passe par l'onboarding **obligatoire** : carte d'alias curée
+(divisions basses = clubs plus obscurs → souvent plus de curation manuelle),
+backfill 3 saisons, les deux tests mécaniques (co-occurrence, volume), et un
+backtest ECE pour le palier de confiance par championnat. **Deuxième cercle** (Extra
+Leagues football-data : Scandinaves, Pologne, Russie…) : format de fichier
+différent + cotes réduites → chargeur séparé, qualité moindre, 2ᵉ classe — pas dans
+le « 11 → 18 ». Le classement live vs éligible vs cote seule est produit par
+`catalogue.py` (`classify()`), confronté au catalogue réel à chaque run.
+
 ### Second fournisseur : API-Football (api-sports.io) — SECOURS TIÈDE, non intégré
 
 > [!NOTE]

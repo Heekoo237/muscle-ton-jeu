@@ -73,7 +73,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client
           # Retire tout espace/retour à la ligne parasite de la chaîne collée.
           DBURL="${MTJ_DATABASE_URL//[$'\t\r\n ']/}"
-          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog 0007_prediction_bookmaker 0008_source_mode; do
+          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog 0007_prediction_bookmaker 0008_source_mode 0009_regime_cote_seule; do
             echo "== migration $f =="
             psql "$DBURL" -v ON_ERROR_STOP=1 -f ../db/migrations/$f.sql
           done
