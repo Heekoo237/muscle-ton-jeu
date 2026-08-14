@@ -19,33 +19,64 @@ function pct1(prob: number): number {
 }
 
 // Compteurs de bascule vers le template (par instance). Journalisés à chaque
-// bascule pour qu'un taux qui remonte se voie dans les logs, sans lire le code.
+// bascule AVEC la raison, pour qu'un taux qui remonte se voie — et s'explique —
+// dans les logs, sans lire le code.
 let genTotal = 0;
 let genFallback = 0;
 
 /**
  * Rédaction sous garde-fous (brief §4.3/4.4) : on régénère si un nombre est
  * fabriqué ou un terme interdit apparaît ; après 2 échecs, template sans chiffres.
+ * `maskNames` : noms propres du ticket retirés du texte avant le contrôle des
+ * nombres (un « 05 » de « Mainz 05 » n'est pas un chiffre analytique).
  */
-async function writeSafely(input: WritingInput): Promise<string> {
+async function writeSafely(input: WritingInput, maskNames: string[]): Promise<string> {
 	genTotal += 1;
-	let dernier: ReturnType<typeof checkGeneratedText> | null = null;
+	let raison = 'echec_modele';
+	let detail = '';
 	for (let i = 0; i < 2; i++) {
-		const texte = await writing.writeAnalysis(input);
-		const controle = checkGeneratedText(texte, writing.allowedNumbers(input));
+		let texte: string;
+		try {
+			texte = await writing.writeAnalysis(input);
+		} catch (e) {
+			raison = 'echec_modele';
+			detail = String(e).slice(0, 120);
+			continue;
+		}
+		const controle = checkGeneratedText(texte, writing.allowedNumbers(input), maskNames);
 		if (controle.ok) return texte;
-		dernier = controle;
+		if (!controle.vocabulary.ok) {
+			raison = 'vocabulaire_interdit';
+			detail = controle.vocabulary.hits.join(',');
+		} else {
+			raison = 'nombre_hors_autorises';
+			detail = controle.numbers.offending.join(',');
+		}
 	}
 	genFallback += 1;
 	const taux = Math.round((genFallback / genTotal) * 100);
 	console.warn(
-		`[rédaction] bascule template ${genFallback}/${genTotal} (~${taux}%) — ` +
-			`vocab: ${dernier?.vocabulary.hits.join(',') || '—'} · ` +
-			`nombres hors autorisés: ${dernier?.numbers.offending.join(',') || '—'}`
+		`[rédaction] bascule template ${genFallback}/${genTotal} (~${taux}%) ` +
+			`raison=${raison} détail=${detail || '—'}`
 	);
 	return input.rienARetirer
 		? 'Rien à retirer. Ton ticket tient debout.'
 		: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.';
+}
+
+/** Noms propres du ticket (libellés de match + équipes) à masquer au contrôle. */
+function ticketNames(selections: Selection[]): string[] {
+	const noms = new Set<string>();
+	for (const s of selections) {
+		const label = s.matchLabel?.trim();
+		if (!label) continue;
+		noms.add(label);
+		for (const part of label.split(' – ')) {
+			const p = part.trim();
+			if (p) noms.add(p);
+		}
+	}
+	return [...noms];
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -84,7 +115,7 @@ export const load: PageServerLoad = async (event) => {
 		confiance: 'correcte',
 		rienARetirer: r.rienARetirer
 	};
-	const texte = await writeSafely(writingInput);
+	const texte = await writeSafely(writingInput, ticketNames(r.selections));
 
 	// 4. Facturation (règle : débit à l'affichage réussi, jamais avant, une fois).
 	//    Idempotent : une fois `billing` posé, on ne recalcule ni ne redébite.

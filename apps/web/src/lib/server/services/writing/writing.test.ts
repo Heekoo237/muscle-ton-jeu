@@ -43,6 +43,25 @@ describe('rédaction — un fragile plus/moins ne dégrade plus vers le template
 		expect(allowed).not.toContain(5); // « 05 » du nom d’équipe : non
 	});
 
+	// Le vrai correctif : masquer les noms propres AVANT d'extraire les nombres.
+	const MASQUE_MAINZ = ['FSV Mainz 05 – Leverkusen', 'FSV Mainz 05', 'Leverkusen'];
+
+	it('1. « FSV Mainz 05 · Plus de 2,5 buts » → texte RICHE (nom masqué), pas le template', async () => {
+		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
+		const texte = await new FakeWriting().writeAnalysis(input);
+		expect(texte).toContain('FSV Mainz 05'); // le nom figure bien dans le texte
+		const controle = checkGeneratedText(texte, allowedNumbersFor(input), MASQUE_MAINZ);
+		expect(controle.ok).toBe(true); // « 05 » masqué → aucune bascule injustifiée
+	});
+
+	it('2. un nombre inventé (« 87 % ») reste rejeté même avec un nom d’équipe présent', () => {
+		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
+		const texte = 'FSV Mainz 05 est le maillon faible. Tes chances montent à 87 %.';
+		const controle = checkGeneratedText(texte, allowedNumbersFor(input), MASQUE_MAINZ);
+		expect(controle.ok).toBe(false);
+		expect(controle.numbers.offending).toContain(87);
+	});
+
 	it('un nombre fabriqué reste rejeté (le garde-fou n’est pas désactivé)', () => {
 		const input = inputAvecFragile('Lens – Nice — Plus de 2,5 buts');
 		// 42 n’est ni une proba, ni un seuil du libellé : doit être refusé.

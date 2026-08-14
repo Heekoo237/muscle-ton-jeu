@@ -98,15 +98,44 @@ export interface NumbersResult {
 	offending: number[];
 }
 
+/** Échappe les caractères spéciaux d'une chaîne pour un usage littéral en regex. */
+function escapeRegExp(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Retire du texte les NOMS PROPRES fournis (noms d'équipe, libellés de match)
+ * avant l'extraction des nombres. Un numéro dans un nom propre (« Mainz 05 ») est
+ * un morceau de nom, pas un chiffre analytique : on le sort de l'analyse plutôt
+ * que d'élargir la liste blanche (ce qui créerait un trou). Ce qui reste — « 2,5 »,
+ * « 7,5 % », ou un « 87 % » inventé — est vérifié normalement.
+ */
+function stripNames(text: string, names: string[]): string {
+	let out = text;
+	for (const raw of names) {
+		const n = raw.trim();
+		if (n.length < 2) continue; // jamais un jeton trop court
+		out = out.replace(new RegExp(escapeRegExp(n), 'gi'), ' ');
+	}
+	return out;
+}
+
 /**
  * Vérifie que chaque nombre du texte figure dans `allowed` — l'ensemble des
  * valeurs déjà calculées, exprimées **dans leur forme d'affichage** (ex. 7.5
  * pour « 7,5 % », 3 pour « 3 matchs », 1.85 pour une cote).
  *
  * @param epsilon tolérance d'arrondi (les probabilités sont arrondies au dixième).
+ * @param maskNames noms propres à retirer du texte AVANT extraction (voir stripNames).
  */
-export function checkNumbers(text: string, allowed: number[], epsilon = 0.05): NumbersResult {
-	const found = extractNumbers(text);
+export function checkNumbers(
+	text: string,
+	allowed: number[],
+	epsilon = 0.05,
+	maskNames: string[] = []
+): NumbersResult {
+	const cleaned = maskNames.length ? stripNames(text, maskNames) : text;
+	const found = extractNumbers(cleaned);
 	const offending: number[] = [];
 	for (const n of found) {
 		const matched = allowed.some((a) => Math.abs(a - n) <= epsilon);
@@ -130,8 +159,12 @@ export interface GuardResult {
  * `ok === false` → régénérer ; après 2 échecs, l'appelant bascule sur un
  * template sans chiffres.
  */
-export function checkGeneratedText(text: string, allowedNumbers: number[]): GuardResult {
+export function checkGeneratedText(
+	text: string,
+	allowedNumbers: number[],
+	maskNames: string[] = []
+): GuardResult {
 	const vocabulary = checkVocabulary(text);
-	const numbers = checkNumbers(text, allowedNumbers);
+	const numbers = checkNumbers(text, allowedNumbers, 0.05, maskNames);
 	return { ok: vocabulary.ok && numbers.ok, vocabulary, numbers };
 }
