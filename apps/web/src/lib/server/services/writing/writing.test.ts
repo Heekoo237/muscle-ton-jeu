@@ -185,13 +185,56 @@ describe('faits descriptifs (qualitatifs, en toutes lettres)', () => {
 	};
 
 	it('rend des phrases qualitatives, sans chiffre extractible', () => {
-		const phrases = faitsDescriptifs(fait);
+		const phrases = faitsDescriptifs(fait, 'WIN_HOME');
 		expect(phrases.length).toBeGreaterThan(0);
 		// Aucune phrase ne doit contenir de chiffre (tout est en toutes lettres).
 		for (const p of phrases) expect(p).not.toMatch(/\d/);
 	});
 
-	it('match inconnu → aucun fait (le rédacteur s’en tient au risque)', () => {
-		expect(faitsDescriptifs(undefined)).toEqual([]);
+	it('match inconnu ou marché sans direction → aucun fait', () => {
+		expect(faitsDescriptifs(undefined, 'WIN_HOME')).toEqual([]);
+		expect(faitsDescriptifs(fait, null)).toEqual([]);
+		// « match nul » et « un ou l'autre » (12) n'ont pas de sens directionnel.
+		expect(faitsDescriptifs(fait, 'DRAW')).toEqual([]);
+		expect(faitsDescriptifs(fait, 'DC_HOME_AWAY')).toEqual([]);
+	});
+});
+
+describe('orientation des faits (brief §3 — pas de contresens de lecture)', () => {
+	// Un match qui offre à la fois un fait « plus de buts » et un fait « moins de buts ».
+	const fait: FaitsMatch = {
+		fixtureId: 2,
+		home: {
+			nom: 'Real',
+			forme: ['V', 'N', 'D', 'V', 'N'], // rien de distinctif
+			butsMarquesDom: 2.0, // marque BEAUCOUP à domicile → « plus » de buts
+			butsEncaissesDom: 1.2,
+			butsMarquesExt: 1.2,
+			butsEncaissesExt: 1.2,
+			joues: 10
+		},
+		away: {
+			nom: 'Sevilla',
+			forme: ['V', 'N', 'N', 'V', 'D'],
+			butsMarquesDom: 1.2,
+			butsEncaissesDom: 1.2,
+			butsMarquesExt: 1.1,
+			butsEncaissesExt: 0.6, // encaisse PEU à l'extérieur → « moins » de buts
+			joues: 10
+		},
+		h2h: []
+	};
+
+	it('« Plus de 2,5 buts » fragile : seuls les faits « moins de buts » sont retenus', () => {
+		const phrases = faitsDescriptifs(fait, 'OVER_2_5');
+		expect(phrases).toContain("Sevilla encaisse peu à l'extérieur."); // va vers moins de buts
+		expect(phrases.join(' ')).not.toContain('marque beaucoup'); // « plus » exclu
+		expect(phrases.every((p) => !p.includes('beaucoup'))).toBe(true);
+	});
+
+	it('« Moins de 2,5 buts » fragile : c’est l’inverse (les faits « plus de buts »)', () => {
+		const phrases = faitsDescriptifs(fait, 'UNDER_2_5');
+		expect(phrases).toContain('Real marque beaucoup à domicile.'); // va vers plus de buts
+		expect(phrases.join(' ')).not.toContain('encaisse peu');
 	});
 });

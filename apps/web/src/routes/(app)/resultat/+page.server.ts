@@ -132,7 +132,8 @@ export const load: PageServerLoad = async (event) => {
 		avecBadge: s.fragile,
 		chanceSur: chanceSur(s.probabilite ?? null),
 		chanceSurMot: chanceSurMot(s.probabilite ?? null),
-		faits: s.fixtureId !== null ? faitsDescriptifs(faitsParMatch.get(s.fixtureId)) : []
+		// Faits ORIENTÉS : seulement ceux qui jouent contre la sélection jouée.
+		faits: s.fixtureId !== null ? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche) : []
 	}));
 	const writingInput: WritingInput = {
 		probaTotalePct: pct1(r.probaTotale),

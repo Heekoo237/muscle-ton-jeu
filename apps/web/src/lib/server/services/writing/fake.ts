@@ -21,12 +21,16 @@ export class FakeWriting implements WritingService {
 	}
 
 	private pourRetrait(r: RetraitEnrichi): string {
-		const tete = r.avecBadge
-			? `${nomSelection(r.libelleFr)}, c'est risqué.`
-			: `${nomSelection(r.libelleFr)}, la moins solide de ton ticket.`;
-		const fait = r.faits[0] ? ` ${r.faits[0]}` : '';
+		const nom = nomSelection(r.libelleFr);
+		const tete = r.avecBadge ? `${nom}, c'est risqué.` : `${nom}, la moins solide de ton ticket.`;
+		// Aucun fait distinctif → on le dit franchement, on ne meuble pas (brief).
+		const corps = r.faits.length
+			? ` ${r.faits.join(' ')}`
+			: r.avecBadge
+				? " On n'a rien de marquant à signaler. C'est la cote qui le rend fragile."
+				: " On n'a rien de marquant à signaler. C'est la cote qui le place en dernier.";
 		const chance = r.chanceSurMot ? ` ${cap(r.chanceSurMot)}, pas plus.` : '';
-		return `${tete}${fait}${chance}`.trim();
+		return `${tete}${corps}${chance}`.trim();
 	}
 
 	allowedNumbers(input: WritingInput): number[] {

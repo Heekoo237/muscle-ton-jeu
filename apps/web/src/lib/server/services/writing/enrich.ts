@@ -14,6 +14,7 @@
  * d'aucune liste blanche.
  */
 import type { FaitsEquipe, FaitsMatch } from '$lib/server/services/stats';
+import type { Market } from '$lib/types';
 import type { WritingInput } from './index';
 
 const MOTS = [
@@ -67,18 +68,62 @@ function cap(s: string): string {
  * fragiles) : ce sont exactement les nombres qu'un modèle fabrique le plus
  * facilement (« six matchs » pour huit). Règle d'or n°1 : aucun de ces nombres
  * ne sort du LLM. Le modèle garde les explications par sélection, où il excelle.
+ *
+ * On fait VARIER la formulation pour qu'un utilisateur qui analyse plusieurs
+ * tickets dans le week-end ne lise pas trois fois la même phrase. Pas de hasard :
+ * la variante est choisie de façon DÉTERMINISTE selon le contexte (nombre de
+ * fragiles, contraste entre les deux probabilités), donc le même ticket donne
+ * toujours le même texte.
  */
 export function syntheseDeterministe(input: WritingInput): string {
-	if (input.rienARetirer) return 'Rien à retirer. Ton ticket tient debout.';
-	const matchs = `${enMots(input.nbMatchs)} match${input.nbMatchs > 1 ? 's' : ''}`;
-	if (input.nbFragiles <= 0) {
-		return `Ton ticket tient sur ${matchs}. On a allégé les sélections les moins solides.`;
-	}
-	const fragiles =
-		input.nbFragiles === 1
-			? 'Un seul est fragile'
-			: `${cap(enMots(input.nbFragiles))} sont fragiles`;
-	return `Ton ticket tient sur ${matchs}. ${fragiles}, et il suffit d'un pour tout faire tomber.`;
+	if (input.rienARetirer) return synthRienARetirer(input);
+	const m = input.nbMatchs;
+	const matchs = `${enMots(m)} match${m > 1 ? 's' : ''}`;
+	if (input.nbFragiles <= 0) return choisir(synthNeutre(matchs, enMots(m)), input);
+	return choisir(synthFragiles(matchs, input.nbFragiles), input);
+}
+
+/** Contraste renforcement/total : à quel point retirer améliore les chances. */
+function contrasteBucket(input: WritingInput): number {
+	const t = input.probaTotalePct;
+	if (t <= 0) return 0;
+	const ratio = input.probaRenforceePct / t;
+	return ratio >= 2.2 ? 2 : ratio >= 1.5 ? 1 : 0;
+}
+
+/** Choix DÉTERMINISTE d'une variante selon le contexte du ticket. */
+function choisir(variantes: string[], input: WritingInput): string {
+	const idx = (input.nbFragiles + contrasteBucket(input) + input.nbMatchs) % variantes.length;
+	return variantes[idx];
+}
+
+function synthFragiles(matchs: string, nbFragiles: number): string[] {
+	const un = nbFragiles === 1;
+	const fMot = enMots(nbFragiles);
+	const sontFragiles = un ? 'Un seul est fragile' : `${cap(fMot)} sont fragiles`;
+	const maillons = un ? 'un maillon faible' : `${fMot} maillons faibles`;
+	const neTiennent = un ? 'une ne tient pas la route' : `${fMot} ne tiennent pas la route`;
+	return [
+		`Ton ticket tient sur ${matchs}. ${sontFragiles}.`,
+		`${cap(matchs)}, ${maillons}. Un seul suffit à tout faire tomber.`,
+		`Sur tes ${matchs.replace('match', 'sélection')}, ${neTiennent}.`,
+		`Ton ticket tient sur ${matchs}. ${sontFragiles}, et il suffit d'un pour tout faire tomber.`,
+		`${cap(matchs)} sur ton ticket. ${sontFragiles}.`,
+		`Tu joues ${matchs}. ${sontFragiles} — reste sur tes gardes.`
+	];
+}
+
+function synthNeutre(matchs: string, mMot: string): string[] {
+	return [
+		`Ton ticket tient sur ${matchs}. On a allégé la sélection la moins solide.`,
+		`${cap(matchs)}, aucun fragile. On a juste retiré la plus faible.`,
+		`Sur tes ${mMot} sélections, rien de fragile. On a allégé le maillon le plus faible.`
+	];
+}
+
+function synthRienARetirer(input: WritingInput): string {
+	const variantes = ['Rien à retirer. Ton ticket tient debout.', 'Rien à retirer. Ton ticket est solide.'];
+	return variantes[input.nbMatchs % variantes.length];
 }
 
 /* ------------------------------------------------------------------------ */
@@ -93,68 +138,126 @@ function compte(forme: FaitsEquipe['forme'], issue: 'V' | 'N' | 'D'): number {
 	return forme.filter((x) => x === issue).length;
 }
 
-/** Un fait de forme récente, s'il est distinctif (au moins trois matchs connus). */
-function faitForme(e: FaitsEquipe): string | null {
+/**
+ * Un fait candidat, avec son ORIENTATION. `buts` : le fait tire le total de buts
+ * vers le haut ou le bas. `faveur` : l'équipe que le fait avantage (issue 1X2 /
+ * double chance). Sert à ne retenir que les faits DÉFAVORABLES à la sélection
+ * jouée — sinon le lecteur risque de lire le fait à l'envers (brief).
+ */
+interface FaitCandidat {
+	texte: string;
+	buts?: 'plus' | 'moins';
+	faveur?: 'home' | 'away';
+}
+
+/** L'équipe adverse d'un camp. */
+function adverse(camp: 'home' | 'away'): 'home' | 'away' {
+	return camp === 'home' ? 'away' : 'home';
+}
+
+/** Fait de forme récente d'une équipe (distinctif à partir de trois matchs). */
+function candForme(e: FaitsEquipe, camp: 'home' | 'away'): FaitCandidat | null {
 	const n = e.forme.length;
 	if (n < 3) return null;
 	const v = compte(e.forme, 'V');
 	const d = compte(e.forme, 'D');
-	if (d >= 3) return `${e.nom} a perdu ${enMots(d)} de ses ${enMots(n)} derniers matchs.`;
-	if (v >= 3) return `${e.nom} reste sur ${enMots(v)} victoires.`;
+	// Mauvaise forme → avantage l'adversaire ; bonne forme → avantage l'équipe.
+	if (d >= 3)
+		return {
+			texte: `${e.nom} a perdu ${enMots(d)} de ses ${enMots(n)} derniers matchs.`,
+			faveur: adverse(camp)
+		};
+	if (v >= 3) return { texte: `${e.nom} reste sur ${enMots(v)} victoires.`, faveur: camp };
 	return null;
 }
 
-/** Faits de buts pour une équipe reçue à domicile. */
-function faitsButsDom(e: FaitsEquipe): string[] {
-	const out: string[] = [];
+/** Faits de buts d'une équipe à domicile. */
+function candButsDom(e: FaitsEquipe): FaitCandidat[] {
+	const out: FaitCandidat[] = [];
 	if (e.butsEncaissesDom !== null && e.butsEncaissesDom >= BEAUCOUP)
-		out.push(`${e.nom} encaisse souvent à domicile.`);
+		out.push({ texte: `${e.nom} encaisse souvent à domicile.`, buts: 'plus', faveur: 'away' });
 	else if (e.butsEncaissesDom !== null && e.butsEncaissesDom < PEU)
-		out.push(`${e.nom} encaisse peu à domicile.`);
+		out.push({ texte: `${e.nom} encaisse peu à domicile.`, buts: 'moins', faveur: 'home' });
 	if (e.butsMarquesDom !== null && e.butsMarquesDom < PEU)
-		out.push(`${e.nom} marque peu à domicile.`);
+		out.push({ texte: `${e.nom} marque peu à domicile.`, buts: 'moins', faveur: 'away' });
 	else if (e.butsMarquesDom !== null && e.butsMarquesDom >= BEAUCOUP)
-		out.push(`${e.nom} marque beaucoup à domicile.`);
+		out.push({ texte: `${e.nom} marque beaucoup à domicile.`, buts: 'plus', faveur: 'home' });
 	return out;
 }
 
-/** Faits de buts pour une équipe jouant à l'extérieur. */
-function faitsButsExt(e: FaitsEquipe): string[] {
-	const out: string[] = [];
+/** Faits de buts d'une équipe à l'extérieur. */
+function candButsExt(e: FaitsEquipe): FaitCandidat[] {
+	const out: FaitCandidat[] = [];
 	if (e.butsEncaissesExt !== null && e.butsEncaissesExt >= BEAUCOUP)
-		out.push(`${e.nom} encaisse souvent à l'extérieur.`);
+		out.push({ texte: `${e.nom} encaisse souvent à l'extérieur.`, buts: 'plus', faveur: 'home' });
 	else if (e.butsEncaissesExt !== null && e.butsEncaissesExt < PEU)
-		out.push(`${e.nom} encaisse peu à l'extérieur.`);
+		out.push({ texte: `${e.nom} encaisse peu à l'extérieur.`, buts: 'moins', faveur: 'away' });
 	if (e.butsMarquesExt !== null && e.butsMarquesExt < PEU)
-		out.push(`${e.nom} marque peu à l'extérieur.`);
+		out.push({ texte: `${e.nom} marque peu à l'extérieur.`, buts: 'moins', faveur: 'home' });
 	else if (e.butsMarquesExt !== null && e.butsMarquesExt >= BEAUCOUP)
-		out.push(`${e.nom} marque beaucoup à l'extérieur.`);
+		out.push({ texte: `${e.nom} marque beaucoup à l'extérieur.`, buts: 'plus', faveur: 'away' });
 	return out;
 }
 
-/** Un fait de confrontations directes, du point de vue du domicile. */
-function faitH2h(f: FaitsMatch): string | null {
+/** Fait de confrontations directes (du point de vue du domicile). */
+function candH2h(f: FaitsMatch): FaitCandidat | null {
 	if (f.h2h.length < 2) return null;
 	const v = compte(f.h2h, 'V');
 	const d = compte(f.h2h, 'D');
-	if (d >= 2 && d > v) return `${f.home.nom} a souvent perdu contre ${f.away.nom}.`;
-	if (v >= 2 && v > d) return `${f.home.nom} gagne souvent contre ${f.away.nom}.`;
+	if (d >= 2 && d > v)
+		return { texte: `${f.home.nom} a souvent perdu contre ${f.away.nom}.`, faveur: 'away' };
+	if (v >= 2 && v > d)
+		return { texte: `${f.home.nom} gagne souvent contre ${f.away.nom}.`, faveur: 'home' };
 	return null;
 }
 
 /**
- * Pool de faits descriptifs pour un match, prêts à être reformulés. Au plus
- * quatre : de quoi écrire deux ou trois phrases courtes sans noyer le lecteur.
- * Vide si aucun fait n'est distinctif — le rédacteur s'en tient alors au risque.
+ * Un candidat est-il DÉFAVORABLE à la sélection jouée ? Seuls ces faits-là sont
+ * cités : pour un « Plus de 2,5 buts » fragile, on ne garde que les faits qui
+ * tirent vers MOINS de buts (ils expliquent la faiblesse). Pour « match nul » et
+ * « un ou l'autre » (12), aucun fait n'a de sens clair : on n'en cite aucun.
  */
-export function faitsDescriptifs(f: FaitsMatch | undefined): string[] {
-	if (!f) return [];
-	const pool: string[] = [];
-	const forme = faitForme(f.home) ?? faitForme(f.away);
+function estDefavorable(c: FaitCandidat, marche: Market): boolean {
+	switch (marche) {
+		case 'WIN_HOME':
+		case 'DC_HOME_DRAW':
+			return c.faveur === 'away';
+		case 'WIN_AWAY':
+		case 'DC_DRAW_AWAY':
+			return c.faveur === 'home';
+		case 'OVER_1_5':
+		case 'OVER_2_5':
+		case 'OVER_3_5':
+		case 'BTTS_YES':
+			return c.buts === 'moins';
+		case 'UNDER_1_5':
+		case 'UNDER_2_5':
+		case 'UNDER_3_5':
+		case 'BTTS_NO':
+			return c.buts === 'plus';
+		case 'DRAW':
+		case 'DC_HOME_AWAY':
+			return false;
+	}
+}
+
+/**
+ * Faits descriptifs à citer pour une sélection fragile, ORIENTÉS : uniquement
+ * ceux qui jouent CONTRE la sélection jouée. Au plus trois, pour rester lisible.
+ * Vide si le match est inconnu, le marché sans direction claire, ou aucun fait
+ * distinctif — le rédacteur dit alors franchement qu'il n'a rien de marquant.
+ */
+export function faitsDescriptifs(f: FaitsMatch | undefined, marche: Market | null): string[] {
+	if (!f || !marche) return [];
+	const pool: FaitCandidat[] = [];
+	const forme = candForme(f.home, 'home') ?? candForme(f.away, 'away');
 	if (forme) pool.push(forme);
-	pool.push(...faitsButsDom(f.home));
-	pool.push(...faitsButsExt(f.away));
-	const h2h = faitH2h(f);
+	pool.push(...candButsDom(f.home));
+	pool.push(...candButsExt(f.away));
+	const h2h = candH2h(f);
 	if (h2h) pool.push(h2h);
-	return pool.slice(0, 4);
+	return pool
+		.filter((c) => estDefavorable(c, marche))
+		.map((c) => c.texte)
+		.slice(0, 3);
 }
