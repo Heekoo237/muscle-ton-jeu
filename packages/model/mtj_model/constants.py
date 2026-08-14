@@ -62,6 +62,18 @@ ODDS_MARKETS = frozenset(m for m, s in PROBABILITY_SOURCE.items() if s == "odds"
 # lire un échantillon. Seuil à 50 % : on veut le voir monter, pas attendre pire.
 REPLI_ALERT = 0.50
 
+# ── Escalade vers alternate_totals (Pinnacle 2,5 garanti) — critère CHIFFRÉ ───
+# Le plus/moins 2,5 est pris chez le book EU le plus serré qui le poste (gratuit).
+# On n'escalade vers `alternate_totals` (+50 % de crédits sur l'appel cotes) que
+# si ce 2,5 coûte trop en marge, LARGEMENT et DURABLEMENT :
+#   marge OU-2,5 moyenne du book serveur > 8 %  sur > 3 ligues,  tenu ≥ 3 nocturnes.
+# En deçà, la version gratuite reste préférable. « Une décision reportée sans
+# critère est une décision jamais prise » : ce seuil EST la décision. Chiffres
+# provisoires, à rejuger à la prochaine recalibration (voir README, écarts connus).
+ALT_TOTALS_MARGIN_PCT = 8.0
+ALT_TOTALS_MIN_LEAGUES = 3
+ALT_TOTALS_MIN_NIGHTS = 3
+
 
 # ── Seuil de fragilité PAR MARCHÉ ────────────────────────────────────────────
 # Une sélection est « fragile » si sa probabilité est SOUS le seuil de son marché.

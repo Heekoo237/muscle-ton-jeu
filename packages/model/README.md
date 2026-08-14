@@ -132,16 +132,44 @@ betclic **18 %**, contre ~5 % pour Pinnacle). À 18 % de marge le book n'est pas
 `source_mode.py`. Marge mesurée et journalisée par le collecteur
 (`pipeline_runs.detail.marges`).
 
-> [!WARNING]
-> **Écart connu backtest vs production — à revérifier à la prochaine recalibration.**
-> Le backtest a été calibré sur la marge de **clôture** Pinnacle (~2,84 %). En
-> production, le collecteur relève l'**ouverture** (~5,2 % pour Pinnacle) — c'est
-> le comportement normal de Pinnacle, qui resserre vers le coup d'envoi, pas une
-> erreur. Mais **la source de production est structurellement plus large que celle
-> du backtest.** Le dévigage puissance retire la marge dans les deux cas, donc
-> l'effet sur les probabilités est faible ; à confirmer néanmoins en rejouant le
-> backtest sur les cotes d'**ouverture** (voir note ci-dessous) lors de la
-> prochaine recalibration.
+> [!NOTE]
+> La marge de production plus large que celle du backtest est l'**écart n°2**
+> ci-dessous, à traiter avec les deux autres à la recalibration.
+
+## Écarts connus backtest ↔ production
+
+Trois écarts séparent les conditions du backtest de celles de la production. Aucun
+n'invalide le pipeline aujourd'hui — l'effet sur les probabilités est faible dans
+les trois cas — mais **ils se traitent ENSEMBLE le jour de la recalibration.**
+Regroupés ici pour ne pas les perdre.
+
+| # | Écart | Backtest | Production | Effet | À faire à la recalibration |
+|---|---|---|---|---|---|
+| 1 | **Ouverture vs clôture** | cotes de **clôture** | le collecteur relève l'**ouverture** | faible : le dévigage retire la marge des deux côtés | rejouer le backtest sur les cotes d'**ouverture** |
+| 2 | **Marge Pinnacle** | ~**2,84 %** (clôture) | ~**5,2 %** (ouverture) | facette de l'écart n°1 : Pinnacle resserre vers le coup d'envoi | vérifié avec le n°1 |
+| 3 | **Source du plus/moins 2,5** | cotes 2,5 football-data, **moyennées entre books** | book EU **le plus serré** posant une ligne 2,5 | faible : le meilleur book est proche de la moyenne | mesurer la marge OU-2,5 servie (journalisée) ; escalader seulement si le critère ci-dessous est franchi |
+
+**Pourquoi l'écart n°3 existe.** La ligne principale d'un book flotte selon le
+match (2,25 / 2,75 / 3,0…) ; le 2,5 n'est sa ligne principale que ~28 % du temps.
+On prend donc le 2,5 chez le book EU le plus serré qui le poste (couverture 100 %,
+zéro crédit en plus). Le backtest, lui, utilisait le 2,5 de football-data, déjà
+moyenné entre books — donc « meilleur book dispo » est **plus proche** de la
+calibration que forcer Pinnacle pur.
+
+**Critère d'escalade `alternate_totals` — chiffré d'avance.** Le marché
+`alternate_totals` donnerait le 2,5 de Pinnacle garanti, mais coûte **+50 % de
+crédits** sur l'appel cotes. On n'y passe que si le 2,5 gratuit coûte trop en
+marge, **largement et durablement** :
+
+> marge OU-2,5 moyenne du book serveur **> 8 %**, sur **plus de 3 ligues**, tenu
+> sur **≥ 3 nocturnes** consécutifs.
+
+En deçà, la version gratuite reste préférable. Seuils dans `constants.py`
+(`ALT_TOTALS_MARGIN_PCT`, `ALT_TOTALS_MIN_LEAGUES`, `ALT_TOTALS_MIN_NIGHTS`),
+surveillés par `health` à partir de `pipeline_runs.detail.totals_2_5_books` (quel
+book sert le 2,5 et sa marge, par ligue, journalisé chaque nuit). *Une décision
+reportée sans critère est une décision jamais prise* : ce seuil EST la décision.
+Chiffres provisoires, à rejuger ici à la recalibration.
 
 ## Seuil de fragilité (étape 4.5)
 
@@ -301,10 +329,18 @@ clé) — aucun doublon si une nuit échoue puis reprend. Le collecteur : une li
 par fenêtre de 6 h.
 
 **Surveillance.** Chaque exécution ouvre/ferme une ligne `pipeline_runs` avec le
-compte de matchs **par championnat et par source** (cote / modèle / repli).
-`health` sort en code ≠ 0 si un job n'a pas réussi depuis > 36 h (nocturne) ou
-> 12 h (collecteur) — à brancher sur l'alerte. Un pipeline mort en silence, c'est
-une semaine de probabilités périmées servies aux utilisateurs.
+compte de matchs **par championnat et par source** (cote / modèle / repli), le
+**taux de repli par marché coté et par ligue** (`repli_marches`) et **quel book
+sert le plus/moins 2,5, avec sa marge** (`totals_2_5_books`). `health` sort en
+code ≠ 0 si :
+- un job n'a pas réussi depuis > 36 h (nocturne) ou > 12 h (collecteur) ;
+- un marché coté retombe au modèle au-delà de **50 %** de repli (panne de
+  couverture, pas un choix — `REPLI_ALERT`) ;
+- le **critère d'escalade `alternate_totals`** est atteint (voir « Écarts connus »).
+
+Un pipeline mort en silence, c'est une semaine de probabilités périmées servies
+aux utilisateurs — et un marché coté qui bascule au modèle sans qu'on le voie,
+c'est la moitié de l'avantage perdue en silence.
 
 **Fournisseur de données** encapsulé dans `pipeline/provider.py` (règle d'archi
 n°4) : le reste du pipeline ignore d'où viennent calendrier, résultats et cotes.

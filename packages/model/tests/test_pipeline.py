@@ -143,6 +143,33 @@ def test_repli_rates_ranks_worst_first_and_ignores_empty_base():
     assert all(d["base"] > 0 for d in out)  # jamais de base vide
 
 
+def test_totals_book_report_groups_by_league_and_book_with_margin():
+    from mtj_model.pipeline.nightly import _totals_book_report
+    fixtures = [(1, "B1"), (2, "B1"), (3, "N1"), (4, "N1")]
+    odds = {
+        1: {"OVER_2_5": 2.0, "UNDER_2_5": 2.0},    # marge 0 %
+        2: {"OVER_2_5": 1.90, "UNDER_2_5": 1.90},  # marge ~5,26 %
+        3: {"OVER_2_5": 1.80, "UNDER_2_5": 1.80},  # marge ~11,1 %
+        4: {"WIN_HOME": 2.0},                       # pas de 2,5 → ignoré
+    }
+    books = {1: {"OVER_2_5": "pinnacle"}, 2: {"OVER_2_5": "pinnacle"},
+             3: {"UNDER_2_5": "bwin"}, 4: {}}
+    rep = _totals_book_report(fixtures, odds, books)
+    assert rep["B1"] == [{"book": "pinnacle", "matchs": 2, "marge_pct": 2.63}]
+    assert rep["N1"] == [{"book": "bwin", "matchs": 1, "marge_pct": 11.11}]
+
+
+def test_leagues_over_totals_margin_weights_by_matches():
+    from mtj_model.pipeline.nightly import leagues_over_totals_margin
+    night = {
+        "B1": [{"book": "x", "matchs": 8, "marge_pct": 9.0}],           # 9 % > 8 → over
+        "N1": [{"book": "y", "matchs": 6, "marge_pct": 3.0},
+               {"book": "z", "matchs": 2, "marge_pct": 5.0}],           # pondérée 3,5 % → non
+        "T1": [{"book": "w", "matchs": 0, "marge_pct": 20.0}],          # base vide → ignoré
+    }
+    assert leagues_over_totals_margin(night, 8.0) == ["B1"]
+
+
 def test_parse_odds_skips_event_without_bookmaker():
     ev = [{"id": "e", "commence_time": "2026-08-15T14:00:00Z",
            "home_team": "A", "away_team": "B", "bookmakers": []}]

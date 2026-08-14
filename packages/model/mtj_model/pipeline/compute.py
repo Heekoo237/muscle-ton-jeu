@@ -87,7 +87,7 @@ def league_predictions(
     league_code: str,
     ref_date: pd.Timestamp,
     odds_by_fixture: dict[int, dict[str, float]] | None = None,
-    book_by_fixture: dict[int, str] | None = None,
+    book_by_fixture: dict[int, dict[str, str]] | None = None,
     margin_override: bool = False,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat pour ses matchs à venir.
@@ -112,7 +112,8 @@ def league_predictions(
             continue  # équipe inconnue → marchés inconnus, on n'écrit rien
         model_probs = market_probabilities(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
         market_probs = devig_fixture_odds(odds_by_fixture.get(m.fixture_id, {}))
-        book = book_by_fixture.get(int(m.fixture_id))
+        books = book_by_fixture.get(int(m.fixture_id), {})  # {marché: book} — le 1X2 et
+        # le plus/moins 2,5 peuvent venir de books différents (voir provider.parse_odds).
         for marche in PROBABILITY_SOURCE:  # marchés couverts non-BTTS
             proba, source = _resolve(marche, model_probs, market_probs, margin_override)
             rows.append(PredictionRow(
@@ -122,6 +123,6 @@ def league_predictions(
                 confiance=round(confidence_for(league_code, source), 4),
                 source=source,
                 seuil_fragile=FRAGILE_THRESHOLDS.get(marche),
-                bookmaker=book if source == "odds" else None,
+                bookmaker=books.get(marche) if source == "odds" else None,
             ))
     return rows

@@ -48,6 +48,50 @@ def _repli_rates(repli: dict[str, dict[str, list[int]]]) -> list[dict]:
     return out
 
 
+def _totals_book_report(fixtures: list[tuple[int, str]],
+                        odds: dict[int, dict[str, float]],
+                        books: dict[int, dict[str, str]]) -> dict[str, list[dict]]:
+    """Quel book sert le plus/moins 2,5, et sa marge OU, PAR LIGUE.
+
+    `fixtures` : liste (fixture_id, ligue). Renvoie ligue → liste triée
+    {book, matchs, marge_pct}. C'est LA donnée qui dira, plus tard, si escalader
+    vers `alternate_totals` (Pinnacle 2,5 garanti) vaut les crédits — sans elle,
+    on ne pourra jamais trancher (voir README, écarts backtest/production).
+    """
+    acc: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for fid, lg in fixtures:
+        o = odds.get(fid, {})
+        if "OVER_2_5" not in o or "UNDER_2_5" not in o:
+            continue
+        bk = books.get(fid, {})
+        book = bk.get("OVER_2_5") or bk.get("UNDER_2_5") or "?"
+        marge = 1 / o["OVER_2_5"] + 1 / o["UNDER_2_5"] - 1
+        acc[lg][book].append(marge)
+    out: dict[str, list[dict]] = {}
+    for lg, bks in acc.items():
+        rows = [{"book": b, "matchs": len(ms), "marge_pct": round(100 * sum(ms) / len(ms), 2)}
+                for b, ms in bks.items()]
+        rows.sort(key=lambda d: d["matchs"], reverse=True)
+        out[lg] = rows
+    return out
+
+
+def leagues_over_totals_margin(night: dict[str, list[dict]], seuil_pct: float) -> list[str]:
+    """Ligues dont la marge OU-2,5 (pondérée par le nb de matchs) dépasse le seuil.
+
+    Sert le critère d'escalade vers `alternate_totals` (voir README).
+    """
+    over: list[str] = []
+    for lg, rows in (night or {}).items():
+        tot = sum(r["matchs"] for r in rows)
+        if not tot:
+            continue
+        pondere = sum(r["marge_pct"] * r["matchs"] for r in rows) / tot
+        if pondere > seuil_pct:
+            over.append(lg)
+    return over
+
+
 def _fetch_upcoming(con, days: int) -> pd.DataFrame:
     sql = """
         select f.id as fixture_id, l.provider_ref as league_code,
@@ -86,8 +130,12 @@ def _fetch_history(con) -> pd.DataFrame:
     return df
 
 
-def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str, float]], dict[int, str]]:
-    """Dernière cote par (match, marché) + le bookmaker qui l'a fournie."""
+def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str, float]], dict[int, dict[str, str]]]:
+    """Dernière cote par (match, marché) + le bookmaker qui l'a fournie, PAR MARCHÉ.
+
+    Le book est retenu par (match, marché) : depuis le correctif totals, le 1X2 et
+    le plus/moins 2,5 d'un même match peuvent venir de books différents.
+    """
     if not fixture_ids:
         return {}, {}
     sql = """
@@ -97,15 +145,15 @@ def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str,
          order by fixture_id, marche, releve_le desc
     """
     odds: dict[int, dict[str, float]] = defaultdict(dict)
-    books: dict[int, str] = {}
+    books: dict[int, dict[str, str]] = defaultdict(dict)
     with con.cursor() as cur:
         cur.execute(sql, (fixture_ids,))
         for fixture_id, marche, cote, bookmaker in cur.fetchall():
             fid = int(fixture_id)
             odds[fid][marche] = float(cote)
             if bookmaker:
-                books[fid] = bookmaker  # un seul book par match (choisi à la collecte)
-    return dict(odds), books
+                books[fid][marche] = bookmaker
+    return dict(odds), dict(books)
 
 
 def _margins_7d(con) -> dict[str, float]:
@@ -248,6 +296,12 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             repli_rates = _repli_rates(repli)
             if repli_rates:
                 journal["repli_marches"] = repli_rates
+            fixtures_lg = ([(int(f), str(l)) for f, l in
+                            zip(upcoming["fixture_id"], upcoming["league_code"])]
+                           if not upcoming.empty else [])
+            totals_books = _totals_book_report(fixtures_lg, odds, books)
+            if totals_books:
+                journal["totals_2_5_books"] = totals_books
             if switches:
                 journal["bascules"] = switches
             _close_run(con, run_id, statut, fixtures_done, journal)
@@ -265,8 +319,13 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
         print(f"  ⚠ repli élevé sur marché coté (≥ {REPLI_ALERT:.0%}) :")
         for d in hot:
             print(f"      {d['ligue']:<4} {d['marche']:<10} {d['taux']:>5.0%}  ({d['repli']}/{d['base']})")
+    if totals_books:
+        print("  book du plus/moins 2,5 par ligue (marge OU moyenne) :")
+        for lg in sorted(totals_books):
+            parts = ", ".join(f"{r['book']}×{r['matchs']} {r['marge_pct']:.1f}%" for r in totals_books[lg])
+            print(f"      {lg:<4} {parts}")
     return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows),
-            "detail": detail, "repli_marches": repli_rates}
+            "detail": detail, "repli_marches": repli_rates, "totals_2_5_books": totals_books}
 
 
 # Marchés représentatifs : un par famille de source pour montrer l'hybride.

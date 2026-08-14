@@ -12,8 +12,14 @@ import json
 import sys
 from datetime import timedelta
 
-from ..constants import REPLI_ALERT
+from ..constants import (
+    ALT_TOTALS_MARGIN_PCT,
+    ALT_TOTALS_MIN_LEAGUES,
+    ALT_TOTALS_MIN_NIGHTS,
+    REPLI_ALERT,
+)
 from .db import connect
+from .nightly import leagues_over_totals_margin
 
 # Seuils de fraîcheur par job. La nocturne tourne 1×/jour → 36 h laisse rater une
 # nuit sans alerter, mais pas deux. Le collecteur tourne toutes les 6 h.
@@ -113,6 +119,34 @@ def _repli_coverage(cur, alerts: list[str]) -> None:
         )
 
 
+def _totals_escalation(cur, alerts: list[str]) -> None:
+    """Signale quand le critère d'escalade `alternate_totals` est atteint.
+
+    Lit les `totals_2_5_books` des derniers nocturnes. Le 2,5 gratuit devient
+    cher si sa marge OU dépasse le seuil sur trop de ligues, DURABLEMENT : on
+    n'alerte que si la largeur (> N ligues) tient sur les N dernières nuits.
+    """
+    cur.execute(
+        """select detail->'totals_2_5_books'
+             from pipeline_runs
+            where job = 'nightly' and detail ? 'totals_2_5_books'
+            order by demarre_le desc limit %s""",
+        (ALT_TOTALS_MIN_NIGHTS,),
+    )
+    nights = [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in cur.fetchall()]
+    if len(nights) < ALT_TOTALS_MIN_NIGHTS:
+        return  # pas encore assez d'historique pour juger la durabilité
+    counts = [len(leagues_over_totals_margin(n, ALT_TOTALS_MARGIN_PCT)) for n in nights]
+    if all(c > ALT_TOTALS_MIN_LEAGUES for c in counts):
+        alerts.append(
+            f"escalade totals : > {ALT_TOTALS_MIN_LEAGUES} ligues au-dessus de "
+            f"{ALT_TOTALS_MARGIN_PCT:.0f}% de marge OU-2,5 sur {ALT_TOTALS_MIN_NIGHTS} nocturnes "
+            f"(dernier : {counts[0]} ligues) — envisager alternate_totals (voir README)."
+        )
+    else:
+        print(f"escalade    OK — marge 2,5 sous le critère d'escalade sur {len(nights)} nuits")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -121,6 +155,7 @@ def check() -> list[str]:
         _league_silence(cur, alerts)
         _credit_budget(cur, alerts)
         _repli_coverage(cur, alerts)
+        _totals_escalation(cur, alerts)
     return alerts
 
 
