@@ -158,10 +158,19 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 		expect(s.fixtureId).toBe(100);
 	});
 
-	it('équipes reconnues mais aucun match sous 7 jours → hors_fenetre (pas « non couvert »)', () => {
-		const [s] = resolveTicket(raw('Sporting Lisbon - Braga  1  1.80'), F, T);
-		expect(s.etatResolution).toBe('inconnu');
+	it('match trouvé mais au-delà de la période analysée → hors_fenetre', () => {
+		const far: Fixture[] = [
+			...F,
+			{ id: 300, dateUtc: '2099-12-31T18:45:00Z', teamHome: 'Sporting Lisbon', teamAway: 'Braga', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const [s] = resolveTicket(raw('Sporting Lisbon - Braga  1  1.80'), far, T);
 		expect(s.raison).toBe('hors_fenetre');
+		expect(s.fixtureId).toBeNull();
+	});
+
+	it('équipes reconnues mais AUCUN match entre elles → non_resolu (« on n’a pas retrouvé »), pas hors_fenetre', () => {
+		const [s] = resolveTicket(raw('Sporting Lisbon - Braga  1  1.80'), F, T);
+		expect(s.raison).toBe('non_resolu');
 		expect(s.fixtureId).toBeNull();
 	});
 

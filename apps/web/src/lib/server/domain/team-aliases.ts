@@ -27,7 +27,10 @@ export const TEAM_ALIASES: Record<string, string> = {
 	'paris sg': 'paris saint germain',
 	'sporting portugal': 'sporting lisbon',
 	// Çorum FK, ex-Çorum Belediyespor : Betclic garde l'ancien nom, Odds API le nouveau.
-	'corum belediyespor': 'corum fk'
+	'corum belediyespor': 'corum fk',
+	// Vitória SC = Vitória de Guimarães : Betclic dit « Guimaraes », Odds API « SC ».
+	// La contenance par mot ne peut pas rapprocher « guimaraes » et « sc » — alias requis.
+	'vitoria guimaraes': 'vitoria sc'
 };
 
 /** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */

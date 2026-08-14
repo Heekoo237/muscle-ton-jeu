@@ -13,6 +13,7 @@ import type { Fixture, Selection, Team } from '$lib/types';
 import type { RawLine, RawTicketRead } from '$lib/server/services/vision';
 import { resolveMarket, marketLabelFr, splitResultMarket, type MarketResolution } from './market-map';
 import { aliasFor } from './team-aliases';
+import { ANALYSIS_WINDOW_DAYS } from './window';
 
 function normalize(s: string): string {
 	return s
@@ -121,11 +122,23 @@ function diagnoseMatch(matchText: string, fixtures: Fixture[], teams: Team[]): M
 				normalize(f.teamHome) === normalize(homeTeam.nom) &&
 				normalize(f.teamAway) === normalize(awayTeam.nom)
 		);
-		if (fixture) return { kind: 'ok', fixture, homeTeam, awayTeam };
+		// « Hors fenêtre » N'EST vrai que si un match existe RÉELLEMENT entre ces deux
+		// équipes, à une date au-delà de la période analysée. Sinon (aucun match entre
+		// elles), c'est « on n'a pas retrouvé ce match » — pas « hors fenêtre ». Ce
+		// libellé m'avait induit en erreur ; il colle maintenant à la donnée.
+		if (fixture) {
+			const t = Date.parse(fixture.dateUtc);
+			const horizon = Date.now() + ANALYSIS_WINDOW_DAYS * 86_400_000;
+			if (Number.isNaN(t) || t <= horizon) return { kind: 'ok', fixture, homeTeam, awayTeam };
+			console.warn(
+				`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
+			);
+			return { kind: 'hors_fenetre', homeTeam, awayTeam };
+		}
 		console.warn(
-			`[résolution] HORS FENÊTRE « ${matchText} » — équipes reconnues, aucun match à venir en base (trop loin, ou pas encore coté)`
+			`[résolution] NON RETROUVÉ « ${matchText} » — équipes reconnues, mais aucun match entre elles en base`
 		);
-		return { kind: 'hors_fenetre', homeTeam, awayTeam };
+		return { kind: 'non_resolu' };
 	}
 
 	// Au moins un côté non résolu : on diagnostique CHAQUE côté manquant.

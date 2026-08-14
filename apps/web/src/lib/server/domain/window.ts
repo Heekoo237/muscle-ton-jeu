@@ -12,3 +12,13 @@
  * le fournisseur a déjà coté — au-delà, le match n'est pas encore en base).
  */
 export const ANALYSIS_WINDOW_DAYS = 21;
+
+/**
+ * Horizon de RÉSOLUTION : jusqu'où on charge les matchs pour DIAGNOSTIQUER (plus
+ * large que la fenêtre d'analyse). Sert à distinguer honnêtement « le match existe
+ * mais il est au-delà de la période analysée » (hors fenêtre) de « on n'a pas
+ * retrouvé ce match » (aucune fixture entre ces deux équipes). Un match trouvé
+ * entre 21 et 60 jours est réel mais pas encore analysé ; au-delà, il n'est
+ * généralement pas encore coté, donc pas en base → « pas retrouvé ».
+ */
+export const RESOLUTION_HORIZON_DAYS = 60;
