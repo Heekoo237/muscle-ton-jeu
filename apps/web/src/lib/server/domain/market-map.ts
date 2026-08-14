@@ -124,6 +124,45 @@ const AMBIGUOUS_UNDER = new Set(['tm', 'under', 'moins']);
 const OVER_CANDIDATES: Market[] = ['OVER_1_5', 'OVER_2_5', 'OVER_3_5'];
 const UNDER_CANDIDATES: Market[] = ['UNDER_1_5', 'UNDER_2_5', 'UNDER_3_5'];
 
+/**
+ * Certains bookmakers (Betclic…) collent le CHOIX devant le TYPE de marché :
+ *   « Paris SG Résultat du match »  ·  « Nul Résultat du match »
+ *   « Saint-Étienne ou Nul Double chance »
+ * On sépare ici le TYPE (résultat / double chance / les deux marquent) du CHOIX.
+ * Le CHOIX est résolu ENSUITE contre les vraies équipes du match (resolve.ts) —
+ * jamais deviné. Renvoie null si la notation n'est pas un marché « à choix ».
+ *
+ * Les phrases de TYPE sont vérifiées sur de VRAIES captures. Français d'abord
+ * (nos bookmakers sont francophones) ; anglais pour les libellés mixtes.
+ */
+const TYPE_1X2 = [
+	'resultat du match',
+	'resultat final',
+	'match result',
+	'full time result',
+	'1x2',
+	'vainqueur du match'
+];
+const TYPE_DC = ['double chance'];
+const TYPE_BTTS = ['les deux equipes marquent', 'both teams to score', 'les deux marquent'];
+/** Bruit à retirer : « (t. rég) », « temps réglementaire », « (90 min) »… */
+const RESULT_NOISE = /\(?\bt\.?\s*reg\w*\)?|\btemps reglementaire\b|\(90 ?min\)|\(t\.r\)/g;
+
+export interface ResultSplit {
+	kind: '1x2' | 'dc' | 'btts';
+	/** La partie « choix » restante (ex. « paris sg », « nul », « paris sg ou nul »). */
+	choice: string;
+}
+
+export function splitResultMarket(notation: string): ResultSplit | null {
+	let n = normalize(notation).replace(RESULT_NOISE, ' ').replace(/\s+/g, ' ').trim();
+	const strip = (phrase: string): string => n.replace(phrase, ' ').replace(/\s+/g, ' ').trim();
+	for (const p of TYPE_1X2) if (n.includes(p)) return { kind: '1x2', choice: strip(p) };
+	for (const p of TYPE_DC) if (n.includes(p)) return { kind: 'dc', choice: strip(p) };
+	for (const p of TYPE_BTTS) if (n.includes(p)) return { kind: 'btts', choice: strip(p) };
+	return null;
+}
+
 export function resolveMarket(notation: string): MarketResolution {
 	const n = normalize(notation);
 	if (n in TABLE) {

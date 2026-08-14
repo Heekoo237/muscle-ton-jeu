@@ -10,25 +10,34 @@
 
 	const index = $derived(String(selection.ordre).padStart(2, '0'));
 	const etat = $derived(selection.etatResolution);
-	// Marché reconnu comme non couvert (ou déclaré tel) : état CALME, pas une
-	// alerte rouge « corrige ou retire ». La ligne reste, non analysée, non facturée.
-	const nonCouvert = $derived(etat === 'inconnu' && selection.raison === 'non_couvert');
-	const dataState = $derived(nonCouvert ? 'noncouvert' : etat);
+	const raison = $derived(selection.raison);
+	// États CALMES (informatifs, rien à corriger) : marché non couvert, ou match
+	// dans un championnat non couvert. Pas d'alerte rouge. La ligne reste, non
+	// analysée, non facturée.
+	const nonCouvert = $derived(etat === 'inconnu' && raison === 'non_couvert');
+	const horsCouv = $derived(etat === 'inconnu' && raison === 'hors_couverture');
+	const calme = $derived(nonCouvert || horsCouv);
+	const dataState = $derived(calme ? 'noncouvert' : etat);
+	const icone = $derived(etat === 'certain' ? '✓' : calme ? '–' : etat === 'ambigu' ? '▲' : '✕');
 </script>
 
 <button class="line" data-state={dataState} type="button" onclick={() => onOpen(selection)}>
 	<span class="idx">{index}</span>
-	<span class="ic">{etat === 'certain' ? '✓' : nonCouvert ? '–' : etat === 'ambigu' ? '▲' : '✕'}</span>
+	<span class="ic">{icone}</span>
 	<div class="mid">
 		<div class="match">{selection.matchLabel}</div>
 		{#if etat === 'certain'}
 			<div class="market">{selection.libelleFr}</div>
+		{:else if horsCouv}
+			<div class="hint">Championnat non couvert — gardé, non analysé, non facturé</div>
 		{:else if nonCouvert}
 			<div class="hint">Ce marché, on ne le couvre pas — gardé, non analysé</div>
 		{:else if etat === 'ambigu'}
 			<div class="hint oc">À corriger — plusieurs lectures possibles</div>
+		{:else if selection.fixtureId != null}
+			<div class="hint">On n'a pas lu ton pari — tape pour corriger</div>
 		{:else}
-			<div class="hint">Non reconnue — corrige ou retire</div>
+			<div class="hint">On n'a pas lu ce match — tape pour retirer</div>
 		{/if}
 	</div>
 	{#if etat === 'certain' && selection.coteSaisie != null}

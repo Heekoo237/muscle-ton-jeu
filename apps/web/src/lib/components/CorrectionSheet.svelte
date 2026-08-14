@@ -25,6 +25,10 @@
 	// on ne pousse pas la liste des marchés couverts, on explique. La liste reste
 	// dessous, seulement au cas où on aurait mal lu.
 	const dejaNonCouvert = $derived(selection.raison === 'non_couvert');
+	// Match résolu ? Si non (championnat non couvert ou match illisible), choisir
+	// un marché ne sert à rien : on n'affiche PAS la liste, seulement l'info + retrait.
+	const matchResolu = $derived(selection.fixtureId != null);
+	const horsCouverture = $derived(selection.raison === 'hors_couverture');
 
 	const GROUPS: { titre: string; markets: Market[] }[] = [
 		{ titre: 'Résultat', markets: ['WIN_HOME', 'DRAW', 'WIN_AWAY'] },
@@ -50,37 +54,54 @@
 	</div>
 
 	<div class="scroll">
-		{#if dejaNonCouvert}
+		{#if !matchResolu}
+			<!-- Match non résolu : choisir un marché ne servirait à rien (pas de match
+			     en base). On informe, on ne fait pas semblant de pouvoir analyser. -->
 			<div class="nc-banner">
-				<p class="nc-titre">Ce marché, on ne le couvre pas encore.</p>
-				<p class="nc-sous">
-					On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas.
-				</p>
+				{#if horsCouverture}
+					<p class="nc-titre">Ce match n'est pas dans un championnat qu'on couvre.</p>
+					<p class="nc-sous">
+						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas. Tu
+						n'as rien à corriger.
+					</p>
+				{:else}
+					<p class="nc-titre">On n'a pas réussi à lire ce match.</p>
+					<p class="nc-sous">Tu peux le retirer du ticket.</p>
+				{/if}
 			</div>
-			<div class="glabel t-small">Si on a mal lu, choisis ton vrai pari</div>
-		{/if}
-
-		{#each GROUPS as g (g.titre)}
-			<div class="group">
-				<div class="glabel t-small">{g.titre}</div>
-				<div class="chips">
-					{#each g.markets as m (m)}
-						<button
-							type="button"
-							class="chip"
-							class:sel={selection.marche === m}
-							onclick={() => onChoose(m, labelOf(m))}
-						>
-							{labelOf(m)}
-						</button>
-					{/each}
+		{:else}
+			{#if dejaNonCouvert}
+				<div class="nc-banner">
+					<p class="nc-titre">Ce marché, on ne le couvre pas encore.</p>
+					<p class="nc-sous">
+						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas.
+					</p>
 				</div>
-			</div>
-		{/each}
+				<div class="glabel t-small">Si on a mal lu, choisis ton vrai pari</div>
+			{/if}
+
+			{#each GROUPS as g (g.titre)}
+				<div class="group">
+					<div class="glabel t-small">{g.titre}</div>
+					<div class="chips">
+						{#each g.markets as m (m)}
+							<button
+								type="button"
+								class="chip"
+								class:sel={selection.marche === m}
+								onclick={() => onChoose(m, labelOf(m))}
+							>
+								{labelOf(m)}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		{/if}
 	</div>
 
 	<div class="actions-bas">
-		{#if !dejaNonCouvert}
+		{#if matchResolu && !dejaNonCouvert}
 			<button type="button" class="nc-btn" onclick={onNonCouvert}>
 				Ce marché, on ne le couvre pas
 			</button>

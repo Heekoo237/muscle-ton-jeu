@@ -83,8 +83,14 @@ export interface Selection {
 	matchLabel: string;
 	marche: Market | null;
 	etatResolution: ResolutionState;
-	/** Pourquoi la ligne n'est pas certaine (non couvert, inconnu, ambigu). */
-	raison?: 'non_couvert' | 'inconnu' | 'ambigu';
+	/**
+	 * Pourquoi la ligne n'est pas certaine :
+	 *  - 'non_couvert'     : marché hors couverture (buteur, mi-temps…) — gardé.
+	 *  - 'hors_couverture' : match lisible mais championnat non couvert — gardé.
+	 *  - 'ambigu'          : plusieurs lectures possibles (seuil de buts absent).
+	 *  - 'inconnu'         : on n'a pas su lire (match ou pari) — à corriger.
+	 */
+	raison?: 'non_couvert' | 'hors_couverture' | 'inconnu' | 'ambigu';
 	/** Cas ambigu : marchés proposés au choix (jamais deviné). */
 	candidates?: Market[];
 	coteSaisie: number | null;

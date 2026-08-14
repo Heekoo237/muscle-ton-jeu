@@ -136,14 +136,25 @@
 		{/each}
 	</div>
 
-	<form method="POST" action="?/finaliser" class="action" onsubmit={onFinaliser}>
-		<button class="btn-dark" type="submit" disabled={analysables < 1}>
-			Analyser {analysables} match{analysables > 1 ? 's' : ''} sur {total}
-		</button>
-		<p class="t-small compteur">
-			Les lignes rouges ne sont pas comptées
-		</p>
-	</form>
+	{#if analysables < 1}
+		<!-- Rien d'analysable : on ne laisse pas un bouton « Analyser 0 » bloqué. On
+		     le dit clairement et on propose une sortie. -->
+		<div class="rien">
+			<p class="t-body">Aucun match analysable sur ce ticket.</p>
+			<p class="t-small">
+				Les matchs de championnats qu'on ne couvre pas encore, et les marchés non couverts, ne sont
+				pas analysés.
+			</p>
+			<a class="btn-dark centre" href="/analyser">Analyser un autre ticket</a>
+		</div>
+	{:else}
+		<form method="POST" action="?/finaliser" class="action" onsubmit={onFinaliser}>
+			<button class="btn-dark" type="submit">
+				Analyser {analysables} match{analysables > 1 ? 's' : ''} sur {total}
+			</button>
+			<p class="t-small compteur">Les lignes non analysables ne sont pas comptées</p>
+		</form>
+	{/if}
 </main>
 
 {#if open}
@@ -226,5 +237,32 @@
 		color: var(--c-ink-3);
 		text-align: center;
 		margin: 0;
+	}
+	.rien {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		align-items: flex-start;
+		padding: var(--s-4);
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+	}
+	.rien .t-body {
+		margin: 0;
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.rien .t-small {
+		margin: 0;
+		color: var(--c-ink-2);
+	}
+	.btn-dark.centre {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		margin-top: var(--s-2);
+		text-decoration: none;
 	}
 </style>
