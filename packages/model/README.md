@@ -382,6 +382,39 @@ testées sans réseau. `get_provider()` est le seul point de sélection
 > la confiance calibrée (`LEAGUE_CONFIDENCE`) et du ξ. `league_catalog` le relie
 > à la clé The Odds API — les deux référentiels ne se confondent jamais.
 
+### Catalogue de couverture (`pipeline/catalogue.py`)
+
+`python -m mtj_model.pipeline.catalogue` liste **toutes** les compétitions
+football du fournisseur via `/v4/sports?all=true` — appel **gratuit, zéro crédit
+consommé**, lecture seule. Il distingue actives / hors-saison et chiffre le coût
+mensuel de les couvrir toutes, comparé au quota du palier (20 000 crédits/mois).
+
+Sert à trancher l'**univers de couverture** (voir `CLAUDE.md` §« Univers de
+couverture ») : la frontière est le catalogue du fournisseur, pas une liste écrite
+à la main. On couvre le football **européen** que le fournisseur price ; jamais les
+championnats **africains domestiques** (choix produit, pas limite technique).
+Modèle de coût vérifié : `crédits/mois = compétitions × relevés/jour × 30 ×
+marchés × régions`, soit **240 crédits/mois/compétition** au rythme actuel (4/j,
+2 marchés, 1 région). Se lance depuis GitHub Actions
+(`Collecte des cotes` → action `catalogue-competitions`).
+
+### Second fournisseur : API-Football (api-sports.io) — SECOURS TIÈDE, non intégré
+
+> [!NOTE]
+> **Documenté ici, pas branché.** API-Football (api-sports.io) est le **plan B**
+> le jour où The Odds API tomberait ou deviendrait trop cher. Il n'a **aucun flux
+> actif** : pas de collecteur parallèle, pas de double appel, aucune ligne dans le
+> pipeline nocturne. L'encapsulation existante (`pipeline/provider.py`,
+> `get_provider()` sélectionné par `MTJ_PROVIDER`) est le point d'accroche : y
+> ajouter un `ApiFootballProvider` le jour venu ne touche que ce fichier.
+>
+> Différences à anticiper avant toute intégration : API-Football est orienté
+> **données de match** (calendrier, résultats, compositions) plus que **cotes de
+> référence** — Pinnacle n'y est pas la référence de dé-vigeage qu'il est chez The
+> Odds API. Le régime « cote seule » y serait donc à revalider. Tant que The Odds
+> API tient, on ne l'active pas : un second flux qui tourne « au cas où » brûle du
+> quota et double la surface de bug pour zéro bénéfice.
+
 ## Commandes
 
 ```bash

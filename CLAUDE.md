@@ -107,6 +107,27 @@ Un marché non couvert est affiché « non analysé » et n'est jamais facturé.
 
 ---
 
+## Univers de couverture — le football EUROPÉEN, jamais l'africain
+
+Nos utilisateurs sont en Afrique francophone. Ce qu'ils **jouent** ne l'est pas : ils parient sur le football **européen**. C'est ce football-là que le produit couvre.
+
+**On ne couvre PAS les championnats africains domestiques. C'est un choix, pas une limite à lever plus tard.** Personne dans cette cible ne compose son ticket sur la D1 camerounaise. Prétendre couvrir ces ligues nous ferait produire des chiffres sur des matchs qu'aucune source ne price correctement — ce qui viole la règle d'or n°1.
+
+**La frontière de couverture, c'est le catalogue du fournisseur de cotes** (The Odds API). La règle par défaut est simple : **on couvre tout ce que le fournisseur price, sauf raison contraire documentée.** Un championnat absent du catalogue n'est pas couvert ; un match dans un championnat absent est `hors_couverture` — gardé dans le ticket, jamais analysé, jamais facturé, jamais deviné.
+
+**Deux régimes de probabilité, selon ce qu'on sait du championnat :**
+
+| Régime | Quand | Source | Confiance | Ce que le texte a le droit de dire |
+|---|---|---|---|---|
+| **Modèle calibré** | Championnats backtestés (les 11 européens de 1re division) | modèle Dixon-Coles + cotes dé-vigées | normale à faible selon l'ECE | peut évoquer une précision **mesurée** |
+| **Cote seule** | Tout autre championnat que le fournisseur price mais qu'on n'a pas backtesté | cote dé-vigée uniquement, barre de fragilité **fixe et conservatrice** | **basse, toujours** | « d'après les cotes » — **jamais laisser croire qu'on a mesuré quoi que ce soit** |
+
+En régime **cote seule**, le rédacteur ne prononce jamais un mot qui suggère une calibration, un backtest, une précision vérifiée. La seule honnêteté disponible est : « c'est ce que disent les cotes ». Une probabilité reste un nombre déterministe issu du dé-vigeage (calcul, pas LLM) — la règle d'or n°1 tient dans les deux régimes.
+
+Le second fournisseur (API-Football) est un **secours tiède** : interface prête, jamais un flux parallèle actif. Documenté dans `packages/model/README.md`, pas intégré.
+
+---
+
 ## Ton et rédaction
 
 - **Tutoiement partout**

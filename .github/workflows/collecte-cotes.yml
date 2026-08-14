@@ -17,6 +17,7 @@ on:
         type: choice
         default: collecter
         options:
+          - catalogue-competitions # liste TOUTES les compétitions foot chez le fournisseur + coût (gratuit)
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - migrer-base           # crée/complète les tables dans Supabase
           - backfill-historique   # charge 3 saisons football-data (une fois)
@@ -52,6 +53,10 @@ jobs:
 
       - name: Installer le paquet et ses dépendances
         run: pip install -e .
+
+      - name: Catalogue des compétitions football chez le fournisseur (gratuit, /sports)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'catalogue-competitions'
+        run: python -m mtj_model.pipeline.catalogue
 
       - name: Vérifier la couverture des 11 championnats
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-couverture'
