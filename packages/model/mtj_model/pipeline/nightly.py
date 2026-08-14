@@ -26,6 +26,7 @@ import pandas as pd
 from ..constants import ODDS_MARKETS, REPLI_ALERT
 from .compute import PredictionRow, league_predictions, league_predictions_cote_seule
 from .db import connect
+from .predictions_io import fetch_latest_odds, write_predictions
 from .provider import NullProvider, get_provider
 from .source_mode import next_mode
 
@@ -134,32 +135,6 @@ def _fetch_history(con) -> pd.DataFrame:
     return df
 
 
-def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str, float]], dict[int, dict[str, str]]]:
-    """Dernière cote par (match, marché) + le bookmaker qui l'a fournie, PAR MARCHÉ.
-
-    Le book est retenu par (match, marché) : depuis le correctif totals, le 1X2 et
-    le plus/moins 2,5 d'un même match peuvent venir de books différents.
-    """
-    if not fixture_ids:
-        return {}, {}
-    sql = """
-        select distinct on (fixture_id, marche) fixture_id, marche, cote, bookmaker
-          from odds_snapshots
-         where fixture_id = any(%s)
-         order by fixture_id, marche, releve_le desc
-    """
-    odds: dict[int, dict[str, float]] = defaultdict(dict)
-    books: dict[int, dict[str, str]] = defaultdict(dict)
-    with con.cursor() as cur:
-        cur.execute(sql, (fixture_ids,))
-        for fixture_id, marche, cote, bookmaker in cur.fetchall():
-            fid = int(fixture_id)
-            odds[fid][marche] = float(cote)
-            if bookmaker:
-                books[fid][marche] = bookmaker
-    return dict(odds), dict(books)
-
-
 def _fetch_regimes(con) -> dict[str, str]:
     """fd_code (= provider_ref des leagues) → régime ('modele' | 'cote_seule').
 
@@ -215,26 +190,6 @@ def _apply_source_modes(con, marges_7d: dict[str, float]) -> tuple[set[str], lis
     return model_leagues, switches
 
 
-def _write_predictions(con, rows: list[PredictionRow], jour: date) -> None:
-    sql = """
-        insert into predictions
-            (fixture_id, marche, jour_calcul, probabilite, confiance, source, seuil_fragile, bookmaker, calcule_le)
-        values (%s, %s, %s, %s, %s, %s, %s, %s, now())
-        on conflict (fixture_id, marche, jour_calcul) do update set
-            probabilite   = excluded.probabilite,
-            confiance     = excluded.confiance,
-            source        = excluded.source,
-            seuil_fragile = excluded.seuil_fragile,
-            bookmaker     = excluded.bookmaker,
-            calcule_le    = now()
-    """
-    with con.cursor() as cur:
-        cur.executemany(sql, [
-            (r.fixture_id, r.marche, jour, r.probabilite, r.confiance, r.source, r.seuil_fragile, r.bookmaker)
-            for r in rows
-        ])
-
-
 def _open_run(con, jour: date) -> int:
     with con.cursor() as cur:
         cur.execute(
@@ -280,7 +235,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             upcoming = _fetch_upcoming(con, days)
             history = _fetch_history(con)
             fixture_ids = [int(x) for x in upcoming["fixture_id"].tolist()] if not upcoming.empty else []
-            odds, books = _fetch_latest_odds(con, fixture_ids)
+            odds, books = fetch_latest_odds(con, fixture_ids)
 
             # Bascule cote ↔ modèle sur marge excessive (hystérésis 10 %/8 %).
             marges_7d = _margins_7d(con)
@@ -309,7 +264,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                             repli[fd][r.marche][0] += 1
                 all_rows.extend(rows)
 
-            _write_predictions(con, all_rows, jour)
+            write_predictions(con, all_rows, jour)
             fixtures_done = len({r.fixture_id for r in all_rows})
             statut = "success" if fixtures_done else "partial"
             journal: dict = dict(detail)

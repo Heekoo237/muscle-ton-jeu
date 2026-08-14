@@ -10,9 +10,15 @@ matchs et équipes manquants (rattachement), et historise les cotes dans
 Idempotence : une seule ligne par fenêtre de 6 h (fixture × marché × bookmaker) —
 deux passages dans la même fenêtre mettent à jour la même ligne, sans doublon.
 
-Ce job ne calcule AUCUNE probabilité. Il relève et historise, rien d'autre.
-On ne le fusionne jamais avec le nocturne : les cotes bougent toute la journée,
-les probabilités se figent une fois par nuit.
+Ce job n'ajuste AUCUN modèle. Mais il écrit, dans la foulée, les prédictions
+COTE SEULE — un simple dévigeage déterministe de la cote qu'il vient de relever,
+via la MÊME fonction que le nocturne (`predictions_io.cote_seule_rows`), d'où une
+valeur identique (invariant `test_two_writers.py`). Cela comble le trou où un
+match coté restait « pas encore de données » jusqu'à la nuit. Le MODÈLE, lui,
+reste au nocturne : il a besoin de l'ajustement Dixon-Coles, une fois par nuit.
+
+On ne fusionne pas les deux jobs pour autant : les cotes bougent toute la journée
+(collecte 6 h), l'ajustement du modèle se fige une fois par nuit.
 """
 from __future__ import annotations
 
@@ -22,6 +28,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from .db import connect, window_6h
+from .predictions_io import cote_seule_rows, write_predictions
 from .provider import NullProvider, get_provider
 from .quota import assert_quota_ok, planned_monthly_credits
 from .sync import league_worklist, resolve_fixture, slots_for
@@ -93,6 +100,11 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
     detail: dict[str, int] = defaultdict(int)
     marges: dict[str, dict] = {}
     erreurs: dict[str, str] = {}
+    # Prédictions COTE SEULE écrites dans la foulée (par ligue + total). On les
+    # journalise TOUJOURS, même à zéro : un zéro un jour de collecte doit se voir.
+    preds_par_ligue: dict[str, int] = {}
+    preds_total = 0
+    jour = now.date()
     total = 0
     with connect() as con:
         run_id = _open_run(con)
@@ -120,16 +132,29 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
                 with con.transaction():
                     odds = provider.odds(lg["odds_api_key"], days_ahead=days)
                     fixture_cache: dict[str, int] = {}
+                    touched: set[int] = set()
                     for o in odds:
                         fid = fixture_cache.get(o.fixture_ref)
                         if fid is None:
                             fid = resolve_fixture(con, lg["league_id"], o)
                             fixture_cache[o.fixture_ref] = fid
                         _write_snapshot(con, fid, o.marche, o.bookmaker, o.cote, fenetre)
+                        touched.add(fid)
                         detail[lg["fd_code"]] += 1
                         total += 1
                     if odds:
                         marges[lg["fd_code"]] = _margins(odds)
+                    # COTE SEULE : on écrit la prédiction TOUT DE SUITE, sans attendre
+                    # le nocturne. Dévigeage déterministe (aucun modèle, aucun
+                    # historique), lu depuis les snapshots qu'on vient d'écrire, via la
+                    # MÊME fonction que le nocturne (predictions_io.cote_seule_rows) →
+                    # valeur identique, deux écrivains sans divergence. Le modèle, lui,
+                    # reste au nocturne (il a besoin de l'ajustement Dixon-Coles).
+                    if lg["regime"] == "cote_seule" and touched:
+                        rows = cote_seule_rows(con, lg["fd_code"], touched)
+                        write_predictions(con, rows, jour)
+                        preds_par_ligue[lg["fd_code"]] = len(rows)
+                        preds_total += len(rows)
             except Exception as exc:  # noqa: BLE001
                 erreurs[lg["fd_code"]] = str(exc)[:300]
 
@@ -142,6 +167,10 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
             "fenetre": fenetre.isoformat(), "credits": credits,
             "credits_restants": restants, "palier_detecte": palier,
             "plan_mensuel": plan_mensuel, "marges": marges,
+            # Prédictions cote seule écrites en direct (par ligue + total). Toujours
+            # présent, même à zéro — un zéro doit se voir dans le journal.
+            "predictions_cote_seule": preds_total,
+            "predictions_cote_seule_par_ligue": preds_par_ligue,
         }
         if erreurs:
             journal["erreurs"] = erreurs
@@ -152,7 +181,11 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
         m = marges.get(lg, {})
         book = m.get("book", "—")
         mg = m.get("marge_1x2_pct")
-        print(f"  {lg:<5} {n:>4} cotes  ·  {book:<12} marge 1X2 {mg if mg is not None else '—'}%")
+        preds = preds_par_ligue.get(lg)
+        pred_txt = f"  ·  {preds} prédictions cote seule" if preds is not None else ""
+        print(f"  {lg:<5} {n:>4} cotes  ·  {book:<12} marge 1X2 {mg if mg is not None else '—'}%{pred_txt}")
+    # Toujours affiché, même à zéro : c'est le signal que l'écriture en direct vit.
+    print(f"Prédictions cote seule écrites en direct : {preds_total}")
     for lg, e in sorted(erreurs.items()):
         print(f"  {lg:<5} ÉCHEC : {e}")
     if credits is not None:
@@ -162,7 +195,7 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
               f"plan mensuel (fréquence graduée) ≈ {plan_mensuel} / mois")
     return {"fenetre": fenetre.isoformat(), "snapshots": total, "statut": statut,
             "credits": credits, "palier_detecte": palier, "plan_mensuel": plan_mensuel,
-            "erreurs": erreurs}
+            "predictions_cote_seule": preds_total, "erreurs": erreurs}
 
 
 def main() -> None:

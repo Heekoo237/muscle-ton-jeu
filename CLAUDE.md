@@ -74,12 +74,14 @@ Cette règle est juridique autant que produit. Proposer une sélection que l'uti
 
 | # | Règle |
 |---|---|
-| 1 | Toute probabilité vient de la table `predictions`, remplie par le pipeline nocturne |
+| 1 | Toute probabilité vient de la table `predictions`, remplie par des jobs batch **déterministes** : le nocturne pour le modèle, le collecteur pour la cote seule. Le chemin temps réel **lit**, il ne calcule jamais |
 | 2 | Le chemin temps réel ne calcule jamais de probabilité — il lit |
 | 3 | Un marché non reconnu est INCONNU. L'état « probable » n'existe pas |
 | 4 | Le fournisseur de données sportives est encapsulé dans un seul fichier de service |
 | 5 | Le serveur n'envoie jamais au navigateur un contenu non payé. Le floutage CSS est interdit |
 | 6 | Deux agrégateurs de paiement sont branchés. Aucun point de défaillance unique |
+
+**Pourquoi deux écrivains (règle n°1).** Le modèle (Dixon-Coles) a besoin d'un ajustement : il ne peut se calculer qu'une fois par nuit, au nocturne. La cote seule, elle, est un simple dévigeage déterministe de la cote — disponible dès que la cote est en base. Faire attendre le nocturne pour l'écrire créait un trou : un match coté à midi restait « pas encore de données » jusqu'à l'aube. Le collecteur l'écrit donc dans la foulée de la collecte. Les deux écrivains passent par **la même fonction** (`predictions_io.cote_seule_rows` → `league_predictions_cote_seule`), alimentée par **la même lecture de cotes** : sur une même entrée, une même valeur — aucune divergence possible. L'invariant est **vérifié**, pas supposé (`test_two_writers.py`). Ce qui ne change pas : le chemin temps réel **lit** toujours, il ne calcule rien ; la source reste `cote_seule`/`cote_derivee`, confiance basse.
 
 ---
 
