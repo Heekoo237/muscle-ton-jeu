@@ -26,6 +26,7 @@ import pandas as pd
 from .compute import PredictionRow, league_predictions
 from .db import connect
 from .provider import NullProvider, get_provider
+from .source_mode import next_mode
 
 DEFAULT_DAYS = 7
 
@@ -88,6 +89,50 @@ def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str,
             if bookmaker:
                 books[fid] = bookmaker  # un seul book par match (choisi à la collecte)
     return dict(odds), books
+
+
+def _margins_7d(con) -> dict[str, float]:
+    """Marge 1X2 moyenne sur 7 j par ligue (fraction), depuis les runs collecteur."""
+    acc: dict[str, list[float]] = defaultdict(list)
+    with con.cursor() as cur:
+        cur.execute(
+            """select detail->'marges' from pipeline_runs
+                where job='collector' and demarre_le > now() - interval '7 days'
+                  and detail ? 'marges'"""
+        )
+        for (marges,) in cur.fetchall():
+            for fd, m in (marges or {}).items():
+                v = m.get("marge_1x2_pct")
+                if v is not None:
+                    acc[fd].append(float(v) / 100.0)  # % → fraction
+    return {fd: sum(xs) / len(xs) for fd, xs in acc.items() if xs}
+
+
+def _apply_source_modes(con, marges_7d: dict[str, float]) -> tuple[set[str], list[dict]]:
+    """Applique l'hystérésis, persiste l'état, renvoie (ligues en mode modèle, bascules)."""
+    with con.cursor() as cur:
+        cur.execute("select fd_code, mode from league_source_state")
+        current = {fd: mode for fd, mode in cur.fetchall()}
+
+        model_leagues: set[str] = set()
+        switches: list[dict] = []
+        for fd, marge in marges_7d.items():
+            decision = next_mode(current.get(fd), marge)
+            if decision.mode == "model":
+                model_leagues.add(fd)
+            if decision.changed:
+                switches.append({"ligue": fd, "vers": decision.mode, "raison": decision.reason})
+            cur.execute(
+                """insert into league_source_state (fd_code, mode, marge_7j, bascule_le, maj_le)
+                     values (%s, %s, %s, case when %s then now() else null end, now())
+                   on conflict (fd_code) do update set
+                     mode = excluded.mode,
+                     marge_7j = excluded.marge_7j,
+                     bascule_le = case when %s then now() else league_source_state.bascule_le end,
+                     maj_le = now()""",
+                (fd, decision.mode, round(marge, 4), decision.changed, decision.changed),
+            )
+    return model_leagues, switches
 
 
 def _write_predictions(con, rows: list[PredictionRow], jour: date) -> None:
@@ -157,20 +202,30 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             fixture_ids = [int(x) for x in upcoming["fixture_id"].tolist()] if not upcoming.empty else []
             odds, books = _fetch_latest_odds(con, fixture_ids)
 
+            # Bascule cote ↔ modèle sur marge excessive (hystérésis 10 %/8 %).
+            marges_7d = _margins_7d(con)
+            model_leagues, switches = _apply_source_modes(con, marges_7d)
+
             ref_date = pd.Timestamp(jour)
             all_rows: list[PredictionRow] = []
-            detail: dict[str, dict[str, int]] = defaultdict(lambda: {"odds": 0, "model": 0, "repli": 0})
+            detail: dict = defaultdict(lambda: {"odds": 0, "model": 0, "repli": 0, "model_marge_excessive": 0})
             for league_code, up in upcoming.groupby("league_code"):
+                fd = str(league_code)
                 hist = history[history["league_code"] == league_code]
-                rows = league_predictions(hist, up, str(league_code), ref_date, odds, books)
+                rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
                 for r in rows:
-                    detail[str(league_code)][r.source] += 1
+                    detail[fd][r.source] += 1
                 all_rows.extend(rows)
 
             _write_predictions(con, all_rows, jour)
             fixtures_done = len({r.fixture_id for r in all_rows})
             statut = "success" if fixtures_done else "partial"
-            _close_run(con, run_id, statut, fixtures_done, detail)
+            journal: dict = dict(detail)
+            if switches:
+                journal["bascules"] = switches
+            _close_run(con, run_id, statut, fixtures_done, journal)
+            for sw in switches:
+                print(f"  BASCULE {sw['ligue']} → {sw['vers']} ({sw['raison']})")
         except Exception as exc:  # noqa: BLE001 — on journalise puis on relève
             _close_run(con, run_id, "failed", 0, {}, erreur=str(exc)[:2000])
             raise

@@ -27,6 +27,7 @@ from ..constants import (
 from ..markets import market_probabilities
 from ..poisson import score_matrix
 from ..strength import fit_league
+from .source_mode import SOURCE_MODEL_MARGIN
 
 GRID = 11  # taille de la grille de scores (cohérent avec le backtest)
 
@@ -63,10 +64,17 @@ def devig_fixture_odds(raw: dict[str, float]) -> dict[str, float]:
     return out
 
 
-def _resolve(marche: str, model_probs: dict[str, float], market_probs: dict[str, float]):
-    """(probabilité, source) pour un marché, selon l'architecture hybride."""
+def _resolve(marche: str, model_probs: dict[str, float], market_probs: dict[str, float], margin_override: bool):
+    """(probabilité, source) pour un marché, selon l'architecture hybride.
+
+    `margin_override` : la ligue est en mode « modèle » car le book disponible est
+    trop margé. On ignore alors la cote des marchés « odds » et on prend le modèle,
+    en marquant la source « model_marge_excessive » (distincte de « model »).
+    """
     configured = PROBABILITY_SOURCE[marche]
     if configured == "odds":
+        if margin_override:
+            return model_probs[marche], SOURCE_MODEL_MARGIN
         if marche in market_probs:
             return market_probs[marche], "odds"
         return model_probs[marche], "repli"  # cote absente → repli modèle
@@ -80,6 +88,7 @@ def league_predictions(
     ref_date: pd.Timestamp,
     odds_by_fixture: dict[int, dict[str, float]] | None = None,
     book_by_fixture: dict[int, str] | None = None,
+    margin_override: bool = False,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat pour ses matchs à venir.
 
@@ -105,7 +114,7 @@ def league_predictions(
         market_probs = devig_fixture_odds(odds_by_fixture.get(m.fixture_id, {}))
         book = book_by_fixture.get(int(m.fixture_id))
         for marche in PROBABILITY_SOURCE:  # marchés couverts non-BTTS
-            proba, source = _resolve(marche, model_probs, market_probs)
+            proba, source = _resolve(marche, model_probs, market_probs, margin_override)
             rows.append(PredictionRow(
                 fixture_id=int(m.fixture_id),
                 marche=marche,

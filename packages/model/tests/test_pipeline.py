@@ -158,3 +158,28 @@ def test_normalize_collapses_variants():
     assert normalize_team_name("FC Barcelone") == "barcelone"
     assert normalize_team_name("Atlético Madrid") == "atletico madrid"
     assert normalize_team_name("Man Utd") == "manchester united"
+
+
+# --- Hystérésis de la bascule cote ↔ modèle -------------------------------
+from mtj_model.pipeline.source_mode import next_mode  # noqa: E402
+
+
+def test_hysteresis_switch_to_model_above_10pct():
+    d = next_mode("odds", 0.18)   # Grèce à 18 %
+    assert d.mode == "model" and d.changed
+
+
+def test_hysteresis_stays_between_8_and_10():
+    # 9 % : au-dessus de 8, en dessous de 10 → aucune bascule dans un sens ou l'autre
+    assert next_mode("odds", 0.09).mode == "odds"
+    assert next_mode("model", 0.09).mode == "model"
+    assert not next_mode("odds", 0.09).changed
+
+
+def test_hysteresis_returns_to_odds_below_8pct():
+    d = next_mode("model", 0.07)
+    assert d.mode == "odds" and d.changed
+
+
+def test_hysteresis_no_switch_without_data():
+    assert not next_mode("model", None).changed

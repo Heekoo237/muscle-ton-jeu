@@ -100,6 +100,35 @@ Le détail machine est dans `constants.py` (`PROBABILITY_SOURCE`).
 > (`CONFIDENCE_ON_FALLBACK`). On ne présente jamais un repli modèle comme une
 > lecture de marché.
 
+## Bascule cote ↔ modèle sur marge excessive
+
+Le dévigage a été calibré sur Pinnacle. Sur les ligues où Pinnacle est absent
+(Grèce, Écosse…), un autre bookmaker sert, parfois à marge très élevée (Grèce :
+betclic **18 %**, contre ~5 % pour Pinnacle). À 18 % de marge le book n'est pas
+« sharp » : sa cote 1X2 est moins fiable que le modèle calibré. Décision produit :
+
+- Une ligue **bascule vers le modèle** si sa **marge 1X2 moyenne sur 7 j > 10 %**.
+- Elle **revient à la cote** seulement si elle repasse **sous 8 %** sur 7 j
+  (**hystérésis**, pour ne pas osciller ; jamais de bascule sur un seul relevé).
+- Dans ce cas la source est **`model_marge_excessive`** (distincte de `model` =
+  marché sans cote) et la **confiance est plafonnée à « modérée »**.
+- Chaque bascule est journalisée dans `pipeline_runs.detail.bascules`.
+
+État mémorisé dans `league_source_state` ; logique pure et testée dans
+`source_mode.py`. Marge mesurée et journalisée par le collecteur
+(`pipeline_runs.detail.marges`).
+
+> [!WARNING]
+> **Écart connu backtest vs production — à revérifier à la prochaine recalibration.**
+> Le backtest a été calibré sur la marge de **clôture** Pinnacle (~2,84 %). En
+> production, le collecteur relève l'**ouverture** (~5,2 % pour Pinnacle) — c'est
+> le comportement normal de Pinnacle, qui resserre vers le coup d'envoi, pas une
+> erreur. Mais **la source de production est structurellement plus large que celle
+> du backtest.** Le dévigage puissance retire la marge dans les deux cas, donc
+> l'effet sur les probabilités est faible ; à confirmer néanmoins en rejouant le
+> backtest sur les cotes d'**ouverture** (voir note ci-dessous) lors de la
+> prochaine recalibration.
+
 ## Seuil de fragilité (étape 4.5)
 
 Une sélection est **fragile** si sa probabilité passe sous le seuil de **son

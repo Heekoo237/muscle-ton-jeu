@@ -151,14 +151,15 @@ def confidence_for(league_code: str, source: str) -> float:
 
     - source "odds"  : le marché a fixé le prix → confiance « normale ».
     - source "model" : confiance = palier de calibration du championnat (4.3).
-    - source "repli" : cote attendue mais absente → jamais mieux que « modérée »
-      (règle CONFIDENCE_ON_FALLBACK), et jamais au-dessus du palier de la ligue.
+    - source "repli" / "model_marge_excessive" : la cote attendue est absente ou
+      trop margée pour être fiable → jamais mieux que « modérée »
+      (CONFIDENCE_ON_FALLBACK), et jamais au-dessus du palier de la ligue.
     """
     league = LEAGUE_CONFIDENCE.get(league_code, DEFAULT_CONFIDENCE)
     if source == "odds":
         label = "normale"
-    elif source == "repli":
-        # le minimum (plus prudent) entre le repli et le palier de la ligue
+    elif source in ("repli", "model_marge_excessive"):
+        # le minimum (plus prudent) entre le plafond de repli et le palier de la ligue
         order = ("faible", "modérée", "normale")
         label = min(CONFIDENCE_ON_FALLBACK, league, key=order.index)
     else:  # model
