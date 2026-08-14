@@ -13,15 +13,16 @@
 		return `${v.toString().replace('.', ',')} %`;
 	}
 
-	const analysables = $derived(data.lignes.filter((l) => l.analysable));
-	const nbFragiles = $derived(analysables.filter((l) => l.fragile).length);
+	const nbFragiles = $derived(data.lignes.filter((l) => l.analysable && l.fragile).length);
+	// Toutes les lignes, non analysées comprises : neutres, jamais retirées.
 	const paperLines = $derived(
-		analysables.map((l) => ({
+		data.lignes.map((l) => ({
 			matchLabel: l.matchLabel,
 			libelleFr: l.libelleFr,
 			fragile: l.fragile,
 			retiree: l.retiree,
-			mentionNeutre: l.mentionNeutre
+			mentionNeutre: l.mentionNeutre,
+			analysable: l.analysable
 		}))
 	);
 

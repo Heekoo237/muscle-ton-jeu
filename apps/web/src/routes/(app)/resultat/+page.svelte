@@ -18,14 +18,16 @@
 		return `${v.toString().replace('.', ',')} %`;
 	}
 
-	const analysables = $derived(vm.lignes.filter((l) => l.analysable));
+	// Toutes les lignes, y compris les non analysées : elles restent dans les deux
+	// tickets (jamais retirées), affichées neutres avec la mention « non analysé ».
 	const paperLines = $derived(
-		analysables.map((l) => ({
+		vm.lignes.map((l) => ({
 			matchLabel: l.matchLabel,
 			libelleFr: l.libelleFr,
 			fragile: l.fragile,
 			retiree: l.retiree,
-			mentionNeutre: l.mentionNeutre
+			mentionNeutre: l.mentionNeutre,
+			analysable: l.analysable
 		}))
 	);
 

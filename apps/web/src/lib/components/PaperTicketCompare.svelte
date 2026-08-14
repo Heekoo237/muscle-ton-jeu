@@ -13,6 +13,9 @@
 		retiree: boolean;
 		// Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre.
 		mentionNeutre?: boolean;
+		// Marché non couvert : ligne NEUTRE (ni ocre, ni barrée, ni fragile). Elle
+		// reste dans les deux tickets — on n'a simplement pas pu la lire.
+		analysable?: boolean;
 	};
 
 	let {
@@ -51,6 +54,7 @@
 								{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}
 							</div>
 							<div class="pmarket">{l.libelleFr}</div>
+							{#if l.analysable === false}<div class="pnote muted">non analysé</div>{/if}
 						</div>
 					{/each}
 				</div>
@@ -82,7 +86,11 @@
 						<div class="pline">
 							<div class="pmatch" class:strike={l.retiree}>{l.matchLabel}</div>
 							<div class="pmarket" class:strike={l.retiree}>{l.libelleFr}</div>
-							{#if l.mentionNeutre}<div class="pnote">la moins solide de ton ticket</div>{/if}
+							{#if l.analysable === false}
+								<div class="pnote muted">non analysé</div>
+							{:else if l.mentionNeutre}
+								<div class="pnote">la moins solide de ton ticket</div>
+							{/if}
 						</div>
 					{/each}
 				</div>
@@ -201,6 +209,10 @@
 		color: var(--c-ink-3);
 		padding-left: 14px;
 		font-style: italic;
+	}
+	/* Mention non analysée : grise, NEUTRE (ni ocre, ni italique d'alerte). */
+	.pnote.muted {
+		font-style: normal;
 	}
 	.ptotal {
 		display: flex;

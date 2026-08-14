@@ -1,6 +1,7 @@
 import type { LayoutServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { hasRecharged } from '$lib/server/fixtures/userStore';
+import { DEMO_MODE } from '$lib/server/demo';
 
 /**
  * Chrome du produit connecté. On ne bloque jamais l'entrée : même sans crédits ni
@@ -14,6 +15,8 @@ export const load: LayoutServerLoad = async (event) => {
 		connecte: session !== null,
 		credits: session?.credits ?? 0,
 		prenom: session?.prenom ?? null,
-		montreCredits: session ? await hasRecharged(session.userId) : false
+		montreCredits: session ? await hasRecharged(session.userId) : false,
+		// Signale le mode démo à l'écran (bandeau) : on ne s'y trompe pas au coup d'œil.
+		demo: DEMO_MODE
 	};
 };

@@ -5,16 +5,30 @@
  * (bandeau animé, historique, statistiques) tant que le pipeline n'alimente pas
  * encore la base. Rien ici n'est réel.
  *
- * ⚠️ TEMPORAIRE — pour revenir aux vraies données uniquement, passer
- *    DEMO_MODE à false (ou supprimer les branches `if (DEMO_MODE)` des loaders).
- *    Aucune de ces valeurs ne doit survivre en production.
+ * ⚠️ TEMPORAIRE — jamais de démo servie à un vrai utilisateur.
+ *
+ * Le mode démo est piloté par `PUBLIC_DEMO_MODE`. Par SÉCURITÉ, il est DÉSACTIVÉ
+ * par défaut : seule la valeur exacte « true » l'active. Une variable oubliée,
+ * vide ou mal orthographiée laisse la démo ÉTEINTE — on ne compte jamais sur une
+ * config correcte pour éviter de servir du factice (même logique que le garde-fou
+ * anti-factice). Quand il est actif, un bandeau visible le signale à l'écran.
  *
  * Les règles d'or tiennent quand même : aucun nom de personne, aucune promesse
  * de gain, les résultats défavorables à nos analyses sont montrés aussi.
  */
 import type { ExplicationVM, HistoryItem, LineVM } from '$lib/types';
+import { env } from '$env/dynamic/public';
 
-export const DEMO_MODE = true;
+/**
+ * Règle de sécurité (testable) : SEULE la valeur exacte « true » active la démo.
+ * Absent, vide, « false », « 1 », « yes »… → ÉTEINT. Une variable oubliée ne
+ * rallume jamais la démo.
+ */
+export function demoEnabled(raw: string | undefined): boolean {
+	return (raw ?? '').trim().toLowerCase() === 'true';
+}
+
+export const DEMO_MODE = demoEnabled(env.PUBLIC_DEMO_MODE);
 
 /* ---- Bandeau d'historique (≥ 20 pour s'afficher) ---- */
 export function demoHistoryItems(): HistoryItem[] {
