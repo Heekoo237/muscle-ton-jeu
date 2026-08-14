@@ -168,13 +168,21 @@ class TheOddsApiProvider:
 
     def __init__(self, api_key: str):
         self._key = api_key
+        self.credits_used = 0            # crédits consommés cette session (somme des requêtes)
+        self.credits_remaining: int | None = None  # crédits restants sur le palier
 
     def _get(self, path: str, params: dict) -> list[dict]:
         params = {"apiKey": self._key, **params}
         url = f"{API_BASE}/{path}?{urllib.parse.urlencode(params)}"
         req = urllib.request.Request(url, headers={"User-Agent": "mtj-pipeline/1.0"})
         with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310 (URL maîtrisée)
-            return json.loads(r.read())
+            payload = json.loads(r.read())
+            # The Odds API facture par en-têtes : coût de CETTE requête + solde.
+            self.credits_used += int(r.headers.get("x-requests-last") or 0)
+            remaining = r.headers.get("x-requests-remaining")
+            if remaining is not None:
+                self.credits_remaining = int(float(remaining))
+        return payload
 
     def sports(self) -> list[dict]:
         return self._get("sports", {"all": "true"})

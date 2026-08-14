@@ -88,7 +88,9 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
                 erreurs[lg["fd_code"]] = str(exc)[:300]
 
         statut = "success" if not erreurs else ("failed" if len(erreurs) == len(leagues) else "partial")
-        journal = dict(detail) | {"fenetre": fenetre.isoformat()}
+        credits = getattr(provider, "credits_used", None)
+        restants = getattr(provider, "credits_remaining", None)
+        journal = dict(detail) | {"fenetre": fenetre.isoformat(), "credits": credits, "credits_restants": restants}
         if erreurs:
             journal["erreurs"] = erreurs
         _close_run(con, run_id, statut, total, journal, erreur="; ".join(erreurs) or None)
@@ -98,7 +100,12 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
         print(f"  {lg:<5} {n:>4} cotes")
     for lg, e in sorted(erreurs.items()):
         print(f"  {lg:<5} ÉCHEC : {e}")
-    return {"fenetre": fenetre.isoformat(), "snapshots": total, "statut": statut, "erreurs": erreurs}
+    if credits is not None:
+        # Projection mensuelle : 4 relevés/jour × 30 jours.
+        print(f"Crédits consommés ce run : {credits}  ·  restants : {restants}  "
+              f"·  projection ≈ {credits * 4 * 30} / mois")
+    return {"fenetre": fenetre.isoformat(), "snapshots": total, "statut": statut,
+            "credits": credits, "erreurs": erreurs}
 
 
 def main() -> None:
