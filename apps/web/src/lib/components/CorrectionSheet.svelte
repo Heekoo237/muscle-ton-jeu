@@ -5,7 +5,19 @@
 	import type { Market } from '$lib/types';
 	import type { ValidationLineVM } from '../../routes/(app)/analyser/validation/+page.server';
 
-	let { selection, onClose }: { selection: ValidationLineVM; onClose: () => void } = $props();
+	// Choix INSTANTANÉ : le tap remonte le marché choisi ; la page met à jour
+	// l'affichage tout de suite et enregistre en arrière-plan (jamais d'attente).
+	let {
+		selection,
+		onChoose,
+		onRemove,
+		onClose
+	}: {
+		selection: ValidationLineVM;
+		onChoose: (marche: Market, label: string) => void;
+		onRemove: () => void;
+		onClose: () => void;
+	} = $props();
 
 	const GROUPS: { titre: string; markets: Market[] }[] = [
 		{ titre: 'Résultat', markets: ['WIN_HOME', 'DRAW', 'WIN_AWAY'] },
@@ -36,22 +48,23 @@
 				<div class="glabel t-small">{g.titre}</div>
 				<div class="chips">
 					{#each g.markets as m (m)}
-						<form method="POST" action="?/corriger">
-							<input type="hidden" name="ordre" value={selection.ordre} />
-							<button class="chip" class:sel={selection.marche === m} name="marche" value={m}>
-								{labelOf(m)}
-							</button>
-						</form>
+						<button
+							type="button"
+							class="chip"
+							class:sel={selection.marche === m}
+							onclick={() => onChoose(m, labelOf(m))}
+						>
+							{labelOf(m)}
+						</button>
 					{/each}
 				</div>
 			</div>
 		{/each}
 	</div>
 
-	<form method="POST" action="?/retirer" class="retirer-form">
-		<input type="hidden" name="ordre" value={selection.ordre} />
-		<button class="retirer">Retirer cette ligne du ticket</button>
-	</form>
+	<div class="retirer-form">
+		<button type="button" class="retirer" onclick={onRemove}>Retirer cette ligne du ticket</button>
+	</div>
 </div>
 
 <style>

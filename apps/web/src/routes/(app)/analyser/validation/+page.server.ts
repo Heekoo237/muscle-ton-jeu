@@ -69,7 +69,9 @@ export const actions: Actions = {
 			};
 		});
 		await updateTicket(ticket.id, { selections });
-		redirect(303, '/analyser/validation');
+		// Appelée en arrière-plan (fetch) depuis un affichage déjà à jour : simple
+		// succès, aucune redirection (l'écran ne se recharge jamais).
+		return { success: true };
 	},
 
 	// Retire une ligne non reconnue : elle sort du ticket, jamais facturée.
@@ -82,7 +84,7 @@ export const actions: Actions = {
 		const ordre = Number(form.get('ordre'));
 		const selections = ticket.selections.filter((s) => s.ordre !== ordre);
 		await updateTicket(ticket.id, { selections });
-		redirect(303, '/analyser/validation');
+		return { success: true };
 	},
 
 	// Valide la lecture : le ticket passe en « valide », direction le résultat.
