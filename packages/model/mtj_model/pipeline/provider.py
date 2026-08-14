@@ -188,9 +188,11 @@ class TheOddsApiProvider:
         return self._get("sports", {"all": "true"})
 
     def odds(self, league_ref: str, days_ahead: int = 7) -> list[ProviderOdds]:
+        # On demande TOUS les bookmakers EU (pas seulement Pinnacle) : les petites
+        # ligues (Grèce, Écosse) ne sont pas cotées par Pinnacle. parse_odds
+        # préfère Pinnacle quand il est présent, sinon prend un autre book EU.
         events = self._get(f"sports/{league_ref}/odds", {
-            "regions": REGION, "markets": MARKETS,
-            "oddsFormat": "decimal", "bookmakers": BOOKMAKER,
+            "regions": REGION, "markets": MARKETS, "oddsFormat": "decimal",
         })
         return parse_odds(events, league_ref)
 
