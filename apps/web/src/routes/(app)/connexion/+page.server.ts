@@ -2,6 +2,9 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { SESSION_COOKIE, getAppSession } from '$lib/server/session';
 import { getTicket } from '$lib/server/fixtures/ticketStore';
+import { supportLink } from '$lib/support';
+
+const MSG_SUPPORT = 'Bonjour, je n’arrive pas à me connecter avec Google.';
 
 const JOURS_90 = 60 * 60 * 24 * 90; // session longue (PRD session auth)
 
@@ -27,7 +30,15 @@ export const load: PageServerLoad = async (event) => {
 	const session = await getAppSession(event);
 	if (session) redirect(303, pending ? '/resultat' : retour);
 
-	return { retour, contexte: pending ? 'ticket' : 'retour' };
+	// Un échec de connexion (callback) revient ici avec ?erreur=auth : message
+	// lisible + lien support, jamais une 500 brute.
+	const erreur = event.url.searchParams.get('erreur') === 'auth';
+	return {
+		retour,
+		contexte: pending ? 'ticket' : 'retour',
+		erreur,
+		supportUrl: supportLink(MSG_SUPPORT)
+	};
 };
 
 export const actions: Actions = {
