@@ -15,10 +15,15 @@ export interface PredictionsService {
 import { FakePredictions } from './fake';
 import { SupabasePredictions } from './supabase';
 import { isSupabaseConfigured } from '$lib/server/supabase';
+import { assertRealInProduction } from '$lib/server/guardFake';
 
-/** Lecture réelle dès que Supabase est configuré ; sinon maquette déterministe. */
+/** Lecture réelle dès que Supabase est configuré ; sinon maquette déterministe.
+ *  En production, le factice est REFUSÉ : une probabilité affichée vient TOUJOURS
+ *  de la table `predictions`, jamais d'une maquette (règle d'or n°1). */
 function createPredictionsService(): PredictionsService {
-	return isSupabaseConfigured() ? new SupabasePredictions() : new FakePredictions();
+	const real = isSupabaseConfigured();
+	assertRealInProduction('predictions (probabilités)', real);
+	return real ? new SupabasePredictions() : new FakePredictions();
 }
 
 export const predictions: PredictionsService = createPredictionsService();

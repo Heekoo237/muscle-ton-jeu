@@ -8,6 +8,7 @@
  */
 import type { ImageInput, RawTicketRead, VisionService } from './index';
 import { parseVisionResponse } from './parse';
+import { formatCostLine } from './cost';
 
 const API = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-haiku-4-5-20251001'; // rapide + bon marché, vision solide
@@ -62,7 +63,12 @@ export class AnthropicVision implements VisionService {
 		}
 
 		if (!res.ok) return { lignes: [], echec: 'illisible' };
-		const data = (await res.json().catch(() => null)) as { content?: Array<{ text?: string }> } | null;
+		const data = (await res.json().catch(() => null)) as {
+			content?: Array<{ text?: string }>;
+			usage?: Record<string, number>;
+		} | null;
+		// Coût réel de CETTE lecture (notre seule dépense variable) : on le mesure.
+		if (data?.usage) console.log(formatCostLine(data.usage, usable.length));
 		const text = data?.content?.[0]?.text;
 		if (typeof text !== 'string') return { lignes: [], echec: 'illisible' };
 		return parseVisionResponse(text);

@@ -40,6 +40,7 @@ export interface VisionService {
 import { env } from '$env/dynamic/private';
 import { FakeVision } from './fake';
 import { AnthropicVision } from './anthropic';
+import { assertRealInProduction } from '$lib/server/guardFake';
 
 /** Clé du modèle vision : dédiée si présente, sinon la clé Anthropic générique. */
 export function visionKey(): string | undefined {
@@ -48,10 +49,13 @@ export function visionKey(): string | undefined {
 
 /**
  * Point de bascule unique. Avec une clé, on lit vraiment la capture ; sans clé,
- * le ticket factice permet de dérouler le reste du parcours en local.
+ * le ticket factice permet de dérouler le reste du parcours en local. En
+ * production, le factice est REFUSÉ : on ne sert jamais l'analyse d'un ticket
+ * de démonstration à la place de la vraie capture de l'utilisateur.
  */
 function createVisionService(): VisionService {
 	const key = visionKey();
+	assertRealInProduction('vision (lecture des captures)', Boolean(key));
 	return key ? new AnthropicVision(key) : new FakeVision();
 }
 
