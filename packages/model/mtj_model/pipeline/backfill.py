@@ -165,8 +165,10 @@ def _print_report(rapport: dict, frames: dict[str, pd.DataFrame]) -> None:
         if df is None or df.empty:
             continue
         fit = fit_league(df, df["date"].max(), XI_PER_DAY)
-        order = sorted(fit.teams, key=lambda t: fit.attack[fit.index[t]] - fit.defense[fit.index[t]], reverse=True)
-        print(f"\n  {fd} — attaque − défense (haut = fort) :")
+        # Force nette = attaque + défense : dans le modèle, une défense ÉLEVÉE est
+        # une BONNE défense (elle réduit le λ adverse). Les deux se somment.
+        order = sorted(fit.teams, key=lambda t: fit.attack[fit.index[t]] + fit.defense[fit.index[t]], reverse=True)
+        print(f"\n  {fd} — attaque + défense (haut = fort) :")
         for t in order[:3]:
             i = fit.index[t]
             print(f"    +  {t:<24} att {fit.attack[i]:+.2f}  déf {fit.defense[i]:+.2f}")
