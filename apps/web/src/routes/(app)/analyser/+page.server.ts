@@ -92,6 +92,11 @@ export const actions: Actions = {
 		}
 		if (raw.echec) return fail(422, { erreur: raw.echec });
 
+		// Trace de diagnostic : ce que la VISION a réellement extrait (texte brut),
+		// avant toute résolution. Permet de voir si un « à corriger » vient d'une
+		// mauvaise lecture (vision) ou d'une notation absente de la table (résolution).
+		console.log('[vision] lecture brute:', JSON.stringify(raw.lignes));
+
 		// 5. Résolution (code) + sauvegarde du ticket avant tout paiement.
 		const [fixtures, teams] = await Promise.all([sports.upcomingFixtures(), sports.teams()]);
 		const selections = resolveTicket(raw, fixtures, teams);
