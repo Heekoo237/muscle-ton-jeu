@@ -24,7 +24,7 @@ from datetime import date, datetime, timezone
 import pandas as pd
 
 from ..constants import ODDS_MARKETS, REPLI_ALERT
-from .compute import PredictionRow, league_predictions
+from .compute import PredictionRow, league_predictions, league_predictions_cote_seule
 from .db import connect
 from .provider import NullProvider, get_provider
 from .source_mode import next_mode
@@ -156,6 +156,17 @@ def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str,
     return dict(odds), dict(books)
 
 
+def _fetch_regimes(con) -> dict[str, str]:
+    """fd_code (= provider_ref des leagues) → régime ('modele' | 'cote_seule').
+
+    En régime cote seule, le nocturne ne fait PAS tourner le modèle : il dé-vige la
+    cote seule (et dérive la double chance). Aucun historique requis pour ces
+    championnats — c'est justement pourquoi ils sont en cote seule."""
+    with con.cursor() as cur:
+        cur.execute("select fd_code, regime from league_catalog")
+        return {fd: reg for fd, reg in cur.fetchall()}
+
+
 def _margins_7d(con) -> dict[str, float]:
     """Marge 1X2 moyenne sur 7 j par ligue (fraction), depuis les runs collecteur."""
     acc: dict[str, list[float]] = defaultdict(list)
@@ -270,17 +281,22 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             # Bascule cote ↔ modèle sur marge excessive (hystérésis 10 %/8 %).
             marges_7d = _margins_7d(con)
             model_leagues, switches = _apply_source_modes(con, marges_7d)
+            regimes = _fetch_regimes(con)
 
             ref_date = pd.Timestamp(jour)
             all_rows: list[PredictionRow] = []
-            detail: dict = defaultdict(lambda: {"odds": 0, "model": 0, "repli": 0, "model_marge_excessive": 0})
+            detail: dict = defaultdict(lambda: defaultdict(int))
             # Taux de repli par marché coté ET par ligue (métrique permanente) :
             #   fd -> marché -> [repli, base(odds+repli)].
             repli: dict = defaultdict(lambda: defaultdict(lambda: [0, 0]))
             for league_code, up in upcoming.groupby("league_code"):
                 fd = str(league_code)
-                hist = history[history["league_code"] == league_code]
-                rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
+                if regimes.get(fd) == "cote_seule":
+                    # Non backtesté : cote dé-vigée seule + double chance dérivée.
+                    rows = league_predictions_cote_seule(up, fd, odds, books)
+                else:
+                    hist = history[history["league_code"] == league_code]
+                    rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
                 for r in rows:
                     detail[fd][r.source] += 1
                     if r.marche in ODDS_MARKETS and r.source in ("odds", "repli"):
@@ -313,7 +329,8 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
 
     print(f"Nocturne {jour} : {fixtures_done} matchs, {len(all_rows)} lignes predictions.")
     for lg, c in sorted(detail.items()):
-        print(f"  {lg:<5} cote {c['odds']:>3}  modèle {c['model']:>3}  repli {c['repli']:>3}")
+        print(f"  {lg:<5} cote {c['odds']:>3}  modèle {c['model']:>3}  repli {c['repli']:>3}  "
+              f"cote_seule {c['cote_seule']:>3}  dérivée {c['cote_derivee']:>3}")
     hot = [d for d in repli_rates if d["taux"] >= REPLI_ALERT]
     if hot:
         print(f"  ⚠ repli élevé sur marché coté (≥ {REPLI_ALERT:.0%}) :")

@@ -1,8 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { regimeOf, aDesFaits } from './regime';
 import { badgeVisible } from './markets-meta';
+import { buildReinforced } from './ticket';
 import { FakeWriting } from '$lib/server/services/writing/fake';
 import type { WritingInput } from '$lib/server/services/writing';
+import type { PredictionSource, Selection } from '$lib/types';
+
+function mk(ordre: number, source: PredictionSource, prob: number): Selection {
+	return {
+		ordre,
+		texteBrut: '',
+		fixtureId: ordre,
+		matchLabel: 'A – B',
+		marche: 'WIN_HOME',
+		etatResolution: 'certain',
+		coteSaisie: null,
+		probabilite: prob,
+		seuilFragile: 0.5,
+		source,
+		fragile: false,
+		retireeDuRenforce: false,
+		libelleFr: 'A gagne'
+	};
+}
 
 describe('regimeOf — la source décide le régime', () => {
 	it('sources backtestées → mesure (on a mesuré, on a un historique)', () => {
@@ -63,5 +83,33 @@ describe('rédacteur en régime cote — aveu honnête, aucun fait inventé (pr�
 		expect(texte.toLowerCase()).toContain('cote');
 		// Aucun fait descriptif (forme, buts, confrontations) ne doit apparaître.
 		expect(texte).not.toMatch(/victoire|perdu|encaisse|marque|souvent/i);
+	});
+});
+
+describe('cote seule — jamais de badge rouge, mais bien retirable (précision non mesurée)', () => {
+	it('WIN_HOME sous le seuil en cote seule → pas de badge, mais retirée (mention neutre)', () => {
+		const input = [
+			mk(1, 'cote_seule', 0.4), // sous 0,5 → candidate au retrait, SANS badge
+			mk(2, 'model', 0.8),
+			mk(3, 'model', 0.8),
+			mk(4, 'model', 0.8),
+			mk(5, 'model', 0.8)
+		];
+		const r = buildReinforced(input);
+		const s1 = r.selections.find((s) => s.ordre === 1)!;
+		expect(s1.fragile).toBe(false); // jamais de badge rouge en cote seule
+		expect(s1.retireeDuRenforce).toBe(true); // mais bien retirée
+	});
+
+	it('même proba, régime mesure (odds) → badge rouge (contraste)', () => {
+		const input = [
+			mk(1, 'odds', 0.4),
+			mk(2, 'model', 0.8),
+			mk(3, 'model', 0.8),
+			mk(4, 'model', 0.8),
+			mk(5, 'model', 0.8)
+		];
+		const r = buildReinforced(input);
+		expect(r.selections.find((s) => s.ordre === 1)!.fragile).toBe(true);
 	});
 });

@@ -19,6 +19,7 @@ import pandas as pd
 
 from ..backtest.closing_odds import devig_power
 from ..constants import (
+    FRAGILE_THRESHOLD_COTE_SEULE,
     FRAGILE_THRESHOLDS,
     PROBABILITY_SOURCE,
     XI_PER_DAY,
@@ -79,6 +80,58 @@ def _resolve(marche: str, model_probs: dict[str, float], market_probs: dict[str,
             return market_probs[marche], "odds"
         return model_probs[marche], "repli"  # cote absente → repli modèle
     return model_probs[marche], "model"
+
+
+# Double chance DÉRIVÉE du 1X2 dé-vigé (arithmétique, pas une cote lue) : c'est le
+# marché le plus joué, couvert partout, gratuitement. Source « cote_derivee »,
+# distincte de « cote_seule », pour séparer le coté du déduit à la calibration.
+_DC_DERIVED = {
+    "DC_HOME_DRAW": ("WIN_HOME", "DRAW"),
+    "DC_DRAW_AWAY": ("DRAW", "WIN_AWAY"),
+    "DC_HOME_AWAY": ("WIN_HOME", "WIN_AWAY"),
+}
+
+
+def league_predictions_cote_seule(
+    upcoming: pd.DataFrame,
+    league_code: str,
+    odds_by_fixture: dict[int, dict[str, float]] | None = None,
+    book_by_fixture: dict[int, dict[str, str]] | None = None,
+) -> list[PredictionRow]:
+    """Prédictions d'un championnat en RÉGIME COTE SEULE (non backtesté).
+
+    Aucun modèle, aucun historique : la probabilité vient UNIQUEMENT de la cote
+    dé-vigée (calcul déterministe, règle d'or n°1 tenue). On produit :
+      - 1X2 et plus/moins 2,5 → source « cote_seule » (cote lue et dé-vigée) ;
+      - double chance → source « cote_derivee » (P(1X)=P(1)+P(X), arithmétique).
+    Confiance BASSE toujours, barre de fragilité FIXE et conservatrice. Un marché
+    dont le groupe de cotes est absent reste INCONNU (jamais deviné, règle n°3).
+    """
+    odds_by_fixture = odds_by_fixture or {}
+    book_by_fixture = book_by_fixture or {}
+    conf = round(confidence_for(league_code, "cote_seule"), 4)
+    rows: list[PredictionRow] = []
+    for m in upcoming.itertuples(index=False):
+        fid = int(m.fixture_id)
+        market_probs = devig_fixture_odds(odds_by_fixture.get(fid, {}))
+        books = book_by_fixture.get(fid, {})
+        # 1X2 et plus/moins 2,5 : cote lue et dé-vigée → « cote_seule ».
+        for marche, proba in market_probs.items():
+            rows.append(PredictionRow(
+                fixture_id=fid, marche=marche, probabilite=round(float(proba), 4),
+                confiance=conf, source="cote_seule",
+                seuil_fragile=FRAGILE_THRESHOLD_COTE_SEULE, bookmaker=books.get(marche),
+            ))
+        # Double chance : DÉRIVÉE du 1X2 dé-vigé (seulement si le 1X2 est présent).
+        if all(k in market_probs for k in ("WIN_HOME", "DRAW", "WIN_AWAY")):
+            for marche, (a, b) in _DC_DERIVED.items():
+                rows.append(PredictionRow(
+                    fixture_id=fid, marche=marche,
+                    probabilite=round(float(market_probs[a] + market_probs[b]), 4),
+                    confiance=conf, source="cote_derivee",
+                    seuil_fragile=FRAGILE_THRESHOLD_COTE_SEULE, bookmaker=None,
+                ))
+    return rows
 
 
 def league_predictions(

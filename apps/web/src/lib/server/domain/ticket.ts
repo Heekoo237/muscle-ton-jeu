@@ -12,6 +12,7 @@
  */
 import type { Selection } from '$lib/types';
 import { badgeVisible, fragileThreshold } from './markets-meta';
+import { isUnmeasured } from './regime';
 
 /** Plancher absolu du ticket renforcé (règle d'or n°3). */
 export const REINFORCED_FLOOR = 4;
@@ -30,9 +31,14 @@ export function belowThreshold(s: Selection): boolean {
 	return (s.probabilite as number) < fragileThreshold(s.marche, s.seuilFragile);
 }
 
-/** Badge rouge : sous le seuil ET marché où le badge est autorisé (précision > ~50 %). */
+/**
+ * Badge rouge : sous le seuil, marché où le badge est autorisé (précision mesurée
+ * > ~50 %), ET régime MESURE. En cote seule la précision n'est pas mesurée : jamais
+ * de badge rouge (ce serait laisser croire qu'on a mesuré) — la sélection reste
+ * candidate au retrait, expliquée par une mention neutre « la moins solide ».
+ */
 function showsBadge(s: Selection): boolean {
-	return belowThreshold(s) && s.marche !== null && badgeVisible(s.marche);
+	return belowThreshold(s) && s.marche !== null && badgeVisible(s.marche) && !isUnmeasured(s.source);
 }
 
 /**

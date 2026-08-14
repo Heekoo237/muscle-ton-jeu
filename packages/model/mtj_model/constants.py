@@ -105,6 +105,15 @@ FRAGILE_THRESHOLDS = {
 }
 FRAGILE_MIN_SELECTIONS = 4  # plancher du ticket renforcé (règle d'or n°3), jamais moins
 
+# ── Régime COTE SEULE : barre de fragilité FIXE et conservatrice ──────────────
+# Sur un championnat non backtesté, on n'a AUCUNE calibration : les seuils par
+# marché ci-dessus (mesurés) n'ont pas de sens ici. On applique donc une barre
+# UNIQUE et fixe, pour le seul classement du retrait — et l'app NE MONTRE PAS de
+# badge rouge en cote seule (précision non mesurée). Conservatrice : elle marque
+# volontiers l'incertain sur les marchés « résultat » (une issue à ~50 % ou moins
+# est signalée), tout en laissant passer la double chance dérivée (proba haute).
+FRAGILE_THRESHOLD_COTE_SEULE = 0.50
+
 # Trace des chiffres qui JUSTIFIENT le seuil 1X2, pour qu'ils restent visibles.
 FRAGILE_1X2_PRECISION = 0.60       # au point 30 % : part des marquées qui tombent
 FRAGILE_1X2_BASE_FAILURE = 0.457   # taux d'échec des favoris d'ouverture sans filtre
@@ -178,6 +187,10 @@ def confidence_for(league_code: str, source: str) -> float:
       trop margée pour être fiable → jamais mieux que « modérée »
       (CONFIDENCE_ON_FALLBACK), et jamais au-dessus du palier de la ligue.
     """
+    # Régime COTE SEULE : confiance BASSE, TOUJOURS. Aucune calibration mesurée →
+    # on ne prétend jamais mieux que « faible », indépendamment du championnat.
+    if source in ("cote_seule", "cote_derivee"):
+        return CONFIDENCE_VALUE["faible"]
     league = LEAGUE_CONFIDENCE.get(league_code, DEFAULT_CONFIDENCE)
     if source == "odds":
         label = "normale"

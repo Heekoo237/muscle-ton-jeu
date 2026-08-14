@@ -29,3 +29,14 @@ export function regimeOf(source: PredictionSource | null | undefined): Regime {
 export function aDesFaits(source: PredictionSource | null | undefined): boolean {
 	return regimeOf(source) === 'mesure';
 }
+
+/**
+ * Vrai UNIQUEMENT si la source est explicitement une cote non mesurée. Sert à
+ * supprimer le badge rouge en cote seule — mais une source ABSENTE (fixture de
+ * test, donnée héritée) ne doit pas faire disparaître un badge par surprise :
+ * on ne suppose pas « cote » ici, on l'exige. Prédicat distinct de `regimeOf`,
+ * dont le défaut prudent 'cote' vaut pour les FAITS, pas pour le badge.
+ */
+export function isUnmeasured(source: PredictionSource | null | undefined): boolean {
+	return !!source && SOURCES_COTE.includes(source);
+}
