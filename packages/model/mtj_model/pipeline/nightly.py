@@ -23,12 +23,29 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 
+from ..constants import ODDS_MARKETS, REPLI_ALERT
 from .compute import PredictionRow, league_predictions
 from .db import connect
 from .provider import NullProvider, get_provider
 from .source_mode import next_mode
 
 DEFAULT_DAYS = 7
+
+
+def _repli_rates(repli: dict[str, dict[str, list[int]]]) -> list[dict]:
+    """`fd -> marché -> [repli, base]` → liste triée {ligue, marché, repli, base, taux}.
+
+    « base » = lignes qu'on a tenté de sourcer À LA COTE (odds + repli). Les
+    bascules marge (model_marge_excessive) sont un choix, pas une panne : exclues.
+    """
+    out = []
+    for fd, marches in repli.items():
+        for mk, (rp, base) in marches.items():
+            if base:
+                out.append({"ligue": fd, "marche": mk, "repli": rp,
+                            "base": base, "taux": round(rp / base, 3)})
+    out.sort(key=lambda d: (d["taux"], d["base"]), reverse=True)
+    return out
 
 
 def _fetch_upcoming(con, days: int) -> pd.DataFrame:
@@ -209,18 +226,28 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             ref_date = pd.Timestamp(jour)
             all_rows: list[PredictionRow] = []
             detail: dict = defaultdict(lambda: {"odds": 0, "model": 0, "repli": 0, "model_marge_excessive": 0})
+            # Taux de repli par marché coté ET par ligue (métrique permanente) :
+            #   fd -> marché -> [repli, base(odds+repli)].
+            repli: dict = defaultdict(lambda: defaultdict(lambda: [0, 0]))
             for league_code, up in upcoming.groupby("league_code"):
                 fd = str(league_code)
                 hist = history[history["league_code"] == league_code]
                 rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
                 for r in rows:
                     detail[fd][r.source] += 1
+                    if r.marche in ODDS_MARKETS and r.source in ("odds", "repli"):
+                        repli[fd][r.marche][1] += 1
+                        if r.source == "repli":
+                            repli[fd][r.marche][0] += 1
                 all_rows.extend(rows)
 
             _write_predictions(con, all_rows, jour)
             fixtures_done = len({r.fixture_id for r in all_rows})
             statut = "success" if fixtures_done else "partial"
             journal: dict = dict(detail)
+            repli_rates = _repli_rates(repli)
+            if repli_rates:
+                journal["repli_marches"] = repli_rates
             if switches:
                 journal["bascules"] = switches
             _close_run(con, run_id, statut, fixtures_done, journal)
@@ -233,7 +260,13 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     print(f"Nocturne {jour} : {fixtures_done} matchs, {len(all_rows)} lignes predictions.")
     for lg, c in sorted(detail.items()):
         print(f"  {lg:<5} cote {c['odds']:>3}  modèle {c['model']:>3}  repli {c['repli']:>3}")
-    return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows), "detail": detail}
+    hot = [d for d in repli_rates if d["taux"] >= REPLI_ALERT]
+    if hot:
+        print(f"  ⚠ repli élevé sur marché coté (≥ {REPLI_ALERT:.0%}) :")
+        for d in hot:
+            print(f"      {d['ligue']:<4} {d['marche']:<10} {d['taux']:>5.0%}  ({d['repli']}/{d['base']})")
+    return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows),
+            "detail": detail, "repli_marches": repli_rates}
 
 
 # Marchés représentatifs : un par famille de source pour montrer l'hybride.

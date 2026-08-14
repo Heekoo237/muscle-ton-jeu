@@ -8,9 +8,11 @@ Branche cette sortie sur ton système d'alerte (cron qui mail/push si code ≠ 0
 """
 from __future__ import annotations
 
+import json
 import sys
 from datetime import timedelta
 
+from ..constants import REPLI_ALERT
 from .db import connect
 
 # Seuils de fraîcheur par job. La nocturne tourne 1×/jour → 36 h laisse rater une
@@ -84,6 +86,33 @@ def _league_silence(cur, alerts: list[str]) -> None:
             alerts.append(f"ligue {fd_code} : silencieuse depuis {now - derniere} (dernière cote {derniere:%Y-%m-%d}).")
 
 
+def _repli_coverage(cur, alerts: list[str]) -> None:
+    """Alerte si un marché coté a retombé massivement au modèle (panne de couverture).
+
+    Lit `repli_marches` du dernier nocturne réussi. Un 1X2 ou plus/moins 2,5 qui
+    passe le seuil de repli = cotes qui manquent chez le fournisseur, pas un choix.
+    """
+    cur.execute(
+        """select detail->'repli_marches'
+             from pipeline_runs
+            where job = 'nightly' and detail ? 'repli_marches'
+            order by demarre_le desc limit 1"""
+    )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return
+    marches = row[0] if isinstance(row[0], list) else json.loads(row[0])
+    hot = [d for d in marches if float(d.get("taux", 0)) >= REPLI_ALERT]
+    if not hot:
+        print(f"repli cote  OK — aucun marché coté ≥ {REPLI_ALERT:.0%} de repli")
+        return
+    for d in hot:
+        alerts.append(
+            f"repli élevé : {d['ligue']} {d['marche']} à {float(d['taux']):.0%} de repli "
+            f"({d['repli']}/{d['base']}) — cote manquante chez le fournisseur."
+        )
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -91,6 +120,7 @@ def check() -> list[str]:
         _job_freshness(cur, alerts)
         _league_silence(cur, alerts)
         _credit_budget(cur, alerts)
+        _repli_coverage(cur, alerts)
     return alerts
 
 

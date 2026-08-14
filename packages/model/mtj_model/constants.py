@@ -51,6 +51,17 @@ PROBABILITY_SOURCE = {
 }
 CONFIDENCE_ON_FALLBACK = "modérée"  # cote absente → modèle en repli, jamais "normale"
 
+# Marchés dont la probabilité vient de la COTE (le repli n'a de sens que là).
+ODDS_MARKETS = frozenset(m for m, s in PROBABILITY_SOURCE.items() if s == "odds")
+
+# ── Alerte couverture cote ───────────────────────────────────────────────────
+# Un marché coté (1X2, plus/moins 2,5) qui retombe massivement au modèle (repli)
+# signale une panne de couverture chez le fournisseur, pas un choix produit. Le
+# nocturne journalise le taux de repli PAR MARCHÉ ET PAR LIGUE ; au-delà de ce
+# seuil la surveillance alerte — un marché coté à 80 % de repli doit se voir sans
+# lire un échantillon. Seuil à 50 % : on veut le voir monter, pas attendre pire.
+REPLI_ALERT = 0.50
+
 
 # ── Seuil de fragilité PAR MARCHÉ ────────────────────────────────────────────
 # Une sélection est « fragile » si sa probabilité est SOUS le seuil de son marché.

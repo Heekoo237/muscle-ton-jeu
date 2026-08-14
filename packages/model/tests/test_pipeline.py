@@ -129,10 +129,106 @@ def test_parse_odds_maps_markets():
     assert all(o.fixture_ref == "evt1" and o.home == "Arsenal" for o in odds)
 
 
+def test_repli_rates_ranks_worst_first_and_ignores_empty_base():
+    from mtj_model.pipeline.nightly import _repli_rates
+    repli = {
+        "G1": {"OVER_2_5": [4, 4], "WIN_HOME": [0, 4]},   # 100 % et 0 %
+        "E0": {"OVER_2_5": [2, 5]},                        # 40 %
+        "B1": {"UNDER_2_5": [0, 0]},                       # base vide → ignoré
+    }
+    out = _repli_rates(repli)
+    assert [(d["ligue"], d["marche"], d["taux"]) for d in out] == [
+        ("G1", "OVER_2_5", 1.0), ("E0", "OVER_2_5", 0.4), ("G1", "WIN_HOME", 0.0),
+    ]
+    assert all(d["base"] > 0 for d in out)  # jamais de base vide
+
+
 def test_parse_odds_skips_event_without_bookmaker():
     ev = [{"id": "e", "commence_time": "2026-08-15T14:00:00Z",
            "home_team": "A", "away_team": "B", "bookmakers": []}]
     assert parse_odds(ev, "soccer_epl") == []
+
+
+# Le book de référence poste sa ligne totals AILLEURS qu'à 2,5 (2,75), mais un
+# autre book EU a bien le 2,5 : on doit récupérer le 2,5 chez ce book, et garder
+# le 1X2 chez la référence. (Régression : avant, le 2,5 tombait en repli ~70 %.)
+_ODDS_TOTALS_ELSEWHERE = [{
+    "id": "evt2", "commence_time": "2026-08-15T14:00:00Z",
+    "home_team": "Arsenal", "away_team": "Chelsea",
+    "bookmakers": [
+        {"key": "pinnacle", "markets": [
+            {"key": "h2h", "outcomes": [
+                {"name": "Arsenal", "price": 1.90},
+                {"name": "Chelsea", "price": 4.20},
+                {"name": "Draw", "price": 3.60},
+            ]},
+            {"key": "totals", "outcomes": [   # ligne principale Pinnacle = 2,75
+                {"name": "Over", "price": 2.05, "point": 2.75},
+                {"name": "Under", "price": 1.80, "point": 2.75},
+            ]},
+        ]},
+        {"key": "bwin", "markets": [
+            {"key": "totals", "outcomes": [   # bwin a bien le 2,5
+                {"name": "Over", "price": 1.90, "point": 2.5},
+                {"name": "Under", "price": 1.95, "point": 2.5},
+            ]},
+        ]},
+    ],
+}]
+
+
+def test_parse_odds_totals_from_other_book_when_ref_lacks_2_5():
+    odds = {(o.marche): o for o in parse_odds(_ODDS_TOTALS_ELSEWHERE, "soccer_epl")}
+    # 1X2 vient de Pinnacle (référence)
+    assert odds["WIN_HOME"].cote == 1.90 and odds["WIN_HOME"].bookmaker == "pinnacle"
+    # plus/moins 2,5 récupéré chez bwin — plus de repli
+    assert odds["OVER_2_5"].cote == 1.90 and odds["OVER_2_5"].bookmaker == "bwin"
+    assert odds["UNDER_2_5"].cote == 1.95 and odds["UNDER_2_5"].bookmaker == "bwin"
+    # la ligne 2,75 de Pinnacle n'est jamais émise
+    assert set(odds) == {"WIN_HOME", "WIN_AWAY", "DRAW", "OVER_2_5", "UNDER_2_5"}
+
+
+def test_parse_odds_pinnacle_2_5_preferred_over_tighter_soft_book():
+    # Pinnacle a le 2,5 : on le prend même si un soft book est nominalement plus serré.
+    ev = [{
+        "id": "evt3", "commence_time": "2026-08-15T14:00:00Z",
+        "home_team": "A", "away_team": "B",
+        "bookmakers": [
+            {"key": "softbook", "markets": [{"key": "totals", "outcomes": [
+                {"name": "Over", "price": 1.98, "point": 2.5},
+                {"name": "Under", "price": 1.98, "point": 2.5}]}]},
+            {"key": "pinnacle", "markets": [
+                {"key": "h2h", "outcomes": [
+                    {"name": "A", "price": 2.0}, {"name": "B", "price": 3.9}, {"name": "Draw", "price": 3.5}]},
+                {"key": "totals", "outcomes": [
+                    {"name": "Over", "price": 1.93, "point": 2.5},
+                    {"name": "Under", "price": 1.90, "point": 2.5}]}]},
+        ],
+    }]
+    odds = {o.marche: o for o in parse_odds(ev, "soccer_epl")}
+    assert odds["OVER_2_5"].bookmaker == "pinnacle" and odds["OVER_2_5"].cote == 1.93
+
+
+def test_parse_odds_totals_picks_tightest_when_no_pinnacle():
+    # Sans Pinnacle : on prend le book EU de marge OU la plus faible.
+    ev = [{
+        "id": "evt4", "commence_time": "2026-08-15T14:00:00Z",
+        "home_team": "A", "away_team": "B",
+        "bookmakers": [
+            {"key": "gassy", "markets": [{"key": "h2h", "outcomes": [
+                {"name": "A", "price": 2.0}, {"name": "B", "price": 3.9}, {"name": "Draw", "price": 3.5}]},
+                {"key": "totals", "outcomes": [
+                    {"name": "Over", "price": 1.83, "point": 2.5},
+                    {"name": "Under", "price": 1.83, "point": 2.5}]}]},   # marge ~9,3 %
+            {"key": "sharp", "markets": [{"key": "totals", "outcomes": [
+                {"name": "Over", "price": 1.95, "point": 2.5},
+                {"name": "Under", "price": 1.95, "point": 2.5}]}]},        # marge ~2,6 %
+        ],
+    }]
+    odds = {o.marche: o for o in parse_odds(ev, "soccer_epl")}
+    # 1X2 : premier book EU (gassy) faute de Pinnacle ; totals : le plus serré (sharp)
+    assert odds["WIN_HOME"].bookmaker == "gassy"
+    assert odds["OVER_2_5"].bookmaker == "sharp"
 
 
 def test_parse_scores_finished_and_pending():

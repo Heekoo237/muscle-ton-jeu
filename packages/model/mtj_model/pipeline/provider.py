@@ -22,6 +22,7 @@ API_BASE = "https://api.the-odds-api.com/v4"
 REGION = "eu"                       # bookmakers européens (dont Pinnacle)
 BOOKMAKER = "pinnacle"              # sharp, cohérent avec le backtest
 MARKETS = "h2h,totals"             # 1X2 + plus/moins
+TOTALS_POINT = 2.5                  # la SEULE ligne plus/moins qu'on price (marché du ticket)
 
 
 @dataclass(frozen=True)
@@ -69,28 +70,43 @@ _H2H = {"__home__": "WIN_HOME", "Draw": "DRAW", "__away__": "WIN_AWAY"}
 
 
 def parse_odds(events: list[dict], league_ref: str) -> list[ProviderOdds]:
-    """Réponse /odds → cotes internes. Ne garde que h2h et plus/moins 2,5."""
+    """Réponse /odds → cotes internes. Ne garde que h2h et plus/moins 2,5.
+
+    Deux books sont choisis SÉPARÉMENT :
+      - 1X2 (h2h) → book de référence (Pinnacle prioritaire, sinon premier EU),
+        pour rester sur la ligne calibrée au backtest ;
+      - plus/moins 2,5 → le book le plus SERRÉ qui poste RÉELLEMENT une ligne 2,5.
+        La ligne principale d'un book flotte selon le match (2,25 / 2,75 / 3,0…),
+        donc se limiter au book de référence perd le 2,5 ~70 % du temps. Le 2,5
+        existe toujours chez UN book EU — on va le chercher là où il est.
+    """
     out: list[ProviderOdds] = []
     for ev in events:
         home, away = ev.get("home_team"), ev.get("away_team")
         date = _parse_dt(ev.get("commence_time"))
         if not (home and away and date):
             continue
-        book = _pick_bookmaker(ev.get("bookmakers", []))
-        if not book:
-            continue
-        book_key = book.get("key") or BOOKMAKER  # bookmaker RÉELLEMENT utilisé
-        for market in book.get("markets", []):
-            key = market.get("key")
-            for oc in market.get("outcomes", []):
-                marche = _map_outcome(key, oc, home, away)
-                price = oc.get("price")
-                if marche and isinstance(price, (int, float)) and price > 1:
-                    out.append(ProviderOdds(
-                        fixture_ref=str(ev.get("id")), league_ref=league_ref,
-                        date_utc=date, home=home, away=away,
-                        marche=marche, cote=float(price), bookmaker=book_key,
-                    ))
+        books = ev.get("bookmakers", [])
+        fid = str(ev.get("id"))
+        # (book, marché lu chez ce book) : 1X2 chez la référence, totals chez le
+        # book le plus serré qui a réellement la ligne 2,5.
+        for book, want in ((_pick_bookmaker(books), "h2h"),
+                           (_pick_totals_book(books), "totals")):
+            if not book:
+                continue
+            book_key = book.get("key") or BOOKMAKER
+            for market in book.get("markets", []):
+                if market.get("key") != want:
+                    continue
+                for oc in market.get("outcomes", []):
+                    marche = _map_outcome(want, oc, home, away)
+                    price = oc.get("price")
+                    if marche and isinstance(price, (int, float)) and price > 1:
+                        out.append(ProviderOdds(
+                            fixture_ref=fid, league_ref=league_ref,
+                            date_utc=date, home=home, away=away,
+                            marche=marche, cote=float(price), bookmaker=book_key,
+                        ))
     return out
 
 
@@ -140,6 +156,46 @@ def _pick_bookmaker(bookmakers: list[dict]) -> dict | None:
         if b.get("key") == BOOKMAKER:
             return b
     return bookmakers[0]
+
+
+def _totals_pair(bookmaker: dict, point: float = TOTALS_POINT) -> tuple[float, float] | None:
+    """(cote Over, cote Under) au point voulu chez CE book, ou None s'il ne le poste pas."""
+    over = under = None
+    for market in bookmaker.get("markets", []):
+        if market.get("key") != "totals":
+            continue
+        for oc in market.get("outcomes", []):
+            if oc.get("point") != point:
+                continue
+            price = oc.get("price")
+            if oc.get("name") == "Over":
+                over = price
+            elif oc.get("name") == "Under":
+                under = price
+    if isinstance(over, (int, float)) and isinstance(under, (int, float)) and over > 1 and under > 1:
+        return float(over), float(under)
+    return None
+
+
+def _pick_totals_book(bookmakers: list[dict], point: float = TOTALS_POINT) -> dict | None:
+    """Book le plus SERRÉ qui poste une ligne plus/moins au point voulu.
+
+    Pinnacle prioritaire quand il a la ligne (c'est le sharp du backtest et, de
+    fait, le plus serré). Sinon, on prend le book EU de marge minimale — le 2,5
+    d'un book qui le met en ligne principale, pas une ligne alternative molle.
+    """
+    best: dict | None = None
+    best_margin: float | None = None
+    for b in bookmakers:
+        pair = _totals_pair(b, point)
+        if pair is None:
+            continue
+        if b.get("key") == BOOKMAKER:
+            return b  # Pinnacle a le 2,5 → référence directe
+        margin = 1 / pair[0] + 1 / pair[1] - 1
+        if best_margin is None or margin < best_margin:
+            best_margin, best = margin, b
+    return best
 
 
 def _extract_scores(scores, home: str, away: str) -> tuple[int | None, int | None]:
