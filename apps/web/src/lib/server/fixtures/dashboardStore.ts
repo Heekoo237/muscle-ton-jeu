@@ -7,7 +7,7 @@
  * gagné », aucun taux de réussite personnel, aucun gain.
  */
 import { listAnalysedTickets } from './ticketStore';
-import { settleMarket } from './historyStore';
+import { settleMarket } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { Market } from '$lib/types';
 

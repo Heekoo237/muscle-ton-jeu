@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { marketOutcome, settleReinforced, type FinalScore } from './settle';
+import { marketOutcome, settleMarket, settleReinforced, settleTicket, type FinalScore } from './settle';
 import type { Market, Selection } from '$lib/types';
 
 describe('marketOutcome — marché × score final', () => {
@@ -17,6 +17,21 @@ describe('marketOutcome — marché × score final', () => {
 		expect(marketOutcome('OVER_2_5', 1, 1)).toBe(false);
 		expect(marketOutcome('BTTS_YES', 1, 1)).toBe(true);
 		expect(marketOutcome('BTTS_NO', 2, 0)).toBe(true);
+	});
+});
+
+describe('settleMarket — primitive unique (couvert → booléen, sinon null)', () => {
+	it('règle les marchés couverts', () => {
+		expect(settleMarket('WIN_HOME', 2, 0)).toBe(true);
+		expect(settleMarket('DC_DRAW_AWAY', 0, 0)).toBe(true);
+		expect(settleMarket('OVER_2_5', 2, 1)).toBe(true);
+		expect(settleMarket('UNDER_3_5', 2, 1)).toBe(true);
+		expect(settleMarket('BTTS_NO', 2, 0)).toBe(true);
+		expect(settleMarket('BTTS_NO', 1, 1)).toBe(false);
+	});
+	it('renvoie null pour un marché non couvert ou nul', () => {
+		expect(settleMarket('CORNERS_OVER_9_5', 5, 5)).toBeNull();
+		expect(settleMarket(null, 1, 0)).toBeNull();
 	});
 });
 
@@ -64,5 +79,34 @@ describe('settleReinforced — résultat du ticket renforcé', () => {
 		const r = settleReinforced(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 3, away: 0 } }));
 		expect(r.ticket).toBe('passe');
 		expect(r.parSelection.get(2)).toBe(false); // son issue reste calculée
+	});
+});
+
+describe('settleTicket — verdicts original ET renforcé', () => {
+	const scores = (m: Record<number, FinalScore>) =>
+		new Map<number, FinalScore>(Object.entries(m).map(([k, v]) => [Number(k), v]));
+
+	it('le renforcé sauve : original tombe (sélection retirée perdue), renforcé passe', () => {
+		// 1 gardée gagnante, 2 RETIRÉE et perdante.
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'WIN_AWAY', 11, true)];
+		const v = settleTicket(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 3, away: 0 } }));
+		expect(v.originale).toBe('tombe');
+		expect(v.renforce).toBe('passe');
+		expect(v.premierPerduOrdre).toBe(2);
+	});
+
+	it('les deux passent quand toutes les réglables gagnent', () => {
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'OVER_1_5', 11)];
+		const v = settleTicket(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 1, away: 1 } }));
+		expect(v.originale).toBe('passe');
+		expect(v.renforce).toBe('passe');
+		expect(v.premierPerduOrdre).toBeNull();
+	});
+
+	it('en attente tant qu’un match réglable n’est pas terminé (les deux groupes)', () => {
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'OVER_1_5', 11)];
+		const v = settleTicket(s, scores({ 10: { home: 2, away: 0 }, 11: null }));
+		expect(v.originale).toBe('en_attente');
+		expect(v.renforce).toBe('en_attente');
 	});
 });

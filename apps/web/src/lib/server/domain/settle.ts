@@ -8,7 +8,15 @@
  * n'est réglé que lorsque toutes ses sélections gardées le sont.
  */
 import type { Market, Selection, TicketResult } from '$lib/types';
-import { isAnalysable } from './ticket';
+
+/** Marchés couverts, réglables contre un score. BTTS inclus : réglable même si sa
+ *  PROBABILITÉ reste suspendue (on ne PRODUIT pas de proba, on lit juste le score). */
+const COVERED_MARKETS: ReadonlySet<string> = new Set<Market>([
+	'WIN_HOME', 'DRAW', 'WIN_AWAY',
+	'DC_HOME_DRAW', 'DC_DRAW_AWAY', 'DC_HOME_AWAY',
+	'OVER_1_5', 'UNDER_1_5', 'OVER_2_5', 'UNDER_2_5', 'OVER_3_5', 'UNDER_3_5',
+	'BTTS_YES', 'BTTS_NO'
+]);
 
 /** Le marché est-il gagné, au score final (h buts domicile, a buts extérieur) ? */
 export function marketOutcome(market: Market, h: number, a: number): boolean {
@@ -45,13 +53,32 @@ export function marketOutcome(market: Market, h: number, a: number): boolean {
 	}
 }
 
+/**
+ * Règle un marché contre un score, en tolérant un marché NON couvert (→ null,
+ * jamais réglé). POINT D'ENTRÉE UNIQUE du règlement par marché : l'historique, le
+ * tableau de bord et le bandeau passent tous par ici (plus de switch dupliqué).
+ */
+export function settleMarket(marche: Market | string | null, h: number, a: number): boolean | null {
+	if (marche === null || !COVERED_MARKETS.has(marche)) return null;
+	return marketOutcome(marche as Market, h, a);
+}
+
 /** Score final d'un match, ou null tant qu'il n'est pas terminé. */
 export type FinalScore = { home: number; away: number } | null;
 
+/**
+ * Une sélection est RÉGLABLE si elle porte un marché couvert sur un match résolu.
+ * Distinct d'`isAnalysable` (qui exige aussi une probabilité) : le règlement ne
+ * dépend QUE du score réel, jamais d'avoir eu une proba pour la sélection.
+ */
+export function isSettleable(s: Selection): boolean {
+	return s.etatResolution === 'certain' && s.marche !== null && s.fixtureId !== null;
+}
+
 /** Résultat d'une sélection : true = passée, false = tombée, null = en attente. */
 export function selectionOutcome(s: Selection, score: FinalScore): boolean | null {
-	if (!isAnalysable(s) || s.marche === null || score === null) return null;
-	return marketOutcome(s.marche, score.home, score.away);
+	if (!isSettleable(s) || s.marche === null || score === null) return null;
+	return settleMarket(s.marche, score.home, score.away);
 }
 
 export interface SettlementResult {
@@ -61,33 +88,57 @@ export interface SettlementResult {
 	ticket: TicketResult;
 }
 
+/** Verdict d'un groupe de sélections déjà réglées (leurs issues true/false/null). */
+function groupVerdict(issues: (boolean | null)[]): TicketResult {
+	if (issues.length === 0 || issues.some((o) => o === null)) return 'en_attente';
+	return issues.some((o) => o === false) ? 'tombe' : 'passe';
+}
+
+export interface TicketVerdict {
+	/** Résultat par sélection (clé = ordre) : true/false/null. */
+	parSelection: Map<number, boolean | null>;
+	/** Résultat du ticket ORIGINAL (toutes les sélections réglables). */
+	originale: TicketResult;
+	/** Résultat du ticket RENFORCÉ (les sélections gardées, non retirées). */
+	renforce: TicketResult;
+	/** Ordre de la 1re sélection réglable tombée (pour « tombé sur ce match »). */
+	premierPerduOrdre: number | null;
+}
+
 /**
- * Règle le ticket RENFORCÉ à partir des scores finals connus.
- * `scores` : fixtureId → score final (ou null si le match n'est pas terminé).
+ * Règle un ticket à partir des scores finals connus, et renvoie À LA FOIS le
+ * verdict de l'ORIGINAL (toutes les sélections réglables) et celui du RENFORCÉ
+ * (les gardées). `scores` : fixtureId → score final (ou null si non terminé).
  *
- * - une sélection gardée tombée → ticket « tombe » (dès qu'elle est connue) ;
- * - toutes les sélections gardées passées et terminées → « passe » ;
- * - sinon (au moins une pas encore terminée) → « en_attente ».
+ * Un groupe est « en_attente » tant qu'une de ses sélections n'est pas terminée ;
+ * « tombe » si une est perdue une fois tout terminé ; « passe » sinon. C'est LE
+ * point de règlement d'un ticket — l'historique et le tableau de bord en dérivent.
+ */
+export function settleTicket(selections: Selection[], scores: Map<number, FinalScore>): TicketVerdict {
+	const parSelection = new Map<number, boolean | null>();
+	for (const s of selections) {
+		const sc = s.fixtureId != null ? (scores.get(s.fixtureId) ?? null) : null;
+		parSelection.set(s.ordre, selectionOutcome(s, sc));
+	}
+	const reglables = selections.filter(isSettleable).sort((a, b) => a.ordre - b.ordre);
+	const gardees = reglables.filter((s) => !s.retireeDuRenforce);
+	const premierPerdu = reglables.find((s) => parSelection.get(s.ordre) === false);
+	return {
+		parSelection,
+		originale: groupVerdict(reglables.map((s) => parSelection.get(s.ordre) ?? null)),
+		renforce: groupVerdict(gardees.map((s) => parSelection.get(s.ordre) ?? null)),
+		premierPerduOrdre: premierPerdu ? premierPerdu.ordre : null
+	};
+}
+
+/**
+ * Résultat du ticket RENFORCÉ seul. Conservé pour compat ; délègue à `settleTicket`
+ * (source unique). Le renforcé est la proposition du produit portée à l'historique.
  */
 export function settleReinforced(
 	selections: Selection[],
 	scores: Map<number, FinalScore>
 ): SettlementResult {
-	const parSelection = new Map<number, boolean | null>();
-	for (const s of selections) {
-		parSelection.set(s.ordre, selectionOutcome(s, s.fixtureId != null ? (scores.get(s.fixtureId) ?? null) : null));
-	}
-
-	const gardees = selections.filter((s) => isAnalysable(s) && !s.retireeDuRenforce);
-	const issues = gardees.map((s) => parSelection.get(s.ordre) ?? null);
-
-	let ticket: TicketResult;
-	if (issues.some((o) => o === false)) {
-		ticket = 'tombe'; // une sélection gardée est tombée
-	} else if (issues.length > 0 && issues.every((o) => o === true)) {
-		ticket = 'passe'; // toutes gardées, terminées, passées
-	} else {
-		ticket = 'en_attente'; // au moins une pas encore terminée
-	}
-	return { parSelection, ticket };
+	const v = settleTicket(selections, scores);
+	return { parSelection: v.parSelection, ticket: v.renforce };
 }

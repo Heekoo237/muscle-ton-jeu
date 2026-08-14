@@ -1,10 +1,9 @@
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { listAnalysedTickets } from '$lib/server/fixtures/ticketStore';
-import { settleMarket } from '$lib/server/fixtures/historyStore';
+import { settleTicket, type FinalScore } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import { DEMO_MODE, demoHistoLignes } from '$lib/server/demo';
-import type { Market } from '$lib/types';
 
 export interface HistoLine {
 	id: string;
@@ -30,9 +29,9 @@ export const load: PageServerLoad = async (event) => {
 
 	const dateOf = new Map<number, number>();
 	for (const f of upcoming) dateOf.set(f.id, Date.parse(f.dateUtc));
-	const scoreOf = new Map<number, { h: number; a: number }>();
+	const scores = new Map<number, FinalScore>();
 	for (const f of finished) {
-		if (f.scoreHome != null && f.scoreAway != null) scoreOf.set(f.id, { h: f.scoreHome, a: f.scoreAway });
+		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
 	}
 
 	const lignes: HistoLine[] = tickets.map((t) => {
@@ -40,11 +39,10 @@ export const load: PageServerLoad = async (event) => {
 		const nbMatchs = analysables.length;
 		const nbFragiles = t.result?.nbFragiles ?? 0;
 
-		// Tous les matchs sont-ils terminés ?
-		const tousTermines =
-			nbMatchs > 0 && analysables.every((s) => s.fixtureId !== null && scoreOf.has(s.fixtureId));
+		// Règlement déterministe UNIQUE (domain/settle), jamais un LLM.
+		const v = settleTicket(t.selections, scores);
 
-		if (!tousTermines) {
+		if (v.originale === 'en_attente') {
 			const horaires = analysables
 				.map((s) => (s.fixtureId != null ? dateOf.get(s.fixtureId) : undefined))
 				.filter((d): d is number => d != null);
@@ -60,25 +58,21 @@ export const load: PageServerLoad = async (event) => {
 			};
 		}
 
-		// Règlement déterministe (calcul, jamais un LLM).
-		const perdu = (s: (typeof analysables)[number]): boolean => {
-			const sc = scoreOf.get(s.fixtureId as number)!;
-			return settleMarket(s.marche as Market, sc.h, sc.a) === false;
-		};
-		const gardees = analysables.filter((s) => !s.retireeDuRenforce);
-		const originalePasse = analysables.every((s) => !perdu(s));
-		const renforcePasse = gardees.every((s) => !perdu(s));
-		const premierPerdu = analysables.find((s) => perdu(s));
+		const tombeSur =
+			v.premierPerduOrdre != null
+				? (t.selections.find((s) => s.ordre === v.premierPerduOrdre)?.matchLabel ?? null)
+				: null;
 
 		return {
 			id: t.id,
 			dateMs: t.creeLeMs,
 			nbMatchs,
 			nbFragiles,
-			statut: originalePasse ? 'passe' : 'tombe',
+			statut: v.originale === 'passe' ? 'passe' : 'tombe',
 			kickoffMs: null,
-			tombeSur: originalePasse ? null : (premierPerdu?.matchLabel ?? null),
-			verdictRenforce: !originalePasse && renforcePasse
+			// La version renforcée aurait sauvé le ticket : l'original tombe, le renforcé passe.
+			tombeSur: v.originale === 'passe' ? null : tombeSur,
+			verdictRenforce: v.originale === 'tombe' && v.renforce === 'passe'
 		};
 	});
 

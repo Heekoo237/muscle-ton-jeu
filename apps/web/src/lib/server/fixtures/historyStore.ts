@@ -18,52 +18,9 @@
  */
 import type { HistoryItem, Market } from '$lib/types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { settleMarket } from '$lib/server/domain/settle';
 
 export type { HistoryItem };
-
-/**
- * Règle un marché couvert contre un score final. Renvoie null pour un marché
- * non couvert (jamais réglé, jamais affiché).
- */
-export function settleMarket(
-	marche: Market,
-	scoreHome: number,
-	scoreAway: number
-): boolean | null {
-	const total = scoreHome + scoreAway;
-	switch (marche) {
-		case 'WIN_HOME':
-			return scoreHome > scoreAway;
-		case 'DRAW':
-			return scoreHome === scoreAway;
-		case 'WIN_AWAY':
-			return scoreAway > scoreHome;
-		case 'DC_HOME_DRAW':
-			return scoreHome >= scoreAway;
-		case 'DC_DRAW_AWAY':
-			return scoreAway >= scoreHome;
-		case 'DC_HOME_AWAY':
-			return scoreHome !== scoreAway;
-		case 'OVER_1_5':
-			return total >= 2;
-		case 'UNDER_1_5':
-			return total <= 1;
-		case 'OVER_2_5':
-			return total >= 3;
-		case 'UNDER_2_5':
-			return total <= 2;
-		case 'OVER_3_5':
-			return total >= 4;
-		case 'UNDER_3_5':
-			return total <= 3;
-		case 'BTTS_YES':
-			return scoreHome >= 1 && scoreAway >= 1;
-		case 'BTTS_NO':
-			return scoreHome === 0 || scoreAway === 0;
-		default:
-			return null;
-	}
-}
 
 type Row = Record<string, unknown>;
 const numOrNull = (v: unknown): number | null =>
