@@ -8,6 +8,7 @@
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 	import ShareSheet from '$lib/components/ShareSheet.svelte';
+	import { ligneNote, estAnalysee } from '$lib/lineStatus';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
@@ -20,6 +21,7 @@
 
 	// Toutes les lignes, y compris les non analysées : elles restent dans les deux
 	// tickets (jamais retirées), affichées neutres avec la mention « non analysé ».
+	// « analysable » côté papier = réellement analysée (résolue ET avec proba).
 	const paperLines = $derived(
 		vm.lignes.map((l) => ({
 			matchLabel: l.matchLabel,
@@ -27,21 +29,13 @@
 			fragile: l.fragile,
 			retiree: l.retiree,
 			mentionNeutre: l.mentionNeutre,
-			analysable: l.analysable
+			analysable: estAnalysee(l)
 		}))
 	);
 
 	// Lecture détaillée du coupon : match par match, repliée par défaut.
 	let showDetail = $state(false);
 	const nbFragiles = $derived(vm.lignes.filter((l) => l.fragile).length);
-
-	/** Note factuelle par ligne : déterministe, jamais une phrase inventée. */
-	function ligneNote(l: (typeof vm.lignes)[number]): string {
-		if (!l.analysable) return 'Marché non couvert — non analysé, non facturé.';
-		if (l.retiree) return 'Retirée du ticket renforcé — sélection la plus fragile.';
-		if (l.fragile) return 'Sélection fragile — probabilité sous le seuil.';
-		return 'Sélection solide.';
-	}
 </script>
 
 <svelte:head><title>Ton ticket, lu — Muscle Ton Jeu</title></svelte:head>

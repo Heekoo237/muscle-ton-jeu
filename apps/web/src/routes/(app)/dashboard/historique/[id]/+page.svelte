@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
+	import { ligneNote, estAnalysee } from '$lib/lineStatus';
 
 	let { data }: { data: PageData } = $props();
 
@@ -13,8 +14,9 @@
 		return `${v.toString().replace('.', ',')} %`;
 	}
 
-	const nbFragiles = $derived(data.lignes.filter((l) => l.analysable && l.fragile).length);
+	const nbFragiles = $derived(data.lignes.filter((l) => l.fragile).length);
 	// Toutes les lignes, non analysées comprises : neutres, jamais retirées.
+	// « analysable » côté papier = réellement analysée (résolue ET avec proba).
 	const paperLines = $derived(
 		data.lignes.map((l) => ({
 			matchLabel: l.matchLabel,
@@ -22,17 +24,9 @@
 			fragile: l.fragile,
 			retiree: l.retiree,
 			mentionNeutre: l.mentionNeutre,
-			analysable: l.analysable
+			analysable: estAnalysee(l)
 		}))
 	);
-
-	/** Note factuelle par ligne : déterministe, jamais une phrase inventée. */
-	function ligneNote(l: (typeof data.lignes)[number]): string {
-		if (!l.analysable) return 'Marché non couvert — non analysé, non facturé.';
-		if (l.retiree) return 'Retirée du ticket renforcé — sélection la plus fragile.';
-		if (l.fragile) return 'Sélection fragile — probabilité sous le seuil.';
-		return 'Sélection solide.';
-	}
 </script>
 
 <svelte:head><title>Analyse du {dateLabel} — Muscle Ton Jeu</title></svelte:head>
