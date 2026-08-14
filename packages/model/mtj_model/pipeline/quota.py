@@ -60,3 +60,37 @@ def assert_quota_ok(provider, worklist: list[dict]) -> None:
     print(message)
     if not ok and os.environ.get("MTJ_ALLOW_OVER_QUOTA") != "1":
         raise SystemExit(message)
+
+
+def main() -> None:
+    """Vérification du PALIER, gratuite et en LECTURE SEULE — à lancer après un
+    (dés)abonnement pour confirmer que le nouveau palier est bien détecté.
+
+    Appelle /sports (0 crédit), affiche le palier détecté et, si la base est
+    joignable, le plan mensuel et le verdict. Ne collecte rien, n'écrit rien."""
+    from .provider import NullProvider, get_provider
+
+    provider = get_provider()
+    if isinstance(provider, NullProvider):
+        raise SystemExit("Fournisseur non branché — MTJ_PROVIDER=oddsapi + MTJ_PROVIDER_KEY.")
+    provider.sports()  # gratuit : renseigne restants + déjà consommés → palier
+    quota = provider.credits_quota
+    remaining = provider.credits_remaining
+    print(f"Palier détecté : {quota if quota is not None else '?'}   ·   "
+          f"restants : {remaining if remaining is not None else '?'}")
+    try:
+        from .db import connect
+        from .sync import league_worklist
+        with connect() as con:
+            worklist = league_worklist(con)
+        planned = planned_monthly_credits(worklist)
+        ok, message = check_quota(quota, remaining, planned)
+        print(message)
+        print("→ Après abonnement, tu dois voir un palier de 20 000 (et le plan qui tient).")
+    except Exception as exc:  # base non joignable : le palier seul suffit à la vérif
+        print(f"(plan mensuel non calculé — base non joignable : {str(exc)[:80]})")
+        print("→ Après abonnement, tu dois voir « Palier détecté : 20000 ».")
+
+
+if __name__ == "__main__":
+    main()

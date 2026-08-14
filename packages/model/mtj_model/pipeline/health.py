@@ -29,15 +29,25 @@ STALE_AFTER = {"nightly": timedelta(hours=36), "collector": timedelta(hours=12)}
 # c'est légitime (hors-saison) : période de grâce de 14 j après le 1ᵉ collecteur.
 LEAGUE_SILENCE = timedelta(days=14)
 
-# Crédits fournisseur restants sous lesquels on alerte (≈ 1,5 j au rythme réel de
-# ~88/j). Laisse le temps de s'abonner avant l'épuisement du palier gratuit (500).
-CREDIT_LOW = 150
+# On PRÉVIENT avant de BLOQUER. Le collecteur s'arrête si le plan dépasse le palier
+# (garde-fou dur) ; ici, bien avant, on alerte dès que les restants tombent sous
+# 20 % du palier détecté — un avertissement laisse le temps de réagir, un arrêt
+# brutal fait perdre de l'historique. Plancher absolu si le palier est inconnu.
+CREDIT_LOW_FRACTION = 0.20
+CREDIT_LOW_FLOOR = 150
+
+
+def credit_low_threshold(palier: int | None) -> int:
+    """Seuil d'alerte crédits : 20 % du palier détecté, sinon plancher absolu."""
+    if palier is None:
+        return CREDIT_LOW_FLOOR
+    return max(CREDIT_LOW_FLOOR, round(palier * CREDIT_LOW_FRACTION))
 
 
 def _credit_budget(cur, alerts: list[str]) -> None:
-    """Lit les crédits restants du dernier run collecteur et alerte s'ils sont bas."""
+    """Lit restants + palier du dernier run collecteur et alerte AVANT l'épuisement."""
     cur.execute(
-        """select detail->>'credits_restants'
+        """select detail->>'credits_restants', detail->>'palier_detecte'
              from pipeline_runs
             where job = 'collector' and detail ? 'credits_restants'
             order by demarre_le desc limit 1"""
@@ -46,10 +56,16 @@ def _credit_budget(cur, alerts: list[str]) -> None:
     if not row or row[0] is None:
         return
     restants = int(float(row[0]))
-    if restants < CREDIT_LOW:
-        alerts.append(f"crédits fournisseur bas : {restants} restants (< {CREDIT_LOW}) — pense à t'abonner.")
+    palier = int(float(row[1])) if row[1] is not None else None
+    seuil = credit_low_threshold(palier)
+    palier_txt = f" sur un palier de {palier}" if palier is not None else ""
+    if restants < seuil:
+        alerts.append(
+            f"crédits fournisseur bas : {restants} restants (< {seuil}, soit 20 % du "
+            f"palier{palier_txt}) — abonne-toi ou réduis la fréquence avant l'arrêt."
+        )
     else:
-        print(f"crédits     OK — {restants} restants")
+        print(f"crédits     OK — {restants} restants (seuil d'alerte {seuil}{palier_txt})")
 
 
 def _job_freshness(cur, alerts: list[str]) -> None:

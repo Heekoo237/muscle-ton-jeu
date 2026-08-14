@@ -41,3 +41,11 @@ def test_slots_frequence():
     assert slots_for(4) == {0, 6, 12, 18}   # modèle : chaque fenêtre
     assert slots_for(2) == {6, 18}
     assert slots_for(1) == {6}              # cote seule : une seule fenêtre/jour
+
+
+def test_seuil_alerte_proportionnel_au_palier():
+    from mtj_model.pipeline.health import credit_low_threshold
+    # 20 % du palier détecté ; on prévient AVANT le blocage dur.
+    assert credit_low_threshold(20_000) == 4000
+    assert credit_low_threshold(500) == 150     # 20 % = 100, sous le plancher → plancher 150
+    assert credit_low_threshold(None) == 150    # palier inconnu → plancher absolu

@@ -453,6 +453,31 @@ différent + cotes réduites → chargeur séparé, qualité moindre, 2ᵉ class
 le « 11 → 18 ». Le classement live vs éligible vs cote seule est produit par
 `catalogue.py` (`classify()`), confronté au catalogue réel à chaque run.
 
+### Marchés additionnels À LA DEMANDE — validé en principe, à construire après le socle
+
+Les marchés additionnels (plus/moins **1,5** et **3,5**, **BTTS**) vivent sur
+l'endpoint **par événement** (coût par match, pas par compétition). Les couvrir
+systématiquement sur tout le catalogue exploserait le quota. La solution retenue :
+les récupérer **à la demande**, seulement pour les matchs qu'un utilisateur joue
+réellement.
+
+**Design (respecte la règle d'archi n°2 — le temps réel LIT, ne calcule pas) :**
+déclenché à la **validation du ticket**, un fetch par événement récupère la cote,
+la **dé-vige** (calcul déterministe du pipeline) et **écrit dans `predictions`**
+(`source=cote_seule`, historisé, idempotent). La page de résultat **lit** ensuite,
+comme pour tout le reste. C'est de la **collecte à la demande**, pas un calcul en
+temps réel. Grâce à l'historisation `(match, marché, jour)`, un match populaire
+n'est payé **qu'une fois** même joué par vingt utilisateurs → ~360 crédits/mois à
+1 000 tickets, pas 1 800.
+
+**Deux garde-fous à implémenter avec cette brique :**
+1. **Délai court, 2 s max.** Si le fetch dépasse 2 secondes, on n'attend pas : la
+   sélection est **non analysée, non facturée**. On ne fait jamais patienter
+   l'utilisateur pour une cote.
+2. **Crédit journalisé séparément.** L'appel à la demande est compté à part du
+   systématique (`pipeline_runs` : `credits_a_la_demande` distinct de `credits`),
+   pour voir ce que coûte vraiment l'usage réel, indépendamment de la collecte.
+
 ### Second fournisseur : API-Football (api-sports.io) — SECOURS TIÈDE, non intégré
 
 > [!NOTE]
