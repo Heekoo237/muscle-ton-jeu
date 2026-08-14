@@ -10,7 +10,7 @@
  * Aucune probabilité n'est calculée ni lue ici.
  */
 import type { Fixture, Selection, Team } from '$lib/types';
-import type { RawTicketRead } from '$lib/server/services/vision';
+import type { RawLine, RawTicketRead } from '$lib/server/services/vision';
 import { resolveMarket, marketLabelFr } from './market-map';
 
 function normalize(s: string): string {
@@ -72,6 +72,16 @@ function matchFixture(
 	return { fixture, home: home.nom, away: away.nom };
 }
 
+/** Champs d'une ligne : structurés si le modèle vision les a isolés, sinon découpés. */
+function lineParts(ligne: RawLine): { matchText: string; marketText: string; odds: number | null } {
+	if (ligne.matchText || ligne.marketText || ligne.coteText) {
+		const c = (ligne.coteText ?? '').replace(',', '.').trim();
+		const odds = /^\d+(\.\d+)?$/.test(c) ? Number(c) : null;
+		return { matchText: ligne.matchText ?? '', marketText: ligne.marketText ?? '', odds };
+	}
+	return splitLine(ligne.texteBrut);
+}
+
 /**
  * Transforme la lecture brute en sélections résolues, prêtes pour l'écran de
  * validation. L'index d'appariement (`ordre`) est attribué une fois, ici.
@@ -79,7 +89,7 @@ function matchFixture(
 export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Team[]): Selection[] {
 	return raw.lignes.map((ligne, i): Selection => {
 		const ordre = i + 1;
-		const { matchText, marketText, odds } = splitLine(ligne.texteBrut);
+		const { matchText, marketText, odds } = lineParts(ligne);
 		const fx = matchFixture(matchText, fixtures, teams);
 		const market = resolveMarket(marketText);
 

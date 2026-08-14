@@ -1,11 +1,22 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { enhance, applyAction } from '$app/forms';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
+	import { compressImage } from '$lib/compressImage';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	// Messages d'échec de lecture — clairs, jamais techniques, jamais facturés.
+	const ERREURS: Record<string, string> = {
+		aucune: 'Ajoute au moins une capture de ton ticket.',
+		pas_une_image: "Ce fichier n'est pas une image. Envoie une capture d'écran.",
+		illisible: "On n'arrive pas à lire. Réessaie ou saisis à la main.",
+		manuscrit: 'On lit les captures d’écran, pas les tickets papier.',
+		pas_un_ticket: "Cette image n'est pas un ticket. Envoie la capture de ton ticket."
+	};
+	let erreurMsg = $derived(form?.erreur ? (ERREURS[form.erreur] ?? ERREURS.illisible) : null);
 
 	// Empreinte d'appareil : marqueur local persistant, posé en cookie pour que le
 	// serveur puisse vérifier la gratuité du premier ticket (indicatif, non bloquant).
@@ -36,19 +47,36 @@
 	// (objet URL) : aucun octet ne part sur le réseau à ce stade.
 	const SLOTS = [0, 1, 2];
 	let previews = $state<(string | null)[]>([null, null, null]);
+	// Version compressée par slot, prête à envoyer (JPEG). Null tant qu'absente.
+	let compressed = $state<(Blob | null)[]>([null, null, null]);
+	let busy = $state(0); // nombre de compressions en cours (bloque l'envoi)
+	let localErreur = $state<string | null>(null);
 	let inputs: (HTMLInputElement | null)[] = [null, null, null];
 
-	function onPick(i: number, e: Event) {
+	async function onPick(i: number, e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
+		if (!file.type.startsWith('image/')) {
+			localErreur = ERREURS.pas_une_image;
+			clear(i);
+			return;
+		}
+		localErreur = null;
 		if (previews[i]) URL.revokeObjectURL(previews[i]!);
-		previews[i] = URL.createObjectURL(file);
+		previews[i] = URL.createObjectURL(file); // aperçu immédiat depuis l'original
+		busy += 1;
+		try {
+			compressed[i] = await compressImage(file); // réduit avant envoi (forfait data)
+		} finally {
+			busy -= 1;
+		}
 	}
 
 	function clear(i: number) {
 		if (previews[i]) URL.revokeObjectURL(previews[i]!);
 		previews[i] = null;
+		compressed[i] = null;
 		if (inputs[i]) inputs[i]!.value = ''; // ne pas soumettre une capture retirée
 	}
 
@@ -73,10 +101,19 @@
 
 	<p class="t-body-lg intro measure">Envoie 1 à 3 captures de ton ticket. Rien d'autre.</p>
 
+	{#if erreurMsg || localErreur}
+		<p class="erreur t-body" role="alert">{localErreur ?? erreurMsg}</p>
+	{/if}
+
 	<form
 		method="POST"
 		enctype="multipart/form-data"
-		use:enhance={() => {
+		use:enhance={({ formData }) => {
+			// Envoyer les versions COMPRESSÉES prêtes ; à défaut, l'original reste
+			// dans formData (jamais de refus, seulement plus léger quand on peut).
+			for (const i of SLOTS) {
+				if (compressed[i]) formData.set(`capture_${i}`, compressed[i]!, `capture_${i}.jpg`);
+			}
 			reading = true;
 			step = 0;
 			const started = Date.now();
@@ -87,6 +124,8 @@
 				await new Promise((r) => setTimeout(r, wait));
 				clearTimeout(t1);
 				clearTimeout(t2);
+				// Échec (lecture impossible) : on rend la main pour réessayer.
+				if (result.type !== 'redirect') reading = false;
 				await applyAction(result);
 			};
 		}}
@@ -136,12 +175,14 @@
 			application ou site de paris.
 		</p>
 
-		<button class="btn-primary" type="submit" disabled={reading}>
+		<button class="btn-primary" type="submit" disabled={reading || busy > 0}>
 			{reading
 				? 'Lecture en cours…'
-				: data.ticketOffert
-					? 'Analyser mon ticket gratuitement'
-					: 'Analyser mon ticket'}
+				: busy > 0
+					? 'Préparation…'
+					: data.ticketOffert
+						? 'Analyser mon ticket gratuitement'
+						: 'Analyser mon ticket'}
 		</button>
 	</form>
 </main>
@@ -181,6 +222,14 @@
 	.intro {
 		color: var(--c-ink-2);
 		margin: 0 0 var(--s-6);
+	}
+	.erreur {
+		background: var(--c-danger-wash, var(--c-canvas-sunk));
+		border: 1px solid var(--c-danger-line, var(--c-line-strong));
+		border-radius: var(--r-md);
+		padding: var(--s-3) var(--s-4);
+		color: var(--c-ink);
+		margin: 0 0 var(--s-4);
 	}
 	.slots {
 		display: grid;

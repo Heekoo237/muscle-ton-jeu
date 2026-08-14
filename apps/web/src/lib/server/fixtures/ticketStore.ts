@@ -31,6 +31,8 @@ export interface StoredTicket {
 	billing?: StoredBilling;
 	/** Propriétaire ; null tant que le ticket est anonyme (avant connexion). */
 	userId?: number | null;
+	/** Empreinte des captures (SHA-256), pour dédoublonnage et réutilisation 24 h. */
+	empreinte?: string;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -115,7 +117,8 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 /* ------------------------------------------------------------------------ */
 export async function createTicket(
 	selections: Selection[],
-	userId: number | null = null
+	userId: number | null = null,
+	empreinte: string | null = null
 ): Promise<StoredTicket> {
 	if (!isSupabaseConfigured()) {
 		const id = `t_${++memCounter}_${selections.length}`;
@@ -125,7 +128,8 @@ export async function createTicket(
 			selections,
 			creeLe: memCounter,
 			creeLeMs: Date.now(),
-			userId
+			userId,
+			empreinte: empreinte ?? undefined
 		};
 		memStore.set(id, ticket);
 		return ticket;
@@ -133,7 +137,7 @@ export async function createTicket(
 	const sb = supabaseAdmin();
 	const { data: t, error } = await sb
 		.from('tickets')
-		.insert({ user_id: userId, statut: 'en_lecture', nb_selections: selections.length })
+		.insert({ user_id: userId, statut: 'en_lecture', nb_selections: selections.length, empreinte })
 		.select('id, statut, cree_le')
 		.single();
 	if (error) throw error;
