@@ -64,29 +64,29 @@ def canonical_key(nom: str) -> str:
 
 
 def upsert_team(con, league_id: int, nom: str) -> int:
-    """Renvoie le team_id, en dédupliquant sur le club, pas sur la chaîne exacte.
+    """Renvoie le team_id, en dédupliquant sur la CLÉ CANONIQUE (sûr, déterministe).
 
-    Appariement, dans l'ordre :
-      1. carte curée + clé canonique (remappe les abréviations connues) ;
-      2. INCLUSION DE JETONS : « tottenham » ⊆ « tottenham hotspur » = même club.
-    Deux clubs distincts (Manchester United / City) n'ont aucune inclusion → OK.
-    Le nom d'affichage reste la première forme rencontrée ; les variantes sont
-    ajoutées en alias. Normalisation à l'écriture, jamais à la résolution.
+    Appariement UNIQUEMENT par clé canonique (normalisation + carte curée). Sans
+    faux positif. L'inclusion de jetons a été ÉCARTÉE : elle fusionnait des clubs
+    distincts (Club Brugge / Cercle Brugge, Inter Milan / AC Milan, Paris FC / PSG).
+    Les variantes qu'une clé exacte ne rapproche pas passent par la carte curée
+    VÉRIFIÉE (team_aliases.py). Normalisation à l'écriture, jamais à la résolution.
     """
     ckey = canonical_key(nom)
-    ctoks = set(ckey.split())
     with con.cursor() as cur:
-        cur.execute("select id, nom, aliases from teams where league_id = %s", (league_id,))
-        for tid, tnom, aliases in cur.fetchall():
-            for other in [tnom, *(aliases or [])]:
-                otoks = set(canonical_key(other).split())
-                if ctoks and otoks and (ctoks <= otoks or otoks <= ctoks):
-                    if nom not in (aliases or []):
-                        cur.execute(
-                            "update teams set aliases = coalesce(aliases, '{}') || %s where id = %s",
-                            ([nom], tid),
-                        )
-                    return tid
+        cur.execute(
+            "select id, aliases from teams where league_id = %s and %s = any(aliases)",
+            (league_id, ckey),
+        )
+        row = cur.fetchone()
+        if row:
+            tid, aliases = row
+            if nom not in (aliases or []):
+                cur.execute(
+                    "update teams set aliases = coalesce(aliases, '{}') || %s where id = %s",
+                    ([nom], tid),
+                )
+            return tid
         cur.execute(
             "insert into teams (nom, league_id, aliases) values (%s, %s, %s) returning id",
             (nom, league_id, [ckey, nom] if ckey != nom else [ckey]),
