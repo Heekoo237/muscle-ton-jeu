@@ -17,15 +17,15 @@ export interface SportsDataService {
 import { FakeSportsData } from './fake';
 import { SupabaseSportsData } from './supabase';
 import { isSupabaseConfigured } from '$lib/server/supabase';
-import { assertRealInProduction } from '$lib/server/guardFake';
+import { guardFakeService } from '$lib/server/guardFake';
 
 /** Vraies tables Supabase dès qu'elles sont configurées ; sinon jeu factice.
  *  En production, le factice est REFUSÉ : on ne résout jamais les matchs d'un
  *  utilisateur contre une liste de démonstration. */
 function createSportsService(): SportsDataService {
 	const real = isSupabaseConfigured();
-	assertRealInProduction('sports (calendrier des matchs)', real);
-	return real ? new SupabaseSportsData() : new FakeSportsData();
+	const impl = real ? new SupabaseSportsData() : new FakeSportsData();
+	return guardFakeService('sports (calendrier des matchs)', real, impl);
 }
 
 export const sports: SportsDataService = createSportsService();

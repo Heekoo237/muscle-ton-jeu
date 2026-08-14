@@ -66,20 +66,20 @@ export interface WritingService {
 
 import { FakeWriting } from './fake';
 import { AnthropicWriting, realWriterConfigured } from './anthropic';
-import { assertRealInProduction } from '$lib/server/guardFake';
+import { guardFakeService } from '$lib/server/guardFake';
 
 /**
  * ← Bascule vers le vrai modèle de rédaction.
  *
- * GARDE-FOU DE PRODUCTION (obligatoire, brief) : en production, un rédacteur
- * factice servirait un texte plat à la place de la vraie explication — on le
- * refuse au démarrage, comme sports/predictions/vision/paiement. En
- * développement (clé absente), on garde le rédacteur factice.
+ * GARDE-FOU DE PRODUCTION : en production sans clé, le rédacteur factice est
+ * refusé À L'USAGE (writeAnalysis lève) ; l'écran de résultat rattrape via son
+ * repli template et le journalise (raison=echec_modele). On ne fait jamais
+ * planter la page, mais on ne sert pas non plus un vrai texte inventé.
  */
 function createWritingService(): WritingService {
 	const real = realWriterConfigured();
-	assertRealInProduction('rédaction', real);
-	return real ? new AnthropicWriting() : new FakeWriting();
+	const impl = real ? new AnthropicWriting() : new FakeWriting();
+	return guardFakeService('rédaction', real, impl);
 }
 
 export const writing: WritingService = createWritingService();

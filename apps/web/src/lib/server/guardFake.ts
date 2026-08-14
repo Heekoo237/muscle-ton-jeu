@@ -1,13 +1,16 @@
 /**
- * guardFake.ts — Garde-fou : jamais de service FACTICE en production.
+ * guardFake.ts — Garde-fou : jamais de service FACTICE servi à un vrai utilisateur.
  *
- * Les services (sports, predictions, vision) retombent sur un mode factice quand
- * leurs variables d'environnement manquent — pratique en local, INTERDIT en
- * production. Une variable mal configurée ne doit JAMAIS nous faire servir des
- * matchs qui n'existent pas ou des chiffres inventés (CLAUDE.md, règles d'or).
+ * Les services (sports, predictions, vision, rédaction, paiement) retombent sur
+ * un mode factice quand leurs variables d'environnement manquent — pratique en
+ * local, INTERDIT en production (CLAUDE.md, règles d'or).
  *
- * En production, un service factice fait échouer le démarrage avec un message
- * explicite, plutôt que de servir silencieusement des données de démonstration.
+ * IMPORTANT — on refuse le factice À L'USAGE, jamais à l'import. Un garde-fou qui
+ * lève au chargement du module ferait planter TOUTE page important la barrière de
+ * services (le dashboard, par exemple, qui ne lit pourtant aucune capture) avec
+ * une 500 brute. Ici, construire le service ne lève jamais ; c'est APPELER une
+ * méthode d'un service factice en production qui lève une erreur claire, que
+ * l'appelant transforme en message lisible.
  */
 import { dev, building } from '$app/environment';
 
@@ -21,17 +24,37 @@ export function shouldRefuseFake(productionRuntime: boolean, isReal: boolean): b
 	return productionRuntime && !isReal;
 }
 
-/**
- * Lève en production si le service n'est pas réel. Appelé à la construction du
- * service (au chargement du module) : un déploiement mal configuré échoue tout
- * de suite, visiblement, au lieu de servir du factice.
- */
-export function assertRealInProduction(service: string, isReal: boolean): void {
-	if (shouldRefuseFake(isProductionRuntime(), isReal)) {
-		throw new Error(
+/** Erreur levée quand un service factice est appelé en production. */
+export class FakeServiceError extends Error {
+	readonly service: string;
+	constructor(service: string) {
+		super(
 			`[config] Service « ${service} » en mode FACTICE en production. ` +
-				'Renseigne les variables requises (Supabase, clé vision) avant de déployer. ' +
+				'Renseigne les variables requises (Supabase, clés) avant de déployer. ' +
 				"On ne sert jamais de données de démonstration à de vrais utilisateurs."
 		);
+		this.name = 'FakeServiceError';
+		this.service = service;
 	}
+}
+
+/**
+ * Enveloppe un service : en production, si l'implémentation n'est pas réelle,
+ * toute méthode appelée lève `FakeServiceError`. En dev/build, ou si le service
+ * est réel, renvoie l'implémentation telle quelle. Ne lève JAMAIS à la
+ * construction — seulement à l'appel.
+ */
+export function guardFakeService<T extends object>(service: string, isReal: boolean, impl: T): T {
+	if (!shouldRefuseFake(isProductionRuntime(), isReal)) return impl;
+	return new Proxy(impl, {
+		get(target, prop, receiver) {
+			const value = Reflect.get(target, prop, receiver);
+			if (typeof value === 'function') {
+				return () => {
+					throw new FakeServiceError(service);
+				};
+			}
+			return value;
+		}
+	});
 }

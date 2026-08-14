@@ -40,7 +40,7 @@ export interface VisionService {
 import { env } from '$env/dynamic/private';
 import { FakeVision } from './fake';
 import { AnthropicVision } from './anthropic';
-import { assertRealInProduction } from '$lib/server/guardFake';
+import { guardFakeService } from '$lib/server/guardFake';
 
 /** Clé du modèle vision : dédiée si présente, sinon la clé Anthropic générique. */
 export function visionKey(): string | undefined {
@@ -55,8 +55,10 @@ export function visionKey(): string | undefined {
  */
 function createVisionService(): VisionService {
 	const key = visionKey();
-	assertRealInProduction('vision (lecture des captures)', Boolean(key));
-	return key ? new AnthropicVision(key) : new FakeVision();
+	const impl = key ? new AnthropicVision(key) : new FakeVision();
+	// Refus À L'USAGE en production (jamais à l'import) : sans clé, lire une
+	// capture lève une erreur claire, que l'action /analyser rend lisible.
+	return guardFakeService('vision (lecture des captures)', Boolean(key), impl);
 }
 
 export const vision: VisionService = createVisionService();

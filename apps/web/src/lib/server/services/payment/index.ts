@@ -38,7 +38,7 @@ export interface PaymentService {
 
 import { PaymentRouter } from './router';
 import { FakeAggregator } from './fake';
-import { assertRealInProduction } from '$lib/server/guardFake';
+import { guardFakeService } from '$lib/server/guardFake';
 
 /** Vrai quand de VRAIS agrégateurs Mobile Money sont branchés. Aujourd'hui aucun
  *  n'existe → false. Quand ils arriveront : tester ici la présence de leurs clés. */
@@ -49,10 +49,11 @@ function realPaymentConfigured(): boolean {
 /** ← Points de bascule vers les vrais agrégateurs Mobile Money.
  *  GARDE-FOU : un paiement factice en production ferait croire à une recharge
  *  réussie — le pire risque de la liste (« j'ai payé, je n'ai rien reçu »). En
- *  production, le factice fait donc ÉCHOUER le démarrage. */
+ *  production, tout appel au paiement factice ÉCHOUE (refus à l'usage), sans
+ *  faire planter les pages qui ne paient pas. */
 function createPaymentService(): PaymentService {
-	assertRealInProduction('paiement (Mobile Money)', realPaymentConfigured());
-	return new PaymentRouter([new FakeAggregator('psp_a'), new FakeAggregator('psp_b')]);
+	const impl = new PaymentRouter([new FakeAggregator('psp_a'), new FakeAggregator('psp_b')]);
+	return guardFakeService('paiement (Mobile Money)', realPaymentConfigured(), impl);
 }
 
 export const payment: PaymentService = createPaymentService();

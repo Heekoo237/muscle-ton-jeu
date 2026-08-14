@@ -14,7 +14,8 @@
 		pas_une_image: "Ce fichier n'est pas une image. Envoie une capture d'écran.",
 		illisible: "On n'arrive pas à lire. Réessaie ou saisis à la main.",
 		manuscrit: 'On lit les captures d’écran, pas les tickets papier.',
-		pas_un_ticket: "Cette image n'est pas un ticket. Envoie la capture de ton ticket."
+		pas_un_ticket: "Cette image n'est pas un ticket. Envoie la capture de ton ticket.",
+		indisponible: 'La lecture est momentanément indisponible. Réessaie, ou écris au support.'
 	};
 	let erreurMsg = $derived(form?.erreur ? (ERREURS[form.erreur] ?? ERREURS.illisible) : null);
 

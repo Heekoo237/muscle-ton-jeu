@@ -8,7 +8,18 @@
  */
 import { createServerClient } from '@supabase/ssr';
 import { env } from '$env/dynamic/public';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
+
+/**
+ * Toute erreur non rattrapée (load, rendu, chargement de module) passe ici. On
+ * JOURNALISE la cause technique côté serveur — c'est elle qu'on lit dans les
+ * logs — et on ne renvoie au client qu'un message LISIBLE, jamais la stack. La
+ * page +error.svelte l'affiche avec le lien support. Aucune 500 brute.
+ */
+export const handleError: HandleServerError = ({ error, event, status }) => {
+	console.error(`[${status ?? 500}] ${event.request.method} ${event.url.pathname}`, error);
+	return { message: 'Une erreur est survenue de notre côté. Réessaie dans un instant.' };
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const url = env.PUBLIC_SUPABASE_URL;

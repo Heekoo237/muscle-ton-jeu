@@ -81,7 +81,15 @@ export const actions: Actions = {
 		}
 
 		// 4. Lecture réelle. Échec explicite = message clair, aucun crédit débité.
-		const raw = await vision.readTicket(images);
+		//    Un service indisponible (ex. clé vision absente en production) ne doit
+		//    jamais afficher une 500 brute : message lisible, cause en logs.
+		let raw;
+		try {
+			raw = await vision.readTicket(images);
+		} catch (e) {
+			console.error('[analyse] lecture indisponible:', e);
+			return fail(503, { erreur: 'indisponible' });
+		}
 		if (raw.echec) return fail(422, { erreur: raw.echec });
 
 		// 5. Résolution (code) + sauvegarde du ticket avant tout paiement.
