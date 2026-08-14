@@ -171,6 +171,34 @@ book sert le 2,5 et sa marge, par ligue, journalisé chaque nuit). *Une décisio
 reportée sans critère est une décision jamais prise* : ce seuil EST la décision.
 Chiffres provisoires, à rejuger ici à la recalibration.
 
+## Pistes d'amélioration (à évaluer à la recalibration)
+
+**À traiter EN MÊME TEMPS que la recalibration et les trois écarts connus
+ci-dessus — jamais avant que le produit tourne de bout en bout.**
+
+### Variables de congestion (calendrier)
+
+Le calendrier ne sert aujourd'hui qu'à **reconnaître** les matchs ; il n'entre
+pas dans le calcul. Deux variables de congestion sont calculables depuis notre
+**historique existant, sans aucun appel API supplémentaire** :
+
+- **jours de repos** depuis le dernier match, par équipe ;
+- **nombre de matchs sur les 14 derniers jours**, par équipe.
+
+**Hypothèse à tester : la congestion améliore-t-elle la prédiction, surtout sur
+les MARCHÉS SANS COTE** (double chance, plus/moins 1,5 et 3,5) où le modèle est
+notre seule source ? Sur les marchés cotés (1X2, plus/moins 2,5), l'information
+est déjà dans la cote — aucun gain à attendre.
+
+**Méthode.** Ajouter les deux variables au modèle, refaire le backtest, comparer
+le **log-loss avec et sans, PAR MARCHÉ**. Si le gain est dans le bruit, abandonner
+la piste — pas de variable qui ne paie pas sa complexité.
+
+**Bénéfice secondaire à évaluer.** Si l'effet existe, il donne une explication
+très concrète à l'utilisateur (« Marseille joue son troisième match en huit
+jours ») — plus parlante qu'un chiffre de probabilité. À ne considérer que si le
+gain de prédiction est réel : on n'affiche pas une raison qui n'a pas d'effet mesuré.
+
 ## Seuil de fragilité (étape 4.5)
 
 Une sélection est **fragile** si sa probabilité passe sous le seuil de **son

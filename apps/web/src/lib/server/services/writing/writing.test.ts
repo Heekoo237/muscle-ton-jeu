@@ -36,6 +36,13 @@ describe('rédaction — un fragile plus/moins ne dégrade plus vers le template
 		expect(allowed).toContain(7.8); // proba renforcée toujours là
 	});
 
+	it('jeu STRICT : un numéro de nom d’équipe (« Mainz 05 ») n’est PAS autorisé', () => {
+		const input = inputAvecFragile('FSV Mainz 05 – Leverkusen — Plus de 2,5 buts');
+		const allowed = allowedNumbersFor(input);
+		expect(allowed).toContain(2.5); // seuil marché : oui
+		expect(allowed).not.toContain(5); // « 05 » du nom d’équipe : non
+	});
+
 	it('un nombre fabriqué reste rejeté (le garde-fou n’est pas désactivé)', () => {
 		const input = inputAvecFragile('Lens – Nice — Plus de 2,5 buts');
 		// 42 n’est ni une proba, ni un seuil du libellé : doit être refusé.
