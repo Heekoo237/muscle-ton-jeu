@@ -1,0 +1,68 @@
+import { describe, it, expect } from 'vitest';
+import { marketOutcome, settleReinforced, type FinalScore } from './settle';
+import type { Market, Selection } from '$lib/types';
+
+describe('marketOutcome — marché × score final', () => {
+	it('1X2 et double chance', () => {
+		expect(marketOutcome('WIN_HOME', 2, 1)).toBe(true);
+		expect(marketOutcome('DRAW', 1, 1)).toBe(true);
+		expect(marketOutcome('WIN_AWAY', 0, 1)).toBe(true);
+		expect(marketOutcome('DC_HOME_DRAW', 1, 1)).toBe(true);
+		expect(marketOutcome('DC_HOME_DRAW', 0, 1)).toBe(false);
+		expect(marketOutcome('DC_HOME_AWAY', 1, 1)).toBe(false);
+	});
+	it('plus/moins et les deux marquent', () => {
+		expect(marketOutcome('OVER_2_5', 2, 1)).toBe(true);
+		expect(marketOutcome('UNDER_2_5', 1, 1)).toBe(true);
+		expect(marketOutcome('OVER_2_5', 1, 1)).toBe(false);
+		expect(marketOutcome('BTTS_YES', 1, 1)).toBe(true);
+		expect(marketOutcome('BTTS_NO', 2, 0)).toBe(true);
+	});
+});
+
+function sel(ordre: number, marche: Market, fixtureId: number, retiree = false): Selection {
+	return {
+		ordre,
+		texteBrut: `s${ordre}`,
+		fixtureId,
+		matchLabel: `M${ordre}`,
+		marche,
+		etatResolution: 'certain',
+		coteSaisie: null,
+		probabilite: 0.6,
+		seuilFragile: 0.5,
+		fragile: false,
+		retireeDuRenforce: retiree,
+		libelleFr: ''
+	};
+}
+
+describe('settleReinforced — résultat du ticket renforcé', () => {
+	const scores = (m: Record<number, FinalScore>) => new Map<number, FinalScore>(Object.entries(m).map(([k, v]) => [Number(k), v]));
+
+	it('passe quand toutes les gardées sont terminées et gagnées', () => {
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'OVER_1_5', 11)];
+		const r = settleReinforced(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 1, away: 1 } }));
+		expect(r.ticket).toBe('passe');
+	});
+
+	it('tombe dès qu’une sélection gardée est perdue', () => {
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'WIN_AWAY', 11)];
+		const r = settleReinforced(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 2, away: 0 } }));
+		expect(r.ticket).toBe('tombe');
+	});
+
+	it('en attente tant qu’un match gardé n’est pas terminé', () => {
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'OVER_1_5', 11)];
+		const r = settleReinforced(s, scores({ 10: { home: 2, away: 0 }, 11: null }));
+		expect(r.ticket).toBe('en_attente');
+	});
+
+	it('ignore les sélections retirées du renforcé', () => {
+		// La sélection retirée (2) est perdante, mais elle ne compte pas.
+		const s = [sel(1, 'WIN_HOME', 10), sel(2, 'WIN_AWAY', 11, true)];
+		const r = settleReinforced(s, scores({ 10: { home: 2, away: 0 }, 11: { home: 3, away: 0 } }));
+		expect(r.ticket).toBe('passe');
+		expect(r.parSelection.get(2)).toBe(false); // son issue reste calculée
+	});
+});
