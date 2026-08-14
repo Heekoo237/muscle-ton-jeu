@@ -11,9 +11,7 @@
  * cette couche ne calcule jamais une probabilité de marché.
  */
 import type { Selection } from '$lib/types';
-
-/** Seuil de fragilité par défaut, à remplacer par la valeur calibrée (brief §2.3c). */
-export const DEFAULT_FRAGILE_THRESHOLD = 0.55;
+import { badgeVisible, fragileThreshold } from './markets-meta';
 
 /** Plancher absolu du ticket renforcé (règle d'or n°3). */
 export const REINFORCED_FLOOR = 4;
@@ -21,6 +19,20 @@ export const REINFORCED_FLOOR = 4;
 /** Une sélection compte dans le calcul si elle est résolue avec certitude et a une proba. */
 export function isAnalysable(s: Selection): boolean {
 	return s.etatResolution === 'certain' && s.marche !== null && typeof s.probabilite === 'number';
+}
+
+/**
+ * Sous le seuil de SON marché → candidate au retrait (tous marchés confondus).
+ * C'est le classement interne du renforcement, distinct du badge visible.
+ */
+export function belowThreshold(s: Selection): boolean {
+	if (!isAnalysable(s) || s.marche === null) return false;
+	return (s.probabilite as number) < fragileThreshold(s.marche, s.seuilFragile);
+}
+
+/** Badge rouge : sous le seuil ET marché où le badge est autorisé (précision > ~50 %). */
+function showsBadge(s: Selection): boolean {
+	return belowThreshold(s) && s.marche !== null && badgeVisible(s.marche);
 }
 
 /**
@@ -45,15 +57,9 @@ export function productProbability(selections: Selection[]): number {
 		.reduce((acc, s) => acc * (s.probabilite as number), 1);
 }
 
-/** Marque `fragile` toute sélection analysable dont la proba est sous le seuil. */
-export function markFragile(
-	selections: Selection[],
-	threshold = DEFAULT_FRAGILE_THRESHOLD
-): Selection[] {
-	return selections.map((s) => ({
-		...s,
-		fragile: isAnalysable(s) && (s.probabilite as number) < threshold
-	}));
+/** Marque `fragile` (badge rouge) selon le seuil PAR MARCHÉ et la visibilité du badge. */
+export function markFragile(selections: Selection[]): Selection[] {
+	return selections.map((s) => ({ ...s, fragile: showsBadge(s) }));
 }
 
 export interface ReinforcedResult {
@@ -73,21 +79,19 @@ export interface ReinforcedResult {
  * Construit le ticket renforcé par retrait des sélections fragiles, les plus
  * fragiles d'abord, sans jamais descendre sous le plancher de 4 sélections.
  */
-export function buildReinforced(
-	input: Selection[],
-	threshold = DEFAULT_FRAGILE_THRESHOLD,
-	floor = REINFORCED_FLOOR
-): ReinforcedResult {
-	const selections = markFragile(input, threshold);
+export function buildReinforced(input: Selection[], floor = REINFORCED_FLOOR): ReinforcedResult {
+	const selections = markFragile(input);
 	const analysables = selections.filter(isAnalysable);
 	const probaTotale = productProbability(analysables);
 
 	// Combien peut-on retirer sans passer sous le plancher ?
 	const removable = Math.max(0, analysables.length - floor);
 
-	// Candidats au retrait : les fragiles, du plus fragile (proba la plus basse) au moins.
+	// Candidats au retrait : sous leur seuil de marché, du plus fragile au moins.
+	// (Classement interne : inclut les marchés « sûrs » sans badge — ex. double
+	// chance —, qui seront expliqués par une mention neutre à l'affichage.)
 	const fragilesTries = analysables
-		.filter((s) => s.fragile)
+		.filter(belowThreshold)
 		.sort((a, b) => (a.probabilite as number) - (b.probabilite as number));
 
 	const aRetirer = new Set<number>(fragilesTries.slice(0, removable).map((s) => s.ordre));

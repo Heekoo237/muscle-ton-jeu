@@ -76,6 +76,8 @@ function rowToSelection(r: Row): Selection {
 		candidates: (r.candidates as Market[] | null) ?? undefined,
 		coteSaisie: num(r.cote_saisie),
 		probabilite: num(r.probabilite),
+		// Non persisté sur le ticket : relu depuis `predictions` au moment du résultat.
+		seuilFragile: null,
 		fragile: Boolean(r.fragile),
 		retireeDuRenforce: Boolean(r.retiree_du_renforce),
 		libelleFr: (r.libelle_fr as string) ?? ''

@@ -68,6 +68,10 @@ export interface Prediction {
 	marche: Market;
 	probabilite: number; // 0..1
 	confiance: number; // 0..1
+	/** Seuil de fragilité applicable à ce marché (calibré, stocké en table). */
+	seuilFragile: number | null;
+	/** D'où vient la probabilité : cote dé-vigée, modèle, ou repli modèle. */
+	source?: 'odds' | 'model' | 'repli';
 }
 
 export interface Selection {
@@ -85,6 +89,9 @@ export interface Selection {
 	candidates?: Market[];
 	coteSaisie: number | null;
 	probabilite: number | null; // copiée depuis predictions
+	/** Seuil de fragilité du marché (copié depuis predictions) ; null si non lu. */
+	seuilFragile: number | null;
+	/** Marquée fragile ET badge rouge autorisé sur ce marché (1X2, plus/moins 2,5, etc.). */
 	fragile: boolean;
 	retireeDuRenforce: boolean;
 	/** Libellé français du marché prêt à afficher (« Arsenal ou match nul »). */
@@ -110,8 +117,11 @@ export interface LineVM {
 	matchLabel: string;
 	libelleFr: string;
 	cote: number | null;
+	/** Badge rouge « fragile » (marchés à forte précision : 1X2, plus/moins 2,5, plus 3,5). */
 	fragile: boolean;
 	retiree: boolean;
+	/** Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre, jamais « fragile ». */
+	mentionNeutre: boolean;
 	analysable: boolean;
 	/** Probabilité de la sélection (table predictions), en % ; null si non analysée. */
 	probabilitePct: number | null;

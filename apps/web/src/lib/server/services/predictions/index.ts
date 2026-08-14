@@ -13,10 +13,12 @@ export interface PredictionsService {
 }
 
 import { FakePredictions } from './fake';
+import { SupabasePredictions } from './supabase';
+import { isSupabaseConfigured } from '$lib/server/supabase';
 
-/** ← Point de bascule vers la lecture réelle de la table (Session 7/8). */
+/** Lecture réelle dès que Supabase est configuré ; sinon maquette déterministe. */
 function createPredictionsService(): PredictionsService {
-	return new FakePredictions();
+	return isSupabaseConfigured() ? new SupabasePredictions() : new FakePredictions();
 }
 
 export const predictions: PredictionsService = createPredictionsService();

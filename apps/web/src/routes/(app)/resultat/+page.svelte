@@ -24,7 +24,8 @@
 			matchLabel: l.matchLabel,
 			libelleFr: l.libelleFr,
 			fragile: l.fragile,
-			retiree: l.retiree
+			retiree: l.retiree,
+			mentionNeutre: l.mentionNeutre
 		}))
 	);
 

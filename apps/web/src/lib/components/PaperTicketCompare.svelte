@@ -6,7 +6,14 @@
 	const ANTON = "'Anton', Impact, sans-serif";
 	const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
-	type Line = { matchLabel: string; libelleFr: string; fragile: boolean; retiree: boolean };
+	type Line = {
+		matchLabel: string;
+		libelleFr: string;
+		fragile: boolean;
+		retiree: boolean;
+		// Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre.
+		mentionNeutre?: boolean;
+	};
 
 	let {
 		lines,
@@ -75,6 +82,7 @@
 						<div class="pline">
 							<div class="pmatch" class:strike={l.retiree}>{l.matchLabel}</div>
 							<div class="pmarket" class:strike={l.retiree}>{l.libelleFr}</div>
+							{#if l.mentionNeutre}<div class="pnote">la moins solide de ton ticket</div>{/if}
 						</div>
 					{/each}
 				</div>
@@ -186,6 +194,13 @@
 	.pmarket.strike {
 		color: var(--c-ink-3);
 		text-decoration: line-through;
+	}
+	.pnote {
+		font-size: 12px;
+		line-height: 1.3;
+		color: var(--c-ink-3);
+		padding-left: 14px;
+		font-style: italic;
 	}
 	.ptotal {
 		display: flex;

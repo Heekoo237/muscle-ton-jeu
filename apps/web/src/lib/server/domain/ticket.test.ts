@@ -8,17 +8,24 @@ import {
 } from './ticket';
 import type { Selection } from '$lib/types';
 
-/** Fabrique une sélection analysable minimale. */
-function sel(ordre: number, probabilite: number, fixtureId = ordre): Selection {
+/** Fabrique une sélection analysable minimale (seuil explicite pour le test). */
+function sel(
+	ordre: number,
+	probabilite: number,
+	fixtureId = ordre,
+	marche: Selection['marche'] = 'WIN_HOME',
+	seuilFragile = 0.55
+): Selection {
 	return {
 		ordre,
 		texteBrut: `sel ${ordre}`,
 		fixtureId,
 		matchLabel: `Match ${ordre}`,
-		marche: 'WIN_HOME',
+		marche,
 		etatResolution: 'certain',
 		coteSaisie: null,
 		probabilite,
+		seuilFragile,
 		fragile: false,
 		retireeDuRenforce: false,
 		libelleFr: `Match ${ordre}`
@@ -34,7 +41,7 @@ describe('productProbability', () => {
 describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4)', () => {
 	it('retire les sélections fragiles et améliore la probabilité', () => {
 		const s = [sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.72), sel(5, 0.3)];
-		const r = buildReinforced(s, 0.55);
+		const r = buildReinforced(s);
 		expect(r.retirees).toEqual([5]); // la seule sous 0,55
 		expect(r.probaRenforcee).toBeGreaterThan(r.probaTotale);
 		expect(r.rienARetirer).toBe(false);
@@ -43,7 +50,7 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4
 	it('ne descend jamais sous 4 sélections, même si le seuil le justifierait', () => {
 		// 5 sélections, 4 fragiles : on ne peut en retirer qu’une (plancher 4).
 		const s = [sel(1, 0.9), sel(2, 0.3), sel(3, 0.2), sel(4, 0.25), sel(5, 0.35)];
-		const r = buildReinforced(s, 0.55);
+		const r = buildReinforced(s);
 		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
 		expect(gardees).toBe(REINFORCED_FLOOR);
 		expect(r.retirees).toEqual([3]); // la plus fragile d’abord (proba 0,2)
@@ -51,16 +58,47 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4
 
 	it('« rien à retirer » quand aucune sélection n’est fragile', () => {
 		const s = [sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.72)];
-		const r = buildReinforced(s, 0.55);
+		const r = buildReinforced(s);
 		expect(r.rienARetirer).toBe(true);
 		expect(r.retirees).toEqual([]);
 	});
 
 	it('ne retire jamais sous le plancher même avec beaucoup de fragiles', () => {
 		const s = Array.from({ length: 6 }, (_, i) => sel(i + 1, 0.2));
-		const r = buildReinforced(s, 0.55);
+		const r = buildReinforced(s);
 		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
 		expect(gardees).toBe(REINFORCED_FLOOR);
+	});
+});
+
+describe('badge « fragile » vs mention neutre (seuil PAR MARCHÉ)', () => {
+	it('retire une double chance faible SANS badge rouge (mention neutre)', () => {
+		const s = [
+			sel(1, 0.9),
+			sel(2, 0.85),
+			sel(3, 0.8),
+			sel(4, 0.78),
+			sel(5, 0.6, 5, 'DC_HOME_DRAW', 0.74) // sous 0,74 → retirable, mais marché « sûr »
+		];
+		const r = buildReinforced(s);
+		expect(r.retirees).toEqual([5]); // classement interne : elle part
+		const removed = r.selections.find((x) => x.ordre === 5)!;
+		expect(removed.retireeDuRenforce).toBe(true);
+		expect(removed.fragile).toBe(false); // JAMAIS de badge rouge sur double chance
+	});
+
+	it('porte le badge rouge sur un 1X2 sous son seuil', () => {
+		const s = [
+			sel(1, 0.9),
+			sel(2, 0.85),
+			sel(3, 0.8),
+			sel(4, 0.78),
+			sel(5, 0.4, 5, 'WIN_HOME', 0.44) // sous 0,44 → badge visible
+		];
+		const r = buildReinforced(s);
+		const removed = r.selections.find((x) => x.ordre === 5)!;
+		expect(removed.fragile).toBe(true);
+		expect(r.retirees).toEqual([5]);
 	});
 });
 

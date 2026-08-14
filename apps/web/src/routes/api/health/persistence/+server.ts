@@ -21,6 +21,7 @@ function testSelection(ordre: number, marche: Selection['marche']): Selection {
 		etatResolution: marche ? 'certain' : 'inconnu',
 		coteSaisie: 1.5,
 		probabilite: 0.6,
+		seuilFragile: null,
 		fragile: false,
 		retireeDuRenforce: false,
 		libelleFr: marche ? 'Équipe A gagne' : ''

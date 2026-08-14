@@ -1,6 +1,7 @@
 import type { PredictionsService } from './index';
 import type { Market, Prediction } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
+import { FRAGILE_THRESHOLD_BY_MARKET } from '$lib/server/domain/markets-meta';
 
 /**
  * Probabilités factices DÉTERMINISTES : mêmes (match, marché) → même valeur,
@@ -23,7 +24,9 @@ export class FakePredictions implements PredictionsService {
 			fixtureId,
 			marche,
 			probabilite: seeded(fixtureId, marche),
-			confiance: 0.8
+			confiance: 0.8,
+			seuilFragile: FRAGILE_THRESHOLD_BY_MARKET[marche],
+			source: 'model'
 		};
 	}
 
@@ -32,7 +35,9 @@ export class FakePredictions implements PredictionsService {
 			fixtureId,
 			marche,
 			probabilite: seeded(fixtureId, marche),
-			confiance: 0.8
+			confiance: 0.8,
+			seuilFragile: FRAGILE_THRESHOLD_BY_MARKET[marche],
+			source: 'model' as const
 		}));
 	}
 }

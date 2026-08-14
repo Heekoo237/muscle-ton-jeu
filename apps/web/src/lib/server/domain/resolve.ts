@@ -95,6 +95,7 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 				raison: 'inconnu',
 				coteSaisie: odds,
 				probabilite: null,
+				seuilFragile: null,
 				fragile: false,
 				retireeDuRenforce: false,
 				libelleFr: ''
@@ -113,6 +114,7 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 				etatResolution: 'certain',
 				coteSaisie: odds,
 				probabilite: null, // lue plus tard dans predictions
+				seuilFragile: null,
 				fragile: false,
 				retireeDuRenforce: false,
 				libelleFr: marketLabelFr(market.market, fx.home, fx.away)
@@ -131,6 +133,7 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 				candidates: market.candidates,
 				coteSaisie: odds,
 				probabilite: null,
+				seuilFragile: null,
 				fragile: false,
 				retireeDuRenforce: false,
 				libelleFr: ''
@@ -148,6 +151,7 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 			raison: market.raison ?? 'inconnu',
 			coteSaisie: odds,
 			probabilite: null,
+			seuilFragile: null,
 			fragile: false,
 			retireeDuRenforce: false,
 			libelleFr: ''

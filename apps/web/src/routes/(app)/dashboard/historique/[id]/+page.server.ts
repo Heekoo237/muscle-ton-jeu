@@ -31,6 +31,7 @@ export const load: PageServerLoad = async (event) => {
 		cote: s.coteSaisie,
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
+		mentionNeutre: s.retireeDuRenforce && !s.fragile,
 		analysable: s.etatResolution === 'certain',
 		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null
 	}));

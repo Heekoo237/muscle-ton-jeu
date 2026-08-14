@@ -6,7 +6,7 @@ import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications } from '$lib/server/services';
-import { buildReinforced, DEFAULT_FRAGILE_THRESHOLD } from '$lib/server/domain/ticket';
+import { buildReinforced } from '$lib/server/domain/ticket';
 import { computeCharge } from '$lib/server/domain/billing';
 import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
@@ -47,12 +47,14 @@ export const load: PageServerLoad = async (event) => {
 		ticket.selections.map(async (s) => {
 			if (s.etatResolution !== 'certain' || s.fixtureId === null || s.marche === null) return s;
 			const p = await predictions.get(s.fixtureId, s.marche);
-			return { ...s, probabilite: p?.probabilite ?? null };
+			// Match/marché absent de predictions → probabilité null : non analysé,
+			// non facturé, jamais retiré (règles d'archi). On lit, on ne devine pas.
+			return { ...s, probabilite: p?.probabilite ?? null, seuilFragile: p?.seuilFragile ?? null };
 		})
 	);
 
-	// 2. Produit, marquage fragile, renforcé par retrait (plancher 4).
-	const r = buildReinforced(withProbs, DEFAULT_FRAGILE_THRESHOLD);
+	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 4).
+	const r = buildReinforced(withProbs);
 
 	// 3. Rédaction sous garde-fous.
 	const fragiles = r.selections
@@ -127,6 +129,8 @@ export const load: PageServerLoad = async (event) => {
 		cote: s.coteSaisie,
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
+		// Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre.
+		mentionNeutre: s.retireeDuRenforce && !s.fragile,
 		analysable: s.etatResolution === 'certain',
 		// Probabilité par ligne : lue en table (jamais calculée ici), affichée dans
 		// la lecture détaillée. null quand la sélection n'est pas analysable.

@@ -117,6 +117,7 @@ function line(
 		cote,
 		fragile,
 		retiree,
+		mentionNeutre: retiree && !fragile,
 		analysable: true,
 		probabilitePct
 	};
