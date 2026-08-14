@@ -83,8 +83,10 @@
 				<div class="dash"></div>
 				<div class="plines">
 					{#each lines as l (l.matchLabel + l.libelleFr)}
-						<div class="pline">
-							<div class="pmatch" class:strike={l.retiree}>{l.matchLabel}</div>
+						<div class="pline" class:removed={l.retiree}>
+							<div class="pmatch" class:strike={l.retiree}>
+								{l.matchLabel}{#if l.retiree}<span class="ptag">retiré</span>{/if}
+							</div>
 							<div class="pmarket" class:strike={l.retiree}>{l.libelleFr}</div>
 							{#if l.analysable === false}
 								<div class="pnote muted">non analysé</div>
@@ -198,10 +200,33 @@
 		padding-left: 14px;
 		overflow-wrap: anywhere;
 	}
+	/* Ligne retirée : on doit la voir en UNE seconde, sans lire (y compris en plein
+	   soleil sur un écran bas de gamme). Rature nette et sombre, texte bien atténué,
+	   étiquette « retiré » en fin de ligne. */
 	.pmatch.strike,
 	.pmarket.strike {
 		color: var(--c-ink-3);
 		text-decoration: line-through;
+		text-decoration-color: var(--c-ink);
+		text-decoration-thickness: 2px;
+	}
+	.pline.removed {
+		opacity: 0.92;
+	}
+	.ptag {
+		display: inline-block;
+		margin-left: 8px;
+		padding: 1px 8px;
+		border-radius: var(--r-pill);
+		background: var(--c-ink);
+		color: var(--c-paper, #fdfaf3);
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.5px;
+		text-transform: uppercase;
+		text-decoration: none;
+		vertical-align: 1px;
+		white-space: nowrap;
 	}
 	.pnote {
 		font-size: 12px;

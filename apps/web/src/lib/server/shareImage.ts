@@ -105,14 +105,23 @@ function ticket(x: number, side: 'left' | 'right', vm: ShareVM): string {
 		const yy = y0 + 85 + i * rowH;
 		const strike = side === 'right' && l.retiree;
 		const ocre = side === 'left' && l.fragile;
+		// Ligne retirée : texte bien atténué, rature nette et SOMBRE, pastille
+		// « RETIRÉ ». On doit voir d'un coup d'œil que des lignes ont sauté.
 		const mCol = strike ? INK3 : ocre ? OCRE : INK;
 		const sCol = strike ? INK3 : ocre ? OCRE : INK3;
-		const match = clip(l.matchLabel, 24) + (ocre ? '  ▲' : '');
+		const match = clip(l.matchLabel, strike ? 18 : 24) + (ocre ? '  ▲' : '');
 		rows += `<text x="${x + 34}" y="${yy}" font-family="${MONO}" font-weight="500" font-size="26" fill="${mCol}">${esc(match)}</text>`;
 		rows += `<text x="${x + 34}" y="${yy + 30}" font-family="${MONO}" font-weight="500" font-size="22" fill="${sCol}">${esc(clip(l.libelleFr, 26))}</text>`;
 		if (strike) {
-			const wLine = Math.min(W - 68, match.length * 15.6);
-			rows += `<line x1="${x + 34}" y1="${yy - 8}" x2="${x + 34 + wLine}" y2="${yy - 8}" stroke="${INK3}" stroke-width="2"/>`;
+			// Rature nette et sombre, en travers des DEUX lignes.
+			rows += `<line x1="${x + 34}" y1="${yy - 8}" x2="${x + W - 34}" y2="${yy - 8}" stroke="${INK}" stroke-width="3"/>`;
+			rows += `<line x1="${x + 34}" y1="${yy + 22}" x2="${x + W - 34}" y2="${yy + 22}" stroke="${INK}" stroke-width="3"/>`;
+			// Pastille « RETIRÉ » à droite de la ligne.
+			const tagW = 96;
+			const tagX = x + W - 34 - tagW;
+			const tagY = yy - 30;
+			rows += `<rect x="${tagX}" y="${tagY}" width="${tagW}" height="34" rx="17" fill="${INK}"/>`;
+			rows += `<text x="${tagX + tagW / 2}" y="${tagY + 24}" text-anchor="middle" font-family="${GEIST}" font-weight="700" font-size="18" letter-spacing="1" fill="${PAPER}">RETIRÉ</text>`;
 		}
 	});
 	if (reste > 0) {

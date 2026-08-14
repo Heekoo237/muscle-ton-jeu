@@ -188,6 +188,10 @@ export const load: PageServerLoad = async (event) => {
 			statut: 'analyse',
 			billing,
 			userId: session.userId,
+			// FIGE l'état renforcé (fragile + retiré + proba) sur les sélections :
+			// l'historique et l'image de partage relisent CES drapeaux. Sans ça, le
+			// ticket renforcé s'affichait sans aucune ligne barrée (rien de persisté).
+			selections: r.selections,
 			result: {
 				probaTotalePct: writingInput.probaTotalePct,
 				probaRenforceePct: writingInput.probaRenforceePct,
