@@ -10,19 +10,25 @@
 
 	const index = $derived(String(selection.ordre).padStart(2, '0'));
 	const etat = $derived(selection.etatResolution);
+	// Marché reconnu comme non couvert (ou déclaré tel) : état CALME, pas une
+	// alerte rouge « corrige ou retire ». La ligne reste, non analysée, non facturée.
+	const nonCouvert = $derived(etat === 'inconnu' && selection.raison === 'non_couvert');
+	const dataState = $derived(nonCouvert ? 'noncouvert' : etat);
 </script>
 
-<button class="line" data-state={etat} type="button" onclick={() => onOpen(selection)}>
+<button class="line" data-state={dataState} type="button" onclick={() => onOpen(selection)}>
 	<span class="idx">{index}</span>
-	<span class="ic">{etat === 'certain' ? '✓' : etat === 'ambigu' ? '▲' : '✕'}</span>
+	<span class="ic">{etat === 'certain' ? '✓' : nonCouvert ? '–' : etat === 'ambigu' ? '▲' : '✕'}</span>
 	<div class="mid">
 		<div class="match">{selection.matchLabel}</div>
 		{#if etat === 'certain'}
 			<div class="market">{selection.libelleFr}</div>
+		{:else if nonCouvert}
+			<div class="hint">Ce marché, on ne le couvre pas — gardé, non analysé</div>
 		{:else if etat === 'ambigu'}
 			<div class="hint oc">À corriger — plusieurs lectures possibles</div>
 		{:else}
-			<div class="hint">Non couverte — corrige ou retire</div>
+			<div class="hint">Non reconnue — corrige ou retire</div>
 		{/if}
 	</div>
 	{#if etat === 'certain' && selection.coteSaisie != null}
@@ -80,6 +86,13 @@
 	.line[data-state='inconnu'] {
 		background: var(--c-rouge-wash);
 		border-left: 3px solid var(--c-rouge);
+	}
+	/* Non couvert : neutre (ni vert, ni ocre, ni rouge). Ce n'est pas une erreur. */
+	.line[data-state='noncouvert'] {
+		border-left: 3px solid var(--c-line-strong);
+	}
+	.line[data-state='noncouvert'] .ic {
+		color: var(--c-ink-3);
 	}
 	.idx {
 		flex: 0 0 24px;

@@ -79,18 +79,39 @@ const TABLE: Record<string, Market> = {
 };
 
 /**
- * Marchés explicitement NON couverts (CLAUDE.md). Reconnus pour pouvoir dire
- * « non analysé · non facturé », jamais pour produire une probabilité.
+ * Marchés explicitement NON couverts (CLAUDE.md). Reconnus — en français ET dans
+ * les notations anglaises des bookmakers (Betclic, 1xBet, Betwinner) — pour
+ * pouvoir dire « non analysé · non facturé », jamais pour produire une probabilité.
  */
 const UNCOVERED = [
+	// Corners
 	/\bcorner/,
+	// Cartons
 	/\bcarton/,
+	/\bcard/,
+	/\bbooking/,
+	// Tirs
 	/\btir(s)?\b/,
+	/\bshot/,
+	// Buteur (français + anglais)
 	/\bbuteur\b/,
+	/\bgoalscorer\b/,
+	/\bscorer\b/,
+	/\banytime\b/,
+	/\bto score\b/,
+	/\bmarque un but\b/,
+	// Mi-temps / première période
 	/\bmi-?temps\b/,
+	/\bhalf-?time\b/,
+	/\bhalf time\b/,
+	/\b1st half\b/,
+	/\b1re mi-temps\b/,
 	/\b1mt\b/,
 	/\bht\/ft\b/,
+	// Score exact
 	/\bscore exact\b/,
+	/\bcorrect score\b/,
+	// Handicap
 	/\bhandicap\b/
 ];
 

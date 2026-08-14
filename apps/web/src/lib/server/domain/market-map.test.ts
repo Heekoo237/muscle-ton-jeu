@@ -15,6 +15,16 @@ describe('resolveMarket — table stricte (règle d’archi n°3)', () => {
 		expect(resolveMarket('Buteur')).toMatchObject({ state: 'inconnu', raison: 'non_couvert' });
 	});
 
+	it('reconnaît aussi les notations ANGLAISES non couvertes (bookmakers)', () => {
+		// Le piège Betclic : « Goalscorer » n'était pas reconnu → l'utilisateur
+		// devait choisir un marché couvert (faux). Désormais : non couvert.
+		expect(resolveMarket('Goalscorer')).toMatchObject({ state: 'inconnu', raison: 'non_couvert' });
+		expect(resolveMarket('Anytime Goalscorer')).toMatchObject({ raison: 'non_couvert' });
+		expect(resolveMarket('Half Time Result')).toMatchObject({ raison: 'non_couvert' });
+		expect(resolveMarket('Total Cards')).toMatchObject({ raison: 'non_couvert' });
+		expect(resolveMarket('Correct Score')).toMatchObject({ raison: 'non_couvert' });
+	});
+
 	it('rend INCONNU tout ce qui n’est pas dans la table — jamais « probable »', () => {
 		const r = resolveMarket('xyz truc bizarre');
 		expect(r.state).toBe('inconnu');

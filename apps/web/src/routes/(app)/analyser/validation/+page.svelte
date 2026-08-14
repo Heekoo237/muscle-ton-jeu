@@ -82,6 +82,29 @@
 		void sauver('corriger', { ordre: String(cible.ordre), marche }, () => (lignes = avant));
 	}
 
+	/** « Ce marché, on ne le couvre pas » : la ligne reste, marquée non analysée. */
+	function marquerNonCouvert() {
+		const cible = open;
+		if (!cible) return;
+		const avant = lignes.map((s) => ({ ...s }));
+		lignes = lignes.map((s) =>
+			s.ordre === cible.ordre
+				? {
+						...s,
+						marche: null,
+						etatResolution: 'inconnu',
+						raison: 'non_couvert',
+						candidates: undefined,
+						probabilite: null,
+						seuilFragile: null,
+						libelleFr: ''
+					}
+				: s
+		);
+		open = null;
+		void sauver('nonCouvert', { ordre: String(cible.ordre) }, () => (lignes = avant));
+	}
+
 	/** Retrait instantané d'une ligne non reconnue. */
 	function retirer() {
 		const cible = open;
@@ -127,6 +150,7 @@
 	<CorrectionSheet
 		selection={open}
 		onChoose={corriger}
+		onNonCouvert={marquerNonCouvert}
 		onRemove={retirer}
 		onClose={() => (open = null)}
 	/>

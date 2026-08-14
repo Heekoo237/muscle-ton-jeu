@@ -74,6 +74,35 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// « Ce marché, on ne le couvre pas » : la ligne RESTE dans le ticket, marquée
+	// non analysée, jamais facturée, jamais retirée du renforcé. C'est la sortie
+	// honnête quand l'utilisateur a joué un marché hors de notre couverture — on
+	// ne le force plus à déclarer un pari qu'il n'a pas fait.
+	nonCouvert: async ({ cookies, request }) => {
+		const id = cookies.get('ticketId');
+		const ticket = id ? await getTicket(id) : undefined;
+		if (!ticket) redirect(303, '/analyser');
+
+		const form = await request.formData();
+		const ordre = Number(form.get('ordre'));
+		const selections = ticket.selections.map((s) =>
+			s.ordre === ordre
+				? {
+						...s,
+						marche: null,
+						etatResolution: 'inconnu' as const,
+						raison: 'non_couvert' as const,
+						candidates: undefined,
+						probabilite: null,
+						seuilFragile: null,
+						libelleFr: ''
+					}
+				: s
+		);
+		await updateTicket(ticket.id, { selections });
+		return { success: true };
+	},
+
 	// Retire une ligne non reconnue : elle sort du ticket, jamais facturée.
 	retirer: async ({ cookies, request }) => {
 		const id = cookies.get('ticketId');

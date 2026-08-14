@@ -10,14 +10,21 @@
 	let {
 		selection,
 		onChoose,
+		onNonCouvert,
 		onRemove,
 		onClose
 	}: {
 		selection: ValidationLineVM;
 		onChoose: (marche: Market, label: string) => void;
+		onNonCouvert: () => void;
 		onRemove: () => void;
 		onClose: () => void;
 	} = $props();
+
+	// Marché déjà reconnu comme NON couvert (buteur, mi-temps, corners, cartons…) :
+	// on ne pousse pas la liste des marchés couverts, on explique. La liste reste
+	// dessous, seulement au cas où on aurait mal lu.
+	const dejaNonCouvert = $derived(selection.raison === 'non_couvert');
 
 	const GROUPS: { titre: string; markets: Market[] }[] = [
 		{ titre: 'Résultat', markets: ['WIN_HOME', 'DRAW', 'WIN_AWAY'] },
@@ -43,6 +50,16 @@
 	</div>
 
 	<div class="scroll">
+		{#if dejaNonCouvert}
+			<div class="nc-banner">
+				<p class="nc-titre">Ce marché, on ne le couvre pas encore.</p>
+				<p class="nc-sous">
+					On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas.
+				</p>
+			</div>
+			<div class="glabel t-small">Si on a mal lu, choisis ton vrai pari</div>
+		{/if}
+
 		{#each GROUPS as g (g.titre)}
 			<div class="group">
 				<div class="glabel t-small">{g.titre}</div>
@@ -62,7 +79,12 @@
 		{/each}
 	</div>
 
-	<div class="retirer-form">
+	<div class="actions-bas">
+		{#if !dejaNonCouvert}
+			<button type="button" class="nc-btn" onclick={onNonCouvert}>
+				Ce marché, on ne le couvre pas
+			</button>
+		{/if}
 		<button type="button" class="retirer" onclick={onRemove}>Retirer cette ligne du ticket</button>
 	</div>
 </div>
@@ -160,10 +182,42 @@
 	.chip:active {
 		transform: scale(0.98);
 	}
-	.retirer-form {
+	.nc-banner {
+		padding: var(--s-3) var(--s-4);
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+		margin-bottom: var(--s-2);
+	}
+	.nc-titre {
+		margin: 0 0 var(--s-1);
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.nc-sous {
+		margin: 0;
+		font-size: 14px;
+		color: var(--c-ink-2);
+	}
+	.actions-bas {
 		margin-top: var(--s-3);
 		padding-top: var(--s-3);
 		border-top: 1px solid var(--c-line);
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+	.nc-btn {
+		width: 100%;
+		height: 48px;
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line-strong);
+		border-radius: var(--r-pill);
+		font-family: var(--font-body);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink);
+		cursor: pointer;
 	}
 	.retirer {
 		width: 100%;

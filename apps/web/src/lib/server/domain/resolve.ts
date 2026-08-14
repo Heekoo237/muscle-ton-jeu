@@ -150,7 +150,15 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 			};
 		}
 
-		// Marché non couvert ou inconnu, mais match reconnu.
+		// Marché non couvert ou inconnu, mais match reconnu. On JOURNALISE la
+		// notation demandée : c'est elle qui nous dira quels marchés (ou quelles
+		// notations de bookmaker) ajouter en priorité à la table.
+		const quoi = marketText || ligne.texteBrut;
+		if (market.raison === 'non_couvert') {
+			console.warn(`[résolution] marché NON COUVERT demandé : « ${quoi} »`);
+		} else {
+			console.warn(`[résolution] notation NON RECONNUE : « ${quoi} »`);
+		}
 		return {
 			ordre,
 			texteBrut: ligne.texteBrut,
