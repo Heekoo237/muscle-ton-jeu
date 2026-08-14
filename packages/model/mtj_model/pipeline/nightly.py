@@ -236,37 +236,76 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows), "detail": detail}
 
 
+# Marchés représentatifs : un par famille de source pour montrer l'hybride.
+#   WIN_HOME     → cote (ou model_marge_excessive si la ligue a basculé)
+#   DC_HOME_DRAW → modèle
+#   OVER_1_5     → modèle
+#   OVER_2_5     → cote (ou repli si la cote totals manquait)
+_SAMPLE_MARKETS = ("WIN_HOME", "DC_HOME_DRAW", "OVER_1_5", "OVER_2_5")
+
+
 def sample_predictions(limit: int = 10) -> None:
     """Affiche un échantillon de predictions avec source + confiance (contrôle).
 
-    Priorise la Grèce (G1) pour montrer la bascule marge (model_marge_excessive),
-    puis un match à cote (1X2 = odds) pour le contraste.
+    Trois blocs :
+      1. l'état de source par ligue (`league_source_state`) — preuve de la bascule
+         marge ; c'est là que la Grèce apparaît en mode « model » même sans match
+         à venir dans la fenêtre ;
+      2. la répartition des predictions par source, tous jours confondus ;
+      3. un échantillon ÉTALÉ sur les ligues (un match représentatif par ligue,
+         quatre marchés-clés), pour voir l'hybride cote/modèle en un coup d'œil.
     """
-    sql = """
-        with dernier as (select max(jour_calcul) j from predictions)
+    etat_sql = """
+        select fd_code, mode, marge_7j, bascule_le
+          from league_source_state
+         order by (mode <> 'odds') desc, fd_code
+    """
+    # Un match par ligue (le premier du jour de calcul), sur les marchés-clés.
+    sample_sql = """
+        with dernier as (select max(jour_calcul) j from predictions),
+             premier as (
+               select f.league_id, min(p.fixture_id) as fid
+                 from predictions p
+                 join fixtures f on f.id = p.fixture_id
+                where p.jour_calcul = (select j from dernier)
+                group by f.league_id
+             )
         select l.provider_ref, th.nom, ta.nom, p.marche, p.probabilite,
                p.source, p.confiance, coalesce(p.bookmaker, '—')
           from predictions p
-          join fixtures f on f.id = p.fixture_id
-          join leagues l  on l.id = f.league_id
+          join premier  pr on pr.fid = p.fixture_id
+          join fixtures f  on f.id = p.fixture_id
+          join leagues  l  on l.id = f.league_id
           join teams th on th.id = f.team_home_id
           join teams ta on ta.id = f.team_away_id
          where p.jour_calcul = (select j from dernier)
-         order by case when l.provider_ref = 'G1' then 0
-                       when l.provider_ref = 'E0' then 1 else 2 end,
-                  p.fixture_id, p.marche
+           and p.marche = any(%s)
+         order by l.provider_ref, p.fixture_id,
+                  array_position(%s, p.marche)
          limit %s
     """
+    markets = list(_SAMPLE_MARKETS)
     with connect() as con:
         with con.cursor() as cur:
+            cur.execute(etat_sql)
+            etat = cur.fetchall()
             cur.execute("select source, count(*) from predictions group by source order by source")
             par_source = cur.fetchall()
-            cur.execute(sql, (limit,))
+            cur.execute(sample_sql, (markets, markets, limit))
             rows = cur.fetchall()
-    print("Répartition des predictions par source :")
+
+    print("État de source par ligue (league_source_state) :")
+    print(f"  {'lig':<5}{'mode':<26}{'marge 7j':>9}  dernière bascule")
+    for fd, mode, marge, bascule in etat:
+        mpct = f"{float(marge) * 100:.1f}%" if marge is not None else "—"
+        when = bascule.strftime("%Y-%m-%d") if bascule else "—"
+        print(f"  {fd:<5}{mode:<26}{mpct:>9}  {when}")
+
+    print("\nRépartition des predictions par source :")
     for src, n in par_source:
         print(f"  {src:<24} {n}")
-    print(f"\nÉchantillon ({len(rows)} lignes) :")
+
+    print(f"\nÉchantillon ({len(rows)} lignes, un match par ligue) :")
     print(f"  {'lig':<4}{'match':<34}{'marché':<14}{'proba':>7}{'source':>24}{'conf':>6}  book")
     for fd, h, a, m, proba, source, conf, book in rows:
         match = f"{h[:15]}–{a[:15]}"
