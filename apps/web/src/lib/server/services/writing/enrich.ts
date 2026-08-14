@@ -79,7 +79,7 @@ export function syntheseDeterministe(input: WritingInput): string {
 	if (input.rienARetirer) return synthRienARetirer(input);
 	const m = input.nbMatchs;
 	const matchs = `${enMots(m)} match${m > 1 ? 's' : ''}`;
-	if (input.nbFragiles <= 0) return choisir(synthNeutre(matchs, enMots(m)), input);
+	if (input.nbFragiles <= 0) return choisir(synthNeutre(matchs, enMots(m), input.nbRetirees), input);
 	return choisir(synthFragiles(matchs, input.nbFragiles), input);
 }
 
@@ -113,11 +113,20 @@ function synthFragiles(matchs: string, nbFragiles: number): string[] {
 	];
 }
 
-function synthNeutre(matchs: string, mMot: string): string[] {
+/**
+ * Cas « aucun badge rouge, mais un retrait » (ex. double chance) : le ticket
+ * n'est PAS « tout solide » — une sélection moins fiable a été allégée, et il est
+ * facturé. La synthèse doit donc reconnaître le retrait sans se contredire : ni
+ * « rien à retirer » (réservé au vrai zéro retrait, gratuit), ni « aucun fragile »
+ * suivi d'un retrait sec.
+ */
+function synthNeutre(matchs: string, mMot: string, nbRetirees: number): string[] {
+	const lesMoins =
+		nbRetirees <= 1 ? 'la sélection la moins solide' : 'les sélections les moins solides';
 	return [
-		`Ton ticket tient sur ${matchs}. On a allégé la sélection la moins solide.`,
-		`${cap(matchs)}, aucun fragile. On a juste retiré la plus faible.`,
-		`Sur tes ${mMot} sélections, rien de fragile. On a allégé le maillon le plus faible.`
+		`${cap(matchs)}. Aucun n'est vraiment risqué, mais on a allégé ${lesMoins}.`,
+		`Ton ticket tient sur ${matchs}. Rien de vraiment risqué, on a juste retiré ${lesMoins}.`,
+		`Sur tes ${mMot} sélections, aucune n'est vraiment risquée. On a allégé ${lesMoins}.`
 	];
 }
 

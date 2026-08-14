@@ -71,9 +71,11 @@ FRAGILE OU MOINS SOLIDE
 - Sélection « avecBadge = true » : tu peux dire « c'est risqué », « ton match le plus risqué », « fragile ».
 - Sélection « avecBadge = false » : dis seulement « la moins solide de ton ticket ». JAMAIS « fragile » ni « risqué » : la lecture est moins sûre, on ne crie pas au loup.
 
-LES FAITS
+LES FAITS — SOIT DES FAITS, SOIT L'AVEU, JAMAIS LES DEUX
 On te donne des faits déjà écrits (« encaisse peu à l'extérieur »). Ils jouent TOUS contre la sélection : ils expliquent pourquoi elle est faible. Utilise-en un ou deux par sélection, reformulés à ta façon. N'en invente AUCUN, n'en ajoute AUCUN.
-Si on ne te donne AUCUN fait : ne meuble pas, ne reste pas sur le pourcentage. Dis franchement qu'il n'y a rien de marquant à signaler, et que c'est la cote qui rend la sélection fragile (ou la place en dernier, sans badge). Exemple : « Benfica gagne, c'est ton match le plus risqué. On n'a rien de marquant à signaler ici. C'est la cote qui le rend fragile. »
+Quand tu as des faits, tu ne parles PAS de la cote : tu cites les faits, un point c'est tout.
+Quand on ne te donne AUCUN fait : ne meuble pas, ne reste pas sur le pourcentage. Dis franchement qu'il n'y a rien de marquant à signaler, et que c'est la cote qui rend la sélection fragile (ou la place en dernier, sans badge). Exemple : « Benfica gagne, c'est ton match le plus risqué. On n'a rien de marquant à signaler ici. C'est la cote qui le rend fragile. »
+Le mot « cote » n'apparaît donc QUE dans une explication SANS aucun fait. Jamais les deux ensemble.
 
 LES CHANCES
 On te donne « une chance sur deux » tout prêt. Reprends cette formule telle quelle. N'invente aucun autre nombre, aucun pourcentage.
@@ -119,6 +121,8 @@ function toAnalyse(raw: unknown, input: WritingInput): AnalyseTexte {
 	// peuvent donc pas être fabriqués (règle d'or n°1).
 	const synthese = syntheseDeterministe(input);
 	const valides = new Set(input.retraits.map((r) => r.ordre));
+	// Un retrait a-t-il des faits ? Si oui, l'aveu « c'est la cote » est interdit.
+	const aDesFaits = new Map(input.retraits.map((r) => [r.ordre, r.faits.length > 0]));
 	const parSelection: { ordre: number; texte: string }[] = [];
 	if (Array.isArray(o.parSelection)) {
 		for (const e of o.parSelection) {
@@ -131,6 +135,13 @@ function toAnalyse(raw: unknown, input: WritingInput): AnalyseTexte {
 	}
 	// Chaque retrait doit être expliqué : sinon la sortie est incomplète, on régénère.
 	if (parSelection.length !== input.retraits.length) throw new Error('explications incomplètes');
+	// Exclusivité faits / aveu : le mot « cote » ne doit pas apparaître quand des
+	// faits existent (sinon on régénère). L'aveu est réservé au cas sans fait.
+	for (const p of parSelection) {
+		if (aDesFaits.get(p.ordre) && /\bcotes?\b/i.test(p.texte)) {
+			throw new Error('aveu « cote » alors que des faits existent');
+		}
+	}
 	return { synthese, parSelection };
 }
 

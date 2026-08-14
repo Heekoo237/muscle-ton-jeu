@@ -3,7 +3,7 @@ import { FakeWriting } from './fake';
 import { allowedNumbersFor } from './allowed';
 import type { WritingInput, RetraitEnrichi } from './index';
 import { checkGeneratedText, checkCausality } from '$lib/server/domain/guards';
-import { chanceSur, chanceSurMot, faitsDescriptifs, enMots } from './enrich';
+import { chanceSur, chanceSurMot, faitsDescriptifs, enMots, syntheseDeterministe } from './enrich';
 import type { FaitsMatch } from '$lib/server/services/stats';
 
 function retrait(over: Partial<RetraitEnrichi> = {}): RetraitEnrichi {
@@ -73,6 +73,42 @@ describe('règle de causalité (brief §4.4)', () => {
 	it('le texte factice n’emploie aucune tournure causale', async () => {
 		const a = await new FakeWriting().writeAnalysis(input([retrait()]));
 		expect(checkCausality(texteComplet(a)).ok).toBe(true);
+	});
+});
+
+describe('synthèse neutre — un retrait sans badge ne se contredit pas', () => {
+	it('ne dit ni « rien à retirer » ni « aucun fragile » suivi d’un retrait sec', () => {
+		const inp = input([retrait({ avecBadge: false })], { nbFragiles: 0, nbMatchs: 6 });
+		const s = syntheseDeterministe(inp);
+		expect(s).toContain('moins solide'); // le retrait est reconnu
+		expect(s).not.toMatch(/rien à retirer/i); // réservé au vrai zéro retrait (gratuit)
+		expect(s).toMatch(/vraiment|juste/); // ton qui reconnaît la tension
+	});
+
+	it('accorde le pluriel selon le nombre de retraits', () => {
+		const un = syntheseDeterministe(input([retrait({ avecBadge: false })], { nbFragiles: 0, nbMatchs: 6 }));
+		expect(un).toContain('la sélection la moins solide');
+		const deux = syntheseDeterministe(
+			input([retrait({ ordre: 2, avecBadge: false }), retrait({ ordre: 4, avecBadge: false })], {
+				nbFragiles: 0,
+				nbMatchs: 7
+			})
+		);
+		expect(deux).toContain('les sélections les moins solides');
+	});
+});
+
+describe('exclusivité faits / aveu « c’est la cote »', () => {
+	it('avec un fait : pas d’aveu sur la cote', async () => {
+		const a = await new FakeWriting().writeAnalysis(
+			input([retrait({ faits: ['Braga marque peu à l’extérieur.'] })])
+		);
+		expect(a.parSelection[0].texte).not.toMatch(/\bcote\b/i);
+	});
+
+	it('sans fait : l’aveu sur la cote apparaît', async () => {
+		const a = await new FakeWriting().writeAnalysis(input([retrait({ faits: [] })]));
+		expect(a.parSelection[0].texte).toMatch(/\bcote\b/i);
 	});
 });
 
