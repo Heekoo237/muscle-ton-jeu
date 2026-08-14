@@ -30,7 +30,12 @@ export const TEAM_ALIASES: Record<string, string> = {
 	'corum belediyespor': 'corum fk',
 	// Vitória SC = Vitória de Guimarães : Betclic dit « Guimaraes », Odds API « SC ».
 	// La contenance par mot ne peut pas rapprocher « guimaraes » et « sc » — alias requis.
-	'vitoria guimaraes': 'vitoria sc'
+	'vitoria guimaraes': 'vitoria sc',
+	// EXONYME FRANÇAIS : le bookmaker écrit « Séville », la base (Odds API) « Sevilla ».
+	// « seville » et « sevilla » ne partagent aucun mot entier → alias requis. (Même
+	// motif possible pour d'autres exonymes : Cologne/Köln, Naples/Napoli, etc. — on
+	// n'ajoute QUE ce que les logs prouvent, jamais au jugé.)
+	seville: 'sevilla'
 };
 
 /** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */

@@ -23,6 +23,7 @@ describe('team-aliases — carte curée, aucune fusion automatique', () => {
 
 	it('aliasFor renvoie la cible connue, sinon le nom inchangé', () => {
 		expect(aliasFor('paris sg')).toBe('paris saint germain');
+		expect(aliasFor('seville')).toBe('sevilla'); // exonyme français → nom Odds API
 		expect(aliasFor('arsenal')).toBe('arsenal');
 	});
 });
