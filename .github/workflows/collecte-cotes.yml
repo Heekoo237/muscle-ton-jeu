@@ -27,6 +27,7 @@ on:
           - collecter             # relève les cotes une fois
           - nocturne              # calcule et remplit predictions + échantillon
           - echantillon           # relit predictions + état de source (lecture seule)
+          - diag-totals           # diagnostic couverture plus/moins 2,5 (lecture fournisseur)
 
 concurrency:
   group: collecte-cotes          # jamais deux collectes en même temps
@@ -107,6 +108,10 @@ jobs:
       - name: Échantillon predictions + état de source (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'echantillon'
         run: python -m mtj_model.pipeline.nightly --sample 24
+
+      - name: Diagnostic couverture plus/moins 2,5 (lecture fournisseur)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-totals'
+        run: python -m mtj_model.pipeline.diag_totals
 
       - name: Surveillance (fraîcheur des jobs)
         if: github.event_name == 'schedule'
