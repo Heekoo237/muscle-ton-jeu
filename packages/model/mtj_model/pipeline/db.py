@@ -24,7 +24,9 @@ def dsn() -> str:
             f"{ENV_URL} absent. Renseigne la chaîne Postgres (pooler Supabase) "
             "avant de lancer le pipeline."
         )
-    return url
+    # Un copier-coller dans un secret ajoute souvent un retour à la ligne : sans
+    # ce strip, le nom de base devient « postgres\n » et la connexion échoue.
+    return url.strip()
 
 
 @contextmanager
