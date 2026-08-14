@@ -81,4 +81,5 @@ CURATED_ALIASES: dict[str, str] = {
     'torku konyaspor': 'konyaspor',  # « Torku Konyaspor » → « Konyaspor »
     'besiktas': 'besiktas jk',  # « Besiktas » → « Beşiktaş JK »
     'gaziantep': 'gazisehir gaziantep',  # « Gaziantep » → « Gazişehir Gaziantep »
+    'buyuksehyr': 'basaksehir',  # « Buyuksehyr » → « Basaksehir » (Istanbul Başakşehir, ex-Büyükşehir)
 }
