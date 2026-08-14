@@ -26,6 +26,33 @@ from .provider import NullProvider, get_provider
 from .sync import league_worklist, resolve_fixture
 
 
+def _margins(odds) -> dict:
+    """Marge du bookmaker par ligue : (Σ 1/cote) − 1 sur un groupe mutuel.
+
+    Le dévigage a été calibré au backtest sur Pinnacle (~2,84 %). Sur les ligues
+    où Pinnacle est absent, un autre book sert — sa marge est plus élevée. On la
+    mesure pour la voir a posteriori (par ligue ET par bookmaker retenu).
+    """
+    by_fx: dict[str, dict[str, float]] = defaultdict(dict)
+    books: dict[str, int] = defaultdict(int)
+    for o in odds:
+        by_fx[o.fixture_ref][o.marche] = o.cote
+        books[o.bookmaker] += 1
+    m1x2, mou = [], []
+    for mk in by_fx.values():
+        if all(k in mk for k in ("WIN_HOME", "DRAW", "WIN_AWAY")):
+            m1x2.append(1 / mk["WIN_HOME"] + 1 / mk["DRAW"] + 1 / mk["WIN_AWAY"] - 1)
+        if all(k in mk for k in ("OVER_2_5", "UNDER_2_5")):
+            mou.append(1 / mk["OVER_2_5"] + 1 / mk["UNDER_2_5"] - 1)
+    avg = lambda xs: round(100 * sum(xs) / len(xs), 2) if xs else None  # noqa: E731
+    return {
+        "book": max(books, key=books.get) if books else None,
+        "marge_1x2_pct": avg(m1x2),
+        "marge_ou_pct": avg(mou),
+        "matchs": len(by_fx),
+    }
+
+
 def _open_run(con) -> int:
     with con.cursor() as cur:
         cur.execute("insert into pipeline_runs (job, statut) values ('collector', 'running') returning id")
@@ -63,6 +90,7 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
         )
 
     detail: dict[str, int] = defaultdict(int)
+    marges: dict[str, dict] = {}
     erreurs: dict[str, str] = {}
     total = 0
     with connect() as con:
@@ -84,20 +112,28 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
                         _write_snapshot(con, fid, o.marche, o.bookmaker, o.cote, fenetre)
                         detail[lg["fd_code"]] += 1
                         total += 1
+                    if odds:
+                        marges[lg["fd_code"]] = _margins(odds)
             except Exception as exc:  # noqa: BLE001
                 erreurs[lg["fd_code"]] = str(exc)[:300]
 
         statut = "success" if not erreurs else ("failed" if len(erreurs) == len(leagues) else "partial")
         credits = getattr(provider, "credits_used", None)
         restants = getattr(provider, "credits_remaining", None)
-        journal = dict(detail) | {"fenetre": fenetre.isoformat(), "credits": credits, "credits_restants": restants}
+        journal = dict(detail) | {
+            "fenetre": fenetre.isoformat(), "credits": credits,
+            "credits_restants": restants, "marges": marges,
+        }
         if erreurs:
             journal["erreurs"] = erreurs
         _close_run(con, run_id, statut, total, journal, erreur="; ".join(erreurs) or None)
 
     print(f"Collecteur {fenetre:%Y-%m-%d %H:%M UTC} : {total} cotes relevées ({statut}).")
     for lg, n in sorted(detail.items()):
-        print(f"  {lg:<5} {n:>4} cotes")
+        m = marges.get(lg, {})
+        book = m.get("book", "—")
+        mg = m.get("marge_1x2_pct")
+        print(f"  {lg:<5} {n:>4} cotes  ·  {book:<12} marge 1X2 {mg if mg is not None else '—'}%")
     for lg, e in sorted(erreurs.items()):
         print(f"  {lg:<5} ÉCHEC : {e}")
     if credits is not None:

@@ -79,6 +79,7 @@ def parse_odds(events: list[dict], league_ref: str) -> list[ProviderOdds]:
         book = _pick_bookmaker(ev.get("bookmakers", []))
         if not book:
             continue
+        book_key = book.get("key") or BOOKMAKER  # bookmaker RÉELLEMENT utilisé
         for market in book.get("markets", []):
             key = market.get("key")
             for oc in market.get("outcomes", []):
@@ -88,7 +89,7 @@ def parse_odds(events: list[dict], league_ref: str) -> list[ProviderOdds]:
                     out.append(ProviderOdds(
                         fixture_ref=str(ev.get("id")), league_ref=league_ref,
                         date_utc=date, home=home, away=away,
-                        marche=marche, cote=float(price),
+                        marche=marche, cote=float(price), bookmaker=book_key,
                     ))
     return out
 

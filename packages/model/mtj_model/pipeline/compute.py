@@ -45,6 +45,7 @@ class PredictionRow:
     confiance: float
     source: str          # "odds" | "model" | "repli"
     seuil_fragile: float | None
+    bookmaker: str | None = None  # book source pour "odds" ; None pour "model"/"repli"
 
 
 def devig_fixture_odds(raw: dict[str, float]) -> dict[str, float]:
@@ -78,6 +79,7 @@ def league_predictions(
     league_code: str,
     ref_date: pd.Timestamp,
     odds_by_fixture: dict[int, dict[str, float]] | None = None,
+    book_by_fixture: dict[int, str] | None = None,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat pour ses matchs à venir.
 
@@ -89,6 +91,7 @@ def league_predictions(
     ce match : ses marchés restent INCONNUS (règle d'archi n°3), jamais devinés.
     """
     odds_by_fixture = odds_by_fixture or {}
+    book_by_fixture = book_by_fixture or {}
     if history.empty or history["home"].nunique() < 4:
         return []
     fit = fit_league(history, ref_date, XI_PER_DAY)
@@ -100,6 +103,7 @@ def league_predictions(
             continue  # équipe inconnue → marchés inconnus, on n'écrit rien
         model_probs = market_probabilities(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
         market_probs = devig_fixture_odds(odds_by_fixture.get(m.fixture_id, {}))
+        book = book_by_fixture.get(int(m.fixture_id))
         for marche in PROBABILITY_SOURCE:  # marchés couverts non-BTTS
             proba, source = _resolve(marche, model_probs, market_probs)
             rows.append(PredictionRow(
@@ -109,5 +113,6 @@ def league_predictions(
                 confiance=round(confidence_for(league_code, source), 4),
                 source=source,
                 seuil_fragile=FRAGILE_THRESHOLDS.get(marche),
+                bookmaker=book if source == "odds" else None,
             ))
     return rows

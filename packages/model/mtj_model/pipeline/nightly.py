@@ -68,38 +68,44 @@ def _fetch_history(con) -> pd.DataFrame:
     return df
 
 
-def _fetch_latest_odds(con, fixture_ids: list[int]) -> dict[int, dict[str, float]]:
+def _fetch_latest_odds(con, fixture_ids: list[int]) -> tuple[dict[int, dict[str, float]], dict[int, str]]:
+    """Dernière cote par (match, marché) + le bookmaker qui l'a fournie."""
     if not fixture_ids:
-        return {}
+        return {}, {}
     sql = """
-        select distinct on (fixture_id, marche) fixture_id, marche, cote
+        select distinct on (fixture_id, marche) fixture_id, marche, cote, bookmaker
           from odds_snapshots
          where fixture_id = any(%s)
          order by fixture_id, marche, releve_le desc
     """
-    out: dict[int, dict[str, float]] = defaultdict(dict)
+    odds: dict[int, dict[str, float]] = defaultdict(dict)
+    books: dict[int, str] = {}
     with con.cursor() as cur:
         cur.execute(sql, (fixture_ids,))
-        for fixture_id, marche, cote in cur.fetchall():
-            out[int(fixture_id)][marche] = float(cote)
-    return dict(out)
+        for fixture_id, marche, cote, bookmaker in cur.fetchall():
+            fid = int(fixture_id)
+            odds[fid][marche] = float(cote)
+            if bookmaker:
+                books[fid] = bookmaker  # un seul book par match (choisi à la collecte)
+    return dict(odds), books
 
 
 def _write_predictions(con, rows: list[PredictionRow], jour: date) -> None:
     sql = """
         insert into predictions
-            (fixture_id, marche, jour_calcul, probabilite, confiance, source, seuil_fragile, calcule_le)
-        values (%s, %s, %s, %s, %s, %s, %s, now())
+            (fixture_id, marche, jour_calcul, probabilite, confiance, source, seuil_fragile, bookmaker, calcule_le)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, now())
         on conflict (fixture_id, marche, jour_calcul) do update set
             probabilite   = excluded.probabilite,
             confiance     = excluded.confiance,
             source        = excluded.source,
             seuil_fragile = excluded.seuil_fragile,
+            bookmaker     = excluded.bookmaker,
             calcule_le    = now()
     """
     with con.cursor() as cur:
         cur.executemany(sql, [
-            (r.fixture_id, r.marche, jour, r.probabilite, r.confiance, r.source, r.seuil_fragile)
+            (r.fixture_id, r.marche, jour, r.probabilite, r.confiance, r.source, r.seuil_fragile, r.bookmaker)
             for r in rows
         ])
 
@@ -148,14 +154,15 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             _sync_via_provider(con, days)
             upcoming = _fetch_upcoming(con, days)
             history = _fetch_history(con)
-            odds = _fetch_latest_odds(con, [int(x) for x in upcoming["fixture_id"].tolist()]) if not upcoming.empty else {}
+            fixture_ids = [int(x) for x in upcoming["fixture_id"].tolist()] if not upcoming.empty else []
+            odds, books = _fetch_latest_odds(con, fixture_ids)
 
             ref_date = pd.Timestamp(jour)
             all_rows: list[PredictionRow] = []
             detail: dict[str, dict[str, int]] = defaultdict(lambda: {"odds": 0, "model": 0, "repli": 0})
             for league_code, up in upcoming.groupby("league_code"):
                 hist = history[history["league_code"] == league_code]
-                rows = league_predictions(hist, up, str(league_code), ref_date, odds)
+                rows = league_predictions(hist, up, str(league_code), ref_date, odds, books)
                 for r in rows:
                     detail[str(league_code)][r.source] += 1
                 all_rows.extend(rows)

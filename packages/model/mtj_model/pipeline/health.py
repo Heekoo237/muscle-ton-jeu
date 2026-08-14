@@ -21,6 +21,28 @@ STALE_AFTER = {"nightly": timedelta(hours=36), "collector": timedelta(hours=12)}
 # c'est légitime (hors-saison) : période de grâce de 14 j après le 1ᵉ collecteur.
 LEAGUE_SILENCE = timedelta(days=14)
 
+# Crédits fournisseur restants sous lesquels on alerte (≈ 1,5 j au rythme réel de
+# ~88/j). Laisse le temps de s'abonner avant l'épuisement du palier gratuit (500).
+CREDIT_LOW = 150
+
+
+def _credit_budget(cur, alerts: list[str]) -> None:
+    """Lit les crédits restants du dernier run collecteur et alerte s'ils sont bas."""
+    cur.execute(
+        """select detail->>'credits_restants'
+             from pipeline_runs
+            where job = 'collector' and detail ? 'credits_restants'
+            order by demarre_le desc limit 1"""
+    )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return
+    restants = int(float(row[0]))
+    if restants < CREDIT_LOW:
+        alerts.append(f"crédits fournisseur bas : {restants} restants (< {CREDIT_LOW}) — pense à t'abonner.")
+    else:
+        print(f"crédits     OK — {restants} restants")
+
 
 def _job_freshness(cur, alerts: list[str]) -> None:
     cur.execute("select now()")
@@ -68,6 +90,7 @@ def check() -> list[str]:
     with connect() as con, con.cursor() as cur:
         _job_freshness(cur, alerts)
         _league_silence(cur, alerts)
+        _credit_budget(cur, alerts)
     return alerts
 
 
