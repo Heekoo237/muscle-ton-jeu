@@ -1,9 +1,10 @@
 import type { SportsDataService } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { FAKE_TEAMS, fakeFixtures } from '$lib/server/fixtures/sports';
+import { ANALYSIS_WINDOW_DAYS } from '$lib/server/domain/window';
 
 export class FakeSportsData implements SportsDataService {
-	async upcomingFixtures(days = 7): Promise<Fixture[]> {
+	async upcomingFixtures(days = ANALYSIS_WINDOW_DAYS): Promise<Fixture[]> {
 		const now = Date.now();
 		const horizon = now + days * 24 * 3600 * 1000;
 		return fakeFixtures().filter((f) => {

@@ -10,6 +10,7 @@
 import type { SportsDataService } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
+import { ANALYSIS_WINDOW_DAYS } from '$lib/server/domain/window';
 
 interface FixtureRow {
 	id: number;
@@ -36,7 +37,7 @@ export class SupabaseSportsData implements SportsDataService {
 		return new Map((data ?? []).map((t) => [Number(t.id), t.nom as string]));
 	}
 
-	async upcomingFixtures(days = 7): Promise<Fixture[]> {
+	async upcomingFixtures(days = ANALYSIS_WINDOW_DAYS): Promise<Fixture[]> {
 		const nowIso = new Date().toISOString();
 		const horizonIso = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
 		const { data, error } = await supabaseAdmin()

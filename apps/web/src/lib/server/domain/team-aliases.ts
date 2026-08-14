@@ -23,10 +23,11 @@
  * avoir vu le nom exact côté base, jamais au jugé.
  */
 export const TEAM_ALIASES: Record<string, string> = {
-	// Betclic → The Odds API. Confirmés par l'échantillon nocturne (Sporting Lisbon).
+	// Betclic → The Odds API. Confirmés par les logs [résolution] d'un vrai ticket.
 	'paris sg': 'paris saint germain',
-	'sporting portugal': 'sporting lisbon'
-	// À compléter depuis les logs : « vitoria guimaraes » → ? , etc.
+	'sporting portugal': 'sporting lisbon',
+	// Çorum FK, ex-Çorum Belediyespor : Betclic garde l'ancien nom, Odds API le nouveau.
+	'corum belediyespor': 'corum fk'
 };
 
 /** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */

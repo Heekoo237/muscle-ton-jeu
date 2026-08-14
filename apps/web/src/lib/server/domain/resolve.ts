@@ -123,7 +123,7 @@ function diagnoseMatch(matchText: string, fixtures: Fixture[], teams: Team[]): M
 		);
 		if (fixture) return { kind: 'ok', fixture, homeTeam, awayTeam };
 		console.warn(
-			`[résolution] HORS FENÊTRE « ${matchText} » — équipes reconnues, aucun match dans les 7 jours`
+			`[résolution] HORS FENÊTRE « ${matchText} » — équipes reconnues, aucun match à venir en base (trop loin, ou pas encore coté)`
 		);
 		return { kind: 'hors_fenetre', homeTeam, awayTeam };
 	}

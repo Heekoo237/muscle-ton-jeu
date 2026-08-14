@@ -173,7 +173,20 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 	});
 
 	it('aucun candidat en base → hors_couverture (championnat vraiment absent)', () => {
-		const [s] = resolveTicket(raw('Corum Belediyespor - Lens  1  2.0'), F, T);
+		const [s] = resolveTicket(raw('Zzz Belediyespor - Lens  1  2.0'), F, T);
 		expect(s.raison).toBe('hors_couverture');
+	});
+
+	it('alias réel « Corum Belediyespor » → « Çorum FK » (issu des logs) : résolu', () => {
+		const T2: Team[] = [
+			{ id: 5, nom: 'Galatasaray', aliases: ['galatasaray'], leagueId: 1 },
+			{ id: 6, nom: 'Çorum FK', aliases: ['corum fk'], leagueId: 1 }
+		];
+		const F2: Fixture[] = [
+			{ id: 200, dateUtc: '', teamHome: 'Galatasaray', teamAway: 'Çorum FK', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		];
+		const [s] = resolveTicket(raw('Galatasaray - Corum Belediyespor  1  1.5'), F2, T2);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(200);
 	});
 });

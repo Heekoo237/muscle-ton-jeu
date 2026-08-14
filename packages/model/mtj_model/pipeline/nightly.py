@@ -29,7 +29,11 @@ from .db import connect
 from .provider import NullProvider, get_provider
 from .source_mode import next_mode
 
-DEFAULT_DAYS = 7
+# Fenêtre d'analyse (jours à venir). DOIT rester égale à ANALYSIS_WINDOW_DAYS côté
+# app (apps/web/src/lib/server/domain/window.ts) : le nocturne calcule les probas
+# pour cette fenêtre, l'app résout les tickets sur la MÊME. 7 j était trop court —
+# un ticket se compose 1 à 3 semaines avant les matchs.
+DEFAULT_DAYS = 21
 
 
 def _repli_rates(repli: dict[str, dict[str, list[int]]]) -> list[dict]:

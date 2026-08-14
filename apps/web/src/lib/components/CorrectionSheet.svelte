@@ -67,10 +67,10 @@
 						n'as rien à corriger.
 					</p>
 				{:else if horsFenetre}
-					<p class="nc-titre">Ce match n'est pas dans les 7 prochains jours.</p>
+					<p class="nc-titre">Ce match n'est pas encore dans notre période d'analyse.</p>
 					<p class="nc-sous">
-						On analyse les matchs de la semaine à venir. On le garde, sans l'analyser ni te le
-						facturer.
+						On analyse les matchs à venir dès qu'ils sont programmés et cotés. On le garde, sans
+						l'analyser ni te le facturer.
 					</p>
 				{:else if nonResolu}
 					<p class="nc-titre">On n'a pas retrouvé ce match.</p>

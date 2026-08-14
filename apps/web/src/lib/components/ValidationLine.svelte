@@ -35,7 +35,7 @@
 		{:else if nonResolu}
 			<div class="hint">On n'a pas retrouvé ce match — gardé, non analysé</div>
 		{:else if horsFenetre}
-			<div class="hint">Match pas dans les 7 prochains jours — gardé, non analysé</div>
+			<div class="hint">Match pas encore dans la période analysée — gardé, non analysé</div>
 		{:else if nonCouvert}
 			<div class="hint">Ce marché, on ne le couvre pas — gardé, non analysé</div>
 		{:else if etat === 'ambigu'}
