@@ -25,6 +25,7 @@ on:
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
           - collecter             # relève les cotes une fois
+          - nocturne              # calcule et remplit predictions + échantillon
 
 concurrency:
   group: collecte-cotes          # jamais deux collectes en même temps
@@ -94,6 +95,13 @@ jobs:
       - name: Collecter les cotes
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')
         run: python -m mtj_model.pipeline.collector
+
+      - name: Pipeline nocturne (remplit predictions) + échantillon
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'nocturne'
+        run: |
+          python -m mtj_model.pipeline.nightly
+          echo "----- échantillon -----"
+          python -m mtj_model.pipeline.nightly --sample 12
 
       - name: Surveillance (fraîcheur des jobs)
         if: github.event_name == 'schedule'

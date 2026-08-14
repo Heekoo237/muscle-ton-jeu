@@ -236,11 +236,52 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     return {"jour": str(jour), "fixtures": fixtures_done, "lignes": len(all_rows), "detail": detail}
 
 
+def sample_predictions(limit: int = 10) -> None:
+    """Affiche un échantillon de predictions avec source + confiance (contrôle).
+
+    Priorise la Grèce (G1) pour montrer la bascule marge (model_marge_excessive),
+    puis un match à cote (1X2 = odds) pour le contraste.
+    """
+    sql = """
+        with dernier as (select max(jour_calcul) j from predictions)
+        select l.provider_ref, th.nom, ta.nom, p.marche, p.probabilite,
+               p.source, p.confiance, coalesce(p.bookmaker, '—')
+          from predictions p
+          join fixtures f on f.id = p.fixture_id
+          join leagues l  on l.id = f.league_id
+          join teams th on th.id = f.team_home_id
+          join teams ta on ta.id = f.team_away_id
+         where p.jour_calcul = (select j from dernier)
+         order by case when l.provider_ref = 'G1' then 0
+                       when l.provider_ref = 'E0' then 1 else 2 end,
+                  p.fixture_id, p.marche
+         limit %s
+    """
+    with connect() as con:
+        with con.cursor() as cur:
+            cur.execute("select source, count(*) from predictions group by source order by source")
+            par_source = cur.fetchall()
+            cur.execute(sql, (limit,))
+            rows = cur.fetchall()
+    print("Répartition des predictions par source :")
+    for src, n in par_source:
+        print(f"  {src:<24} {n}")
+    print(f"\nÉchantillon ({len(rows)} lignes) :")
+    print(f"  {'lig':<4}{'match':<34}{'marché':<14}{'proba':>7}{'source':>24}{'conf':>6}  book")
+    for fd, h, a, m, proba, source, conf, book in rows:
+        match = f"{h[:15]}–{a[:15]}"
+        print(f"  {fd:<4}{match:<34}{m:<14}{float(proba):>7.3f}{source:>24}{float(conf):>6.2f}  {book}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Pipeline nocturne — calcule et écrit predictions.")
     ap.add_argument("--days", type=int, default=DEFAULT_DAYS, help="fenêtre de matchs à venir (jours)")
+    ap.add_argument("--sample", type=int, metavar="N", help="n'affiche qu'un échantillon de N predictions")
     args = ap.parse_args()
-    run_nightly(days=args.days)
+    if args.sample:
+        sample_predictions(args.sample)
+    else:
+        run_nightly(days=args.days)
 
 
 if __name__ == "__main__":
