@@ -6,6 +6,7 @@
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import ValidationLine from '$lib/components/ValidationLine.svelte';
 	import CorrectionSheet from '$lib/components/CorrectionSheet.svelte';
+	import LoadingCurtain from '$lib/components/LoadingCurtain.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,11 +44,15 @@
 		return p;
 	}
 
-	// Finalisation : si des enregistrements sont encore en vol, on les attend
-	// d'abord (le serveur lit le ticket en base), puis on soumet réellement.
+	// Finalisation : on affiche le rideau « On calcule tes chances » (le calcul —
+	// probabilités + rédaction — a lieu maintenant, à l'affichage du résultat), et
+	// si des enregistrements sont encore en vol on les attend d'abord (le serveur
+	// lit le ticket en base) avant de soumettre réellement.
 	let finalisation = false;
+	let calcul = $state(false);
 	async function onFinaliser(e: SubmitEvent) {
 		if (finalisation) return; // deuxième passage : on laisse partir
+		calcul = true; // le rideau reste visible pendant la navigation vers le résultat
 		if (enVol.length > 0) {
 			e.preventDefault();
 			await Promise.allSettled(enVol);
@@ -125,6 +130,11 @@
 		onRemove={retirer}
 		onClose={() => (open = null)}
 	/>
+{/if}
+
+{#if calcul}
+	<!-- Rideau pendant le calcul (probabilités + rédaction) : plus d'écran figé. -->
+	<LoadingCurtain steps={['On calcule tes chances…']} current={0} />
 {/if}
 
 <style>

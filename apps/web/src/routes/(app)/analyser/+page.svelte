@@ -4,7 +4,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { compressImage } from '$lib/compressImage';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
-	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
+	import LoadingCurtain from '$lib/components/LoadingCurtain.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -33,11 +33,13 @@
 		}
 	});
 
-	// Écran de lecture : pendant l'analyse, on montre un état réel qui avance
-	// (on lit → on reconnaît → on calcule), sur fond de bandeau d'ambiance. Pas de
-	// fausse barre de progression, pas de pourcentage inventé. Le mouvement est
-	// autorisé AVANT le résultat, jamais pendant.
-	const STEPS = ['On lit ta capture…', 'On reconnaît les matchs…', 'On calcule tes chances…'];
+	// Écran de lecture : état RÉEL, jamais un minuteur factice. Cette étape du
+	// parcours fait deux choses côté serveur — lire la capture (vision, l'essentiel
+	// du temps) puis reconnaître les matchs (résolution). « On calcule tes chances »
+	// n'a PAS lieu ici : le calcul se fait à l'affichage du résultat, après la
+	// validation — on ne l'annonce donc pas ici. Le mouvement de fond (« CHARGEMENT »)
+	// dit que ça travaille, sans fausse progression.
+	const STEPS = ['On lit ta capture…', 'On reconnaît les matchs…'];
 
 	let reading = $state(false);
 	let step = $state(0);
@@ -82,10 +84,10 @@
 
 	onDestroy(() => previews.forEach((u) => u && URL.revokeObjectURL(u)));
 
-	// Durée minimale d'affichage : chaque étape doit avoir le temps d'apparaître,
-	// même si le serveur répond instantanément (la vraie vision prendra le relais).
-	const STEP_MS = 850;
-	const MIN_VISIBLE = STEPS.length * STEP_MS; // 2 550 ms
+	// Le rideau reste au moins ce temps affiché pour ne pas CLIGNOTER si le serveur
+	// répond très vite (vision factice en local). Ce n'est pas une fausse
+	// progression : les ÉTAPES, elles, n'avancent que sur de vrais événements.
+	const MIN_VISIBLE = 600;
 </script>
 
 <svelte:head>
@@ -115,15 +117,13 @@
 				if (compressed[i]) formData.set(`capture_${i}`, compressed[i]!, `capture_${i}.jpg`);
 			}
 			reading = true;
-			step = 0;
+			step = 0; // « On lit ta capture » — vraie durée de l'appel vision
 			const started = Date.now();
-			const t1 = setTimeout(() => (step = 1), STEP_MS);
-			const t2 = setTimeout(() => (step = 2), STEP_MS * 2);
 			return async ({ result }) => {
+				// Réponse reçue : la lecture est faite, les matchs sont reconnus.
+				step = 1;
 				const wait = Math.max(0, MIN_VISIBLE - (Date.now() - started));
-				await new Promise((r) => setTimeout(r, wait));
-				clearTimeout(t1);
-				clearTimeout(t2);
+				if (wait) await new Promise((r) => setTimeout(r, wait));
 				// Échec (lecture impossible) : on rend la main pour réessayer.
 				if (result.type !== 'redirect') reading = false;
 				await applyAction(result);
@@ -188,23 +188,8 @@
 </main>
 
 {#if reading}
-	<!-- Écran de lecture, plein cadre. Fond crème (jamais blanc ni sombre, même en
-	     attente — DESIGN §2.2), bandeau d'ambiance en tête, état réel au centre. -->
-	<div class="reading" role="status" aria-live="polite">
-		<AmbianceBanner />
-		<div class="reading-body">
-			<ol class="steps">
-				{#each STEPS as s, i (s)}
-					<li class="step" class:on={i <= step} class:done={i < step}>
-						<span class="dot" aria-hidden="true">{i < step ? '✓' : '•'}</span>
-						<span class="label">{s}</span>
-					</li>
-				{/each}
-			</ol>
-			<p class="t-small hint">On garde ton ticket. Ça arrive.</p>
-		</div>
-		<AmbianceBanner />
-	</div>
+	<!-- Rideau de lecture : étapes RÉELLES + fond « CHARGEMENT » animé (§5). -->
+	<LoadingCurtain steps={STEPS} current={step} />
 {/if}
 
 <style>
@@ -332,77 +317,5 @@
 		background: var(--c-canvas-sunk);
 		color: var(--c-ink-mute);
 		border: 1px solid var(--c-line);
-	}
-
-	/* ---- Écran de lecture ---- */
-	.reading {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: var(--c-canvas);
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-	}
-	.reading-body {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: flex-start;
-		gap: var(--s-6);
-		max-width: var(--container-max);
-		width: 100%;
-		margin-inline: auto;
-		padding: var(--s-8) var(--s-4);
-		box-sizing: border-box;
-	}
-	.steps {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-	}
-	.step {
-		display: flex;
-		align-items: baseline;
-		gap: var(--s-3);
-		font-family: var(--font-body);
-		font-size: 22px;
-		font-weight: 600;
-		letter-spacing: -0.4px;
-		color: var(--c-ink);
-		/* Chaque ligne apparaît en fondu quand l'étape commence. */
-		opacity: 0;
-		transform: translateY(4px);
-		transition:
-			opacity 260ms ease-out,
-			transform 260ms ease-out;
-	}
-	.step.on {
-		opacity: 1;
-		transform: none;
-	}
-	/* Les étapes franchies reculent, sans disparaître. */
-	.step.done {
-		opacity: 0.5;
-		font-weight: 400;
-	}
-	.step .dot {
-		flex: 0 0 auto;
-		color: var(--c-ink-3);
-		font-size: 16px;
-		line-height: 1;
-	}
-	.hint {
-		color: var(--c-ink-3);
-		margin: 0;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.step {
-			transition: none;
-		}
 	}
 </style>
