@@ -17,7 +17,8 @@ on:
         type: choice
         default: collecter
         options:
-          - catalogue-competitions # liste TOUTES les compétitions foot chez le fournisseur + coût (gratuit)
+          - catalogue-competitions # liste TOUTES les compétitions foot + régime + coût (gratuit)
+          - sonder-marches         # sonde double_chance/btts/1,5/3,5 sur un échantillon (crédits bornés)
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - migrer-base           # crée/complète les tables dans Supabase
           - backfill-historique   # charge 3 saisons football-data (une fois)
@@ -57,6 +58,10 @@ jobs:
       - name: Catalogue des compétitions football chez le fournisseur (gratuit, /sports)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'catalogue-competitions'
         run: python -m mtj_model.pipeline.catalogue
+
+      - name: Sonder les marchés additionnels sur un échantillon (crédits bornés)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'sonder-marches'
+        run: python -m mtj_model.pipeline.probe_markets
 
       - name: Vérifier la couverture des 11 championnats
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-couverture'
