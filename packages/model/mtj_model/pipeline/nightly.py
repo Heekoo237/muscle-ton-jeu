@@ -345,15 +345,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             "detail": detail, "repli_marches": repli_rates, "totals_2_5_books": totals_books}
 
 
-# Marchés représentatifs : un par famille de source pour montrer l'hybride.
-#   WIN_HOME     → cote (ou model_marge_excessive si la ligue a basculé)
-#   DC_HOME_DRAW → modèle
-#   OVER_1_5     → modèle
-#   OVER_2_5     → cote (ou repli si la cote totals manquait)
-_SAMPLE_MARKETS = ("WIN_HOME", "DC_HOME_DRAW", "OVER_1_5", "OVER_2_5")
-
-
-def sample_predictions(limit: int = 10) -> None:
+def sample_predictions(limit: int = 30) -> None:
     """Affiche un échantillon de predictions avec source + confiance (contrôle).
 
     Trois blocs :
@@ -364,43 +356,51 @@ def sample_predictions(limit: int = 10) -> None:
       3. un échantillon ÉTALÉ sur les ligues (un match représentatif par ligue,
          quatre marchés-clés), pour voir l'hybride cote/modèle en un coup d'œil.
     """
+    # Nom LISIBLE depuis league_catalog (« Ligue 2 - France »), pas le code technique.
     etat_sql = """
-        select fd_code, mode, marge_7j, bascule_le
-          from league_source_state
-         order by (mode <> 'odds') desc, fd_code
+        select coalesce(c.nom, s.fd_code) as nom, s.mode, s.marge_7j, s.bascule_le
+          from league_source_state s
+          left join league_catalog c on c.fd_code = s.fd_code
+         order by (s.mode <> 'odds') desc, s.fd_code
     """
-    # Un match par ligue (le premier du jour de calcul), sur les marchés-clés.
+    # UN match par RÉGIME (cote seule + modèle), tous ses marchés — pour voir les
+    # deux régimes côte à côte : cote_seule/cote_derivee + confiance basse d'un côté,
+    # sources modèle/cote calibrées de l'autre.
     sample_sql = """
         with dernier as (select max(jour_calcul) j from predictions),
-             premier as (
-               select f.league_id, min(p.fixture_id) as fid
-                 from predictions p
-                 join fixtures f on f.id = p.fixture_id
-                where p.jour_calcul = (select j from dernier)
-                group by f.league_id
+             par_regime as (
+               select distinct fixture_id, regime, nom from (
+                 select p.fixture_id, c.regime, c.nom
+                   from predictions p
+                   join fixtures f on f.id = p.fixture_id
+                   join leagues  l on l.id = f.league_id
+                   join league_catalog c on c.fd_code = l.provider_ref
+                  where p.jour_calcul = (select j from dernier)
+               ) t
+             ),
+             pick as (
+               select fixture_id, regime, nom,
+                      row_number() over (partition by regime order by fixture_id) rn
+                 from par_regime
              )
-        select l.provider_ref, th.nom, ta.nom, p.marche, p.probabilite,
+        select k.regime, k.nom, th.nom, ta.nom, p.marche, p.probabilite,
                p.source, p.confiance, coalesce(p.bookmaker, '—')
           from predictions p
-          join premier  pr on pr.fid = p.fixture_id
-          join fixtures f  on f.id = p.fixture_id
-          join leagues  l  on l.id = f.league_id
+          join pick k on k.fixture_id = p.fixture_id and k.rn = 1
+          join fixtures f on f.id = p.fixture_id
           join teams th on th.id = f.team_home_id
           join teams ta on ta.id = f.team_away_id
          where p.jour_calcul = (select j from dernier)
-           and p.marche = any(%s)
-         order by l.provider_ref, p.fixture_id,
-                  array_position(%s, p.marche)
+         order by k.regime, p.fixture_id, p.marche
          limit %s
     """
-    markets = list(_SAMPLE_MARKETS)
     with connect() as con:
         with con.cursor() as cur:
             cur.execute(etat_sql)
             etat = cur.fetchall()
             cur.execute("select source, count(*) from predictions group by source order by source")
             par_source = cur.fetchall()
-            cur.execute(sample_sql, (markets, markets, limit))
+            cur.execute(sample_sql, (limit,))
             rows = cur.fetchall()
 
     # « mode » ici = état de la BASCULE MARGE (source_mode), PAS le régime calibré.
@@ -408,22 +408,24 @@ def sample_predictions(limit: int = 10) -> None:
     # confiance PLAFONNÉE (jamais « normale »). À ne pas confondre avec le régime
     # modèle d'un championnat backtesté.
     MODE_LABEL = {"model": "repli modèle (marge excessive)", "odds": "cote (marge normale)"}
-    print("Bascule marge par ligue (league_source_state) — état de source_mode, PAS le régime :")
-    print(f"  {'lig':<5}{'bascule marge':<32}{'marge 7j':>9}  dernière bascule")
-    for fd, mode, marge, bascule in etat:
+    print("Bascule marge par championnat (league_source_state) — état de source_mode, PAS le régime :")
+    print(f"  {'championnat':<26}{'bascule marge':<32}{'marge 7j':>9}  dernière bascule")
+    for nom, mode, marge, bascule in etat:
         mpct = f"{float(marge) * 100:.1f}%" if marge is not None else "—"
         when = bascule.strftime("%Y-%m-%d") if bascule else "—"
-        print(f"  {fd:<5}{MODE_LABEL.get(mode, mode):<32}{mpct:>9}  {when}")
+        print(f"  {str(nom)[:24]:<26}{MODE_LABEL.get(mode, mode):<32}{mpct:>9}  {when}")
 
     print("\nRépartition des predictions par source :")
     for src, n in par_source:
         print(f"  {src:<24} {n}")
 
-    print(f"\nÉchantillon ({len(rows)} lignes, un match par ligue) :")
-    print(f"  {'lig':<4}{'match':<34}{'marché':<14}{'proba':>7}{'source':>24}{'conf':>6}  book")
-    for fd, h, a, m, proba, source, conf, book in rows:
-        match = f"{h[:15]}–{a[:15]}"
-        print(f"  {fd:<4}{match:<34}{m:<14}{float(proba):>7.3f}{source:>24}{float(conf):>6.2f}  {book}")
+    REGIME_LABEL = {"cote_seule": "cote seule", "modele": "modèle"}
+    print(f"\nÉchantillon deux régimes ({len(rows)} lignes, un match par régime, tous marchés) :")
+    print(f"  {'régime':<11}{'championnat':<22}{'match':<28}{'marché':<14}{'proba':>7}  {'source':<22}{'conf':>5}  book")
+    for regime, nom, h, a, m, proba, source, conf, book in rows:
+        match = f"{h[:12]}–{a[:12]}"
+        print(f"  {REGIME_LABEL.get(regime, regime):<11}{str(nom)[:20]:<22}{match:<28}{m:<14}"
+              f"{float(proba):>7.3f}  {source:<22}{float(conf):>5.2f}  {book}")
 
 
 def main() -> None:
