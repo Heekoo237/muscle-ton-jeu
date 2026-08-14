@@ -74,19 +74,17 @@ def upsert_team(con, league_id: int, nom: str) -> int:
     """
     ckey = canonical_key(nom)
     with con.cursor() as cur:
-        cur.execute(
-            "select id, aliases from teams where league_id = %s and %s = any(aliases)",
-            (league_id, ckey),
-        )
-        row = cur.fetchone()
-        if row:
-            tid, aliases = row
-            if nom not in (aliases or []):
-                cur.execute(
-                    "update teams set aliases = coalesce(aliases, '{}') || %s where id = %s",
-                    ([nom], tid),
-                )
-            return tid
+        # Appariement par la clé canonique du NOM de chaque équipe (fiable), pas
+        # par les alias stockés (qui peuvent être périmés d'anciennes versions).
+        cur.execute("select id, nom, aliases from teams where league_id = %s", (league_id,))
+        for tid, tnom, aliases in cur.fetchall():
+            if canonical_key(tnom) == ckey or ckey in (aliases or []):
+                if nom not in (aliases or []):
+                    cur.execute(
+                        "update teams set aliases = coalesce(aliases, '{}') || %s where id = %s",
+                        ([nom], tid),
+                    )
+                return tid
         cur.execute(
             "insert into teams (nom, league_id, aliases) values (%s, %s, %s) returning id",
             (nom, league_id, [ckey, nom] if ckey != nom else [ckey]),
