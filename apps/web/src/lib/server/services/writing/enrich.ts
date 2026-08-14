@@ -14,6 +14,7 @@
  * d'aucune liste blanche.
  */
 import type { FaitsEquipe, FaitsMatch } from '$lib/server/services/stats';
+import type { WritingInput } from './index';
 
 const MOTS = [
 	'zéro',
@@ -49,6 +50,35 @@ export function chanceSur(proba: number | null): number | null {
 export function chanceSurMot(proba: number | null): string | null {
 	const x = chanceSur(proba);
 	return x === null ? null : `une chance sur ${enMots(x)}`;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Synthèse déterministe (niveau 1)                                         */
+/* ------------------------------------------------------------------------ */
+
+/** Capitale initiale. */
+function cap(s: string): string {
+	return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+/**
+ * La SYNTHÈSE — une phrase sur le ticket entier — est construite par CODE, pas
+ * par le modèle. Elle porte les compteurs du ticket (nombre de matchs, de
+ * fragiles) : ce sont exactement les nombres qu'un modèle fabrique le plus
+ * facilement (« six matchs » pour huit). Règle d'or n°1 : aucun de ces nombres
+ * ne sort du LLM. Le modèle garde les explications par sélection, où il excelle.
+ */
+export function syntheseDeterministe(input: WritingInput): string {
+	if (input.rienARetirer) return 'Rien à retirer. Ton ticket tient debout.';
+	const matchs = `${enMots(input.nbMatchs)} match${input.nbMatchs > 1 ? 's' : ''}`;
+	if (input.nbFragiles <= 0) {
+		return `Ton ticket tient sur ${matchs}. On a allégé les sélections les moins solides.`;
+	}
+	const fragiles =
+		input.nbFragiles === 1
+			? 'Un seul est fragile'
+			: `${cap(enMots(input.nbFragiles))} sont fragiles`;
+	return `Ton ticket tient sur ${matchs}. ${fragiles}, et il suffit d'un pour tout faire tomber.`;
 }
 
 /* ------------------------------------------------------------------------ */

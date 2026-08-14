@@ -14,7 +14,7 @@
  * masque d'abord les noms propres. Les faits descriptifs sont écrits en toutes
  * lettres (« deux », « trois »), donc n'ajoutent aucun nombre à autoriser.
  */
-import { extractNumbers } from '$lib/server/domain/guards';
+import { extractNumbers, extractNumberWords } from '$lib/server/domain/guards';
 import type { WritingInput } from './index';
 
 /** Les seuls seuils de marché du système (plus/moins de buts). */
@@ -34,5 +34,11 @@ export function allowedNumbersFor(input: WritingInput): number[] {
 	const seuils = input.retraits
 		.flatMap((r) => extractNumbers(r.libelleFr))
 		.filter((n) => SEUILS_MARCHES.has(n));
-	return [...base, ...chances, ...seuils];
+	// Les nombres DÉJÀ présents dans les faits fournis (« perdu deux fois », « cinq
+	// derniers matchs ») sont des valeurs calculées, donc autorisées : sinon le
+	// garde-fou des nombres en toutes lettres rejetterait un fait légitime.
+	const faits = input.retraits.flatMap((r) =>
+		r.faits.flatMap((f) => [...extractNumbers(f), ...extractNumberWords(f)])
+	);
+	return [...base, ...chances, ...seuils, ...faits];
 }

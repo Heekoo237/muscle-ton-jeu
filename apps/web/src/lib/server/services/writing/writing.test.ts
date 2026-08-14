@@ -61,6 +61,7 @@ describe('règle de causalité (brief §4.4)', () => {
 		expect(checkCausality('Napoli est risqué car il perd souvent.').ok).toBe(false);
 		expect(checkCausality("Napoli perd. C'est pourquoi on l'écarte.").ok).toBe(false);
 		expect(checkCausality("Napoli perd souvent, donc on a retiré ce match.").ok).toBe(false);
+		expect(checkCausality('Roma encaisse peu, donc défend bien dehors.').ok).toBe(false);
 	});
 
 	it('accepte une description sans causalité (faits côte à côte)', () => {
@@ -120,6 +121,32 @@ describe('garde-fou des nombres (règle d’or n°1)', () => {
 			'FSV Mainz 05',
 			'Leverkusen'
 		]);
+		expect(controle.ok).toBe(true);
+	});
+
+	it('un compteur inventé EN TOUTES LETTRES est rejeté (« six matchs » pour huit)', () => {
+		const inp = input([retrait({ ordre: 1 })], { nbMatchs: 8, nbFragiles: 2 });
+		// Le modèle fabrique « six » alors que le ticket tient sur huit matchs.
+		const controle = checkGeneratedText('Ton ticket tient sur six matchs.', allowedNumbersFor(inp));
+		expect(controle.ok).toBe(false);
+		expect(controle.numbers.offending).toContain(6);
+	});
+
+	it('le vrai compteur en toutes lettres passe (« huit matchs » quand nbMatchs=8)', () => {
+		const inp = input([retrait({ ordre: 1 })], { nbMatchs: 8, nbFragiles: 2 });
+		const controle = checkGeneratedText('Ton ticket tient sur huit matchs.', allowedNumbersFor(inp));
+		expect(controle.ok).toBe(true);
+	});
+
+	it('un fait fourni en toutes lettres n’est pas rejeté (« cinq derniers matchs »)', () => {
+		const inp = input([
+			retrait({ faits: ['Rennes a perdu trois de ses cinq derniers matchs.'] })
+		]);
+		const controle = checkGeneratedText(
+			'Rennes a perdu trois de ses cinq derniers matchs.',
+			allowedNumbersFor(inp),
+			['Rennes']
+		);
 		expect(controle.ok).toBe(true);
 	});
 

@@ -83,7 +83,7 @@ const CAUSAL: { label: string; re: RegExp }[] = [
 	{ label: 'à cause de', re: /à\s+cause\s+d/iu },
 	{ label: 'ce qui explique', re: /ce\s+qui\s+explique/iu },
 	{ label: 'cela explique', re: /(?:ça|cela|ceci)\s+explique/iu },
-	{ label: 'donc … retiré', re: /donc\b[^.!?]*retir/iu },
+	{ label: 'donc', re: word('donc') },
 	{ label: 'raison pour laquelle', re: /raison\s+pour\s+laquelle/iu }
 ];
 
@@ -126,6 +126,76 @@ export function extractNumbers(text: string): number[] {
 		const normalized = cleaned.replace(/\./g, '').replace(',', '.');
 		const value = Number(normalized);
 		if (!Number.isNaN(value)) out.push(value);
+	}
+	return out;
+}
+
+/**
+ * Nombres écrits EN TOUTES LETTRES. On les traque aussi : un compteur inventé
+ * (« six matchs » quand le ticket en a huit) est un nombre fabriqué au même titre
+ * qu'un « 6 » — CLAUDE.md exige d'extraire TOUS les nombres, pas seulement les
+ * chiffres. On EXCLUT volontairement « un/une » : trop souvent article (« un
+ * match », « une chance ») pour être compté, et le moins risqué à fabriquer.
+ */
+const WORD_TO_NUM: Record<string, number> = {
+	zéro: 0,
+	deux: 2,
+	trois: 3,
+	quatre: 4,
+	cinq: 5,
+	six: 6,
+	sept: 7,
+	huit: 8,
+	neuf: 9,
+	dix: 10,
+	onze: 11,
+	douze: 12,
+	treize: 13,
+	quatorze: 14,
+	quinze: 15,
+	seize: 16,
+	'dix-sept': 17,
+	'dix-huit': 18,
+	'dix-neuf': 19,
+	vingt: 20
+};
+
+const NUMWORD_RE = new RegExp(
+	`(?<![${L}])(?:${Object.keys(WORD_TO_NUM)
+		.sort((a, b) => b.length - a.length)
+		.join('|')})(?![${L}])`,
+	'giu'
+);
+
+/**
+ * Extrait les nombres écrits en toutes lettres. Gère « X virgule Y » (ex. « trois
+ * virgule cinq » → 3.5) et « … et demi » (ex. « deux buts et demi » → 2.5) pour
+ * les seuils de marché énoncés en mots. « un/une » n'est pas compté (voir ci-dessus).
+ */
+export function extractNumberWords(text: string): number[] {
+	const t = text.toLowerCase();
+	const tokens = [...t.matchAll(NUMWORD_RE)];
+	const out: number[] = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const cur = tokens[i];
+		let val = WORD_TO_NUM[cur[0]];
+		const start = cur.index ?? 0;
+		const end = start + cur[0].length;
+		const next = tokens[i + 1];
+		// « trois virgule cinq » → 3.5 (décimale en mots, adjacente).
+		if (next) {
+			const between = t.slice(end, next.index ?? end);
+			if (/^\s+virgule\s+$/.test(between)) {
+				out.push(val + WORD_TO_NUM[next[0]] / 10);
+				i++;
+				continue;
+			}
+		}
+		// « … et demi(e) » dans les quelques mots qui suivent → + 0.5.
+		if (/^(?:\s+[\p{L}’']+){0,3}\s+et\s+demie?\b/u.test(t.slice(end))) {
+			val += 0.5;
+		}
+		out.push(val);
 	}
 	return out;
 }
@@ -173,7 +243,8 @@ export function checkNumbers(
 	maskNames: string[] = []
 ): NumbersResult {
 	const cleaned = maskNames.length ? stripNames(text, maskNames) : text;
-	const found = extractNumbers(cleaned);
+	// Chiffres ET nombres en toutes lettres : « 6 » comme « six » sont des nombres.
+	const found = [...extractNumbers(cleaned), ...extractNumberWords(cleaned)];
 	const offending: number[] = [];
 	for (const n of found) {
 		const matched = allowed.some((a) => Math.abs(a - n) <= epsilon);

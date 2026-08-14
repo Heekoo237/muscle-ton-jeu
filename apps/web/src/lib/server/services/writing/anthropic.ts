@@ -14,6 +14,7 @@
  */
 import type { AnalyseTexte, WritingInput, WritingService } from './index';
 import { allowedNumbersFor } from './allowed';
+import { syntheseDeterministe } from './enrich';
 import { formatWritingCost } from './cost';
 import { env } from '$env/dynamic/private';
 
@@ -49,18 +50,22 @@ TON
 CE QUE TU PRODUIS
 Un objet JSON, et rien d'autre autour :
 {
-  "synthese": "une seule phrase sur le ticket entier",
   "parSelection": [ { "ordre": 3, "texte": "deux à trois phrases courtes sur cette sélection" } ]
 }
-- « synthese » : une phrase qui dit combien de matchs tient le ticket et combien sont fragiles. Écris les nombres en toutes lettres.
-- « parSelection » : une entrée par sélection retirée qu'on te donne, avec son « ordre » exact. Deux à trois phrases.
+- Une entrée par sélection retirée qu'on te donne, avec son « ordre » exact. Deux à trois phrases.
+- La phrase de synthèse du ticket est écrite ailleurs : ne l'écris pas, ne compte pas les matchs.
+
+LES NOMBRES — RÈGLE STRICTE
+- N'invente AUCUN nombre. N'écris que les nombres qu'on te donne.
+- Le seuil de buts se recopie tel quel, en chiffres : « plus de 2,5 buts », jamais « deux buts et demi ».
+- Reprends « une chance sur deux » exactement comme fourni.
 
 RÈGLE DE CAUSALITÉ — NON NÉGOCIABLE
 Tu DÉCRIS des faits. Tu n'affirmes JAMAIS qu'un fait explique le retrait.
 - AUTORISÉ : « Napoli a perdu deux fois à domicile ce mois-ci. »
 - INTERDIT : « On a retiré ce match parce que Napoli est faible. »
-- N'écris jamais « parce que », « c'est pourquoi », « donc on a retiré », « ce qui explique ».
-Tu poses les faits côte à côte. Le lecteur relie tout seul.
+- N'écris jamais « parce que », « car », « donc », « c'est pourquoi », « ce qui explique ».
+Tu poses les faits côte à côte, séparés par des points. Le lecteur relie tout seul.
 
 FRAGILE OU MOINS SOLIDE
 - Sélection « avecBadge = true » : tu peux dire « c'est risqué », « ton match le plus risqué », « fragile ».
@@ -94,13 +99,9 @@ function userPayload(input: WritingInput): string {
 		chanceSurMot: r.chanceSurMot,
 		faits: r.faits
 	}));
-	return JSON.stringify({
-		nbMatchs: input.nbMatchs,
-		nbFragiles: input.nbFragiles,
-		nbRetirees: input.nbRetirees,
-		rienARetirer: input.rienARetirer,
-		retraits
-	});
+	// On ne passe PAS les compteurs du ticket : la synthèse (et ses nombres) est
+	// écrite par le code, pas par le modèle. Le modèle ne voit que les retraits.
+	return JSON.stringify({ retraits });
 }
 
 /** Extrait le premier objet JSON d'un texte (le modèle peut ajouter du bavardage). */
@@ -112,9 +113,10 @@ function extractJson(text: string): unknown {
 }
 
 function toAnalyse(raw: unknown, input: WritingInput): AnalyseTexte {
-	const o = raw as { synthese?: unknown; parSelection?: unknown };
-	const synthese = typeof o.synthese === 'string' ? o.synthese.trim() : '';
-	if (!synthese) throw new Error('synthèse manquante');
+	const o = raw as { parSelection?: unknown };
+	// La synthèse est déterministe (code), jamais du modèle : ses compteurs ne
+	// peuvent donc pas être fabriqués (règle d'or n°1).
+	const synthese = syntheseDeterministe(input);
 	const valides = new Set(input.retraits.map((r) => r.ordre));
 	const parSelection: { ordre: number; texte: string }[] = [];
 	if (Array.isArray(o.parSelection)) {
@@ -141,7 +143,7 @@ export class AnthropicWriting implements WritingService {
 
 	async writeAnalysis(input: WritingInput): Promise<AnalyseTexte> {
 		if (input.rienARetirer) {
-			return { synthese: 'Rien à retirer. Ton ticket tient debout.', parSelection: [] };
+			return { synthese: syntheseDeterministe(input), parSelection: [] };
 		}
 		const res = await fetch(API, {
 			method: 'POST',

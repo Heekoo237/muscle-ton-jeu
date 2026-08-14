@@ -1,6 +1,6 @@
 import type { WritingService, WritingInput, AnalyseTexte, RetraitEnrichi } from './index';
 import { allowedNumbersFor } from './allowed';
-import { enMots } from './enrich';
+import { syntheseDeterministe } from './enrich';
 
 /**
  * Rédaction factice DÉTERMINISTE : un texte au ton du produit qui n'emploie que
@@ -14,24 +14,10 @@ import { enMots } from './enrich';
  */
 export class FakeWriting implements WritingService {
 	async writeAnalysis(input: WritingInput): Promise<AnalyseTexte> {
-		if (input.rienARetirer) {
-			return { synthese: 'Rien à retirer. Ton ticket tient debout.', parSelection: [] };
-		}
-		const synthese = this.synthese(input);
+		const synthese = syntheseDeterministe(input);
+		if (input.rienARetirer) return { synthese, parSelection: [] };
 		const parSelection = input.retraits.map((r) => ({ ordre: r.ordre, texte: this.pourRetrait(r) }));
 		return { synthese, parSelection };
-	}
-
-	private synthese(input: WritingInput): string {
-		const matchs = `${enMots(input.nbMatchs)} match${input.nbMatchs > 1 ? 's' : ''}`;
-		if (input.nbFragiles <= 0) {
-			return `Ton ticket tient sur ${matchs}. On a allégé les sélections les moins solides.`;
-		}
-		const fragiles =
-			input.nbFragiles === 1
-				? 'Un seul est fragile'
-				: `${cap(enMots(input.nbFragiles))} sont fragiles`;
-		return `Ton ticket tient sur ${matchs}. ${fragiles}, et il suffit d'un pour tout faire tomber.`;
 	}
 
 	private pourRetrait(r: RetraitEnrichi): string {
