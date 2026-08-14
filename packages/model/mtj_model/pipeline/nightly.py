@@ -403,12 +403,17 @@ def sample_predictions(limit: int = 10) -> None:
             cur.execute(sample_sql, (markets, markets, limit))
             rows = cur.fetchall()
 
-    print("État de source par ligue (league_source_state) :")
-    print(f"  {'lig':<5}{'mode':<26}{'marge 7j':>9}  dernière bascule")
+    # « mode » ici = état de la BASCULE MARGE (source_mode), PAS le régime calibré.
+    # mode 'model' → repli modèle POUR MARGE excessive → source model_marge_excessive,
+    # confiance PLAFONNÉE (jamais « normale »). À ne pas confondre avec le régime
+    # modèle d'un championnat backtesté.
+    MODE_LABEL = {"model": "repli modèle (marge excessive)", "odds": "cote (marge normale)"}
+    print("Bascule marge par ligue (league_source_state) — état de source_mode, PAS le régime :")
+    print(f"  {'lig':<5}{'bascule marge':<32}{'marge 7j':>9}  dernière bascule")
     for fd, mode, marge, bascule in etat:
         mpct = f"{float(marge) * 100:.1f}%" if marge is not None else "—"
         when = bascule.strftime("%Y-%m-%d") if bascule else "—"
-        print(f"  {fd:<5}{mode:<26}{mpct:>9}  {when}")
+        print(f"  {fd:<5}{MODE_LABEL.get(mode, mode):<32}{mpct:>9}  {when}")
 
     print("\nRépartition des predictions par source :")
     for src, n in par_source:

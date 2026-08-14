@@ -28,7 +28,8 @@ on:
           - lister-equipes        # dump des équipes en base (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
-          - collecter             # relève les cotes une fois
+          - collecter             # relève les cotes une fois (fréquence graduée)
+          - collecter-tout        # relève TOUTES les compétitions maintenant (validation à la demande)
           - nocturne              # calcule et remplit predictions + échantillon
           - echantillon           # relit predictions + état de source (lecture seule)
           - diag-totals           # diagnostic couverture plus/moins 2,5 (lecture fournisseur)
@@ -117,6 +118,10 @@ jobs:
       - name: Collecter les cotes
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')
         run: python -m mtj_model.pipeline.collector
+
+      - name: Collecter TOUTES les compétitions (forcé, validation à la demande)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'collecter-tout'
+        run: python -m mtj_model.pipeline.collector --all
 
       - name: Pipeline nocturne (remplit predictions) + échantillon
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'nocturne'

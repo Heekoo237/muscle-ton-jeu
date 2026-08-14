@@ -80,7 +80,7 @@ def _write_snapshot(con, fixture_id: int, marche: str, bookmaker: str, cote: flo
         cur.execute(sql, (fixture_id, marche, bookmaker, cote, fenetre))
 
 
-def run_collector(days: int = 7, now: datetime | None = None) -> dict:
+def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = False) -> dict:
     now = now or datetime.now(timezone.utc)
     fenetre = window_6h(now)
     provider = get_provider()
@@ -105,7 +105,13 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
         assert_quota_ok(provider, full)
         # Fréquence graduée : ce tour ne relève QUE les compétitions dont la fenêtre
         # tombe maintenant (modèle 4/j → chaque fenêtre ; cote seule 1/j → une seule).
-        leagues = [lg for lg in full if fenetre.hour in slots_for(lg["releves_par_jour"])]
+        # `force_all` court-circuite le gating : collecte de TOUTES les compétitions,
+        # pour valider à la demande sans attendre la fenêtre de 6 h (≈ 45 × 2 crédits).
+        if force_all:
+            leagues = full
+            print(f"Collecte FORCÉE (toutes compétitions, hors fréquence graduée) : {len(full)} compétitions.")
+        else:
+            leagues = [lg for lg in full if fenetre.hour in slots_for(lg["releves_par_jour"])]
         for lg in leagues:
             # Un championnat qui échoue (clé de sport erronée, 404, réseau) ne doit
             # PAS faire tomber les autres. Point de reprise (savepoint) par ligue :
@@ -162,8 +168,10 @@ def run_collector(days: int = 7, now: datetime | None = None) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Collecteur de cotes (6 h) — historise les mouvements.")
     ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--all", action="store_true",
+                    help="forcer la collecte de TOUTES les compétitions (hors fréquence graduée)")
     args = ap.parse_args()
-    run_collector(days=args.days)
+    run_collector(days=args.days, force_all=args.all)
 
 
 if __name__ == "__main__":
