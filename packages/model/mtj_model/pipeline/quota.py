@@ -62,34 +62,59 @@ def assert_quota_ok(provider, worklist: list[dict]) -> None:
         raise SystemExit(message)
 
 
+def _try_worklist() -> tuple[list[dict] | None, str]:
+    """Worklist en base, ou (None, cause) — en distinguant schéma périmé (migrer)
+    de base injoignable (réseau/URL). Un diagnostic ne doit jamais planter."""
+    try:
+        from .db import connect
+        from .sync import league_worklist
+        with connect() as con:
+            return league_worklist(con), ""
+    except Exception as exc:  # noqa: BLE001 — diagnostic : on classe, on ne relève pas
+        msg = str(exc)
+        low = msg.lower()
+        if "does not exist" in low or "undefinedcolumn" in type(exc).__name__.lower():
+            return None, "schema"
+        return None, "connexion"
+
+
 def main() -> None:
     """Vérification du PALIER, gratuite et en LECTURE SEULE — à lancer après un
-    (dés)abonnement pour confirmer que le nouveau palier est bien détecté.
-
-    Appelle /sports (0 crédit), affiche le palier détecté et, si la base est
-    joignable, le plan mensuel et le verdict. Ne collecte rien, n'écrit rien."""
+    (dés)abonnement. N'échoue jamais : elle affiche toujours les en-têtes bruts et
+    le palier ; le plan mensuel n'est qu'un BONUS s'il est calculable."""
     from .provider import NullProvider, get_provider
 
     provider = get_provider()
     if isinstance(provider, NullProvider):
         raise SystemExit("Fournisseur non branché — MTJ_PROVIDER=oddsapi + MTJ_PROVIDER_KEY.")
-    provider.sports()  # gratuit : renseigne restants + déjà consommés → palier
-    quota = provider.credits_quota
-    remaining = provider.credits_remaining
-    print(f"Palier détecté : {quota if quota is not None else '?'}   ·   "
-          f"restants : {remaining if remaining is not None else '?'}")
-    try:
-        from .db import connect
-        from .sync import league_worklist
-        with connect() as con:
-            worklist = league_worklist(con)
-        planned = planned_monthly_credits(worklist)
-        ok, message = check_quota(quota, remaining, planned)
+    provider.sports()  # gratuit (0 crédit) : renseigne les en-têtes de crédits
+
+    # 1. En-têtes BRUTS, tels que le fournisseur les renvoie. C'est la source de
+    #    vérité pour distinguer un souci d'abonnement d'un souci de détection.
+    h = provider.last_headers
+    print("En-têtes bruts du fournisseur :")
+    print(f"  x-requests-remaining = {h.get('x-requests-remaining')}")
+    print(f"  x-requests-used      = {h.get('x-requests-used')}")
+    print(f"  x-requests-last      = {h.get('x-requests-last')}")
+
+    # 2. Palier INFÉRÉ = remaining + used (The Odds API n'expose pas le palier en
+    #    direct). Si tu vois 500 ici alors que tu as payé, c'est la CLÉ qui est
+    #    restée sur le plan gratuit — régénère-la sur le compte abonné.
+    quota, remaining = provider.credits_quota, provider.credits_remaining
+    print(f"\nPalier détecté (remaining + used) : {quota if quota is not None else '?'}"
+          f"   ·   restants : {remaining if remaining is not None else '?'}")
+
+    # 3. Plan mensuel — BONUS, jamais bloquant.
+    worklist, cause = _try_worklist()
+    if worklist is not None:
+        ok, message = check_quota(quota, remaining, planned_monthly_credits(worklist))
         print(message)
-        print("→ Après abonnement, tu dois voir un palier de 20 000 (et le plan qui tient).")
-    except Exception as exc:  # base non joignable : le palier seul suffit à la vérif
-        print(f"(plan mensuel non calculé — base non joignable : {str(exc)[:80]})")
-        print("→ Après abonnement, tu dois voir « Palier détecté : 20000 ».")
+    elif cause == "schema":
+        print("Plan mensuel : non calculable — le schéma n'est pas à jour "
+              "(colonne « regime » absente). Lance « migrer-base » d'abord, puis relance.")
+    else:
+        print("Plan mensuel : non calculable — base injoignable (vérifie MTJ_DATABASE_URL).")
+    print("→ Après abonnement, le palier détecté doit passer à 20000.")
 
 
 if __name__ == "__main__":

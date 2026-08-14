@@ -228,6 +228,7 @@ class TheOddsApiProvider:
         self.credits_used = 0            # crédits consommés cette session (somme des requêtes)
         self.credits_remaining: int | None = None  # crédits restants sur le palier
         self.credits_used_period: int | None = None  # crédits déjà consommés sur le palier
+        self.last_headers: dict[str, str | None] = {}  # en-têtes bruts de crédits (diagnostic)
 
     def _get(self, path: str, params: dict) -> list[dict]:
         params = {"apiKey": self._key, **params}
@@ -243,6 +244,13 @@ class TheOddsApiProvider:
             used = r.headers.get("x-requests-used")
             if used is not None:
                 self.credits_used_period = int(float(used))
+            # En-têtes BRUTS conservés tels quels, pour le diagnostic de palier :
+            # distinguer un problème d'abonnement d'un problème de détection.
+            self.last_headers = {
+                "x-requests-remaining": r.headers.get("x-requests-remaining"),
+                "x-requests-used": r.headers.get("x-requests-used"),
+                "x-requests-last": r.headers.get("x-requests-last"),
+            }
         return payload
 
     @property
