@@ -146,3 +146,15 @@ def test_parse_scores_finished_and_pending():
     res = {f.provider_ref: f for f in parse_scores(events, "soccer_epl")}
     assert res["f1"].status == "finished" and res["f1"].score_home == 2 and res["f1"].score_away == 1
     assert res["f2"].status == "scheduled" and res["f2"].score_home is None
+
+
+# --- Normalisation des noms d'équipes (écriture en base) ------------------
+from mtj_model.pipeline.sync import normalize_team_name  # noqa: E402
+
+
+def test_normalize_collapses_variants():
+    # accents, ponctuation, mots de bruit, abréviations connues
+    assert normalize_team_name("Manchester Utd") == normalize_team_name("Manchester United")
+    assert normalize_team_name("FC Barcelone") == "barcelone"
+    assert normalize_team_name("Atlético Madrid") == "atletico madrid"
+    assert normalize_team_name("Man Utd") == "manchester united"

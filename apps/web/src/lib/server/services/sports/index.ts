@@ -15,10 +15,12 @@ export interface SportsDataService {
 }
 
 import { FakeSportsData } from './fake';
+import { SupabaseSportsData } from './supabase';
+import { isSupabaseConfigured } from '$lib/server/supabase';
 
-/** ← Point de bascule unique vers le vrai fournisseur (Session 8). */
+/** Vraies tables Supabase dès qu'elles sont configurées ; sinon jeu factice. */
 function createSportsService(): SportsDataService {
-	return new FakeSportsData();
+	return isSupabaseConfigured() ? new SupabaseSportsData() : new FakeSportsData();
 }
 
 export const sports: SportsDataService = createSportsService();

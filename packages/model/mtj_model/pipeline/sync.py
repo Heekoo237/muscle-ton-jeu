@@ -10,7 +10,31 @@ correspondance des deux référentiels.
 """
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import datetime
+
+# Mots de « bruit » d'un nom de club : on les retire pour rapprocher les variantes.
+_NOISE = {"fc", "cf", "sc", "ac", "afc", "cd", "ud", "rc", "sv", "bk", "if", "club", "de", "the"}
+# Abréviations déterministes fréquentes (le reste vient de l'enrichissement d'alias).
+_EXPAND = {"utd": "united", "man": "manchester", "spurs": "tottenham", "wolves": "wolverhampton"}
+
+
+def normalize_team_name(raw: str) -> str:
+    """Clé normalisée d'un nom d'équipe : minuscules, sans accents ni ponctuation,
+    mots de bruit retirés, quelques abréviations déterministes développées.
+
+    Le fournisseur de cotes n'utilise pas les mêmes noms que football-data
+    (« Man Utd » vs « Manchester United »). On normalise DÈS L'ÉCRITURE en base,
+    pas à la résolution. Les variantes que la normalisation ne peut pas deviner
+    (abréviations propres à un bookmaker) sont couvertes par l'enrichissement
+    d'alias, à chaque correction utilisateur.
+    """
+    s = unicodedata.normalize("NFD", raw.lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    toks = [_EXPAND.get(t, t) for t in s.split() if t and t not in _NOISE]
+    return " ".join(toks)
 
 
 def league_worklist(con) -> list[dict]:
@@ -28,13 +52,31 @@ def league_worklist(con) -> list[dict]:
 
 
 def upsert_team(con, league_id: int, nom: str) -> int:
-    """Renvoie le team_id, en le créant s'il n'existe pas (unicité league_id+nom)."""
+    """Renvoie le team_id, en dédupliquant sur la clé NORMALISÉE.
+
+    La clé normalisée est stockée comme alias : deux variantes d'un même club
+    (accents, « FC », abréviations connues) tombent sur la même équipe. Le nom
+    d'affichage reste la première forme rencontrée. Normalisation à l'écriture.
+    """
+    key = normalize_team_name(nom)
     with con.cursor() as cur:
+        # Rapproche par clé normalisée (alias) OU par nom exact (équipes créées
+        # avant la normalisation) — et rétro-remplit la clé au passage.
         cur.execute(
-            "insert into teams (nom, league_id) values (%s, %s) on conflict (league_id, nom) do nothing",
-            (nom, league_id),
+            "select id, aliases from teams where league_id = %s and (%s = any(aliases) or nom = %s)",
+            (league_id, key, nom),
         )
-        cur.execute("select id from teams where league_id = %s and nom = %s", (league_id, nom))
+        row = cur.fetchone()
+        if row:
+            tid, aliases = row
+            to_add = [a for a in (key, nom) if a not in (aliases or [])]
+            if to_add:
+                cur.execute("update teams set aliases = coalesce(aliases, '{}') || %s where id = %s", (to_add, tid))
+            return tid
+        cur.execute(
+            "insert into teams (nom, league_id, aliases) values (%s, %s, %s) returning id",
+            (nom, league_id, [key, nom] if key != nom else [key]),
+        )
         return cur.fetchone()[0]
 
 
