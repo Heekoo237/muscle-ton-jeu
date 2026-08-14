@@ -45,6 +45,31 @@ C'est **une ligne de configuration**, jamais du code. Éditer
 > une équipe distincte et apparaît dans le rapport des équipes non réconciliées.
 > Pas de repli automatique par jetons (il fusionnait des clubs distincts).
 
+> [!IMPORTANT]
+> **Les deux régimes n'ont pas le même risque de fusion — mais aucun n'est sans
+> garde-fou.**
+>
+> | Garde-fou | Régime **modèle** | Régime **cote seule** |
+> |---|---|---|
+> | Carte curée `CURATED_ALIASES` (appliquée par `canonical_key` à l'ingestion) | actif | **actif** (une seule source de noms, mais `canonical_key` tourne quand même) |
+> | TEST 1 co-occurrence football-data (`checkmap`) | actif | **dormant** — pas d'historique football-data à réconcilier |
+> | TEST 2 volume football-data (`checkmap`) | actif | **dormant** — même raison |
+> | Invariant même-match sur le feed (`assert_distinct_opponents`, `sync.py`) | actif | **actif** — c'est l'équivalent SOURCE UNIQUE du TEST 1 |
+>
+> Le risque que les deux tests football-data détectent — deux clubs distincts
+> fondus par `canonical_key` (jetons de bruit trop agressifs, alias erroné) — **ne
+> disparaît pas** en cote seule : `upsert_team` écrit les équipes du feed dans les
+> deux régimes. Il **grossit** même dans la longue traîne (Ligue 2, divisions
+> basses : plus de clubs d'une même ville séparés par un seul jeton). L'invariant
+> même-match le rattrape à l'ingestion (deux adversaires ne partagent jamais une
+> clé) ; côté application, `matchTeam` (`resolve.ts`) refuse de deviner un nom de
+> ticket ambigu (exact ou mot entier unique, sinon INCONNU).
+>
+> **Les deux tests football-data se RÉARMENT** le jour où une ligue cote seule est
+> **promue** au régime modèle : on lui ajoute alors l'historique football-data, la
+> deuxième source de noms réapparaît, et l'onboarding complet (alias + co-occurrence
+> + volume) redevient obligatoire pour cette ligue.
+
 ```toml
 [leagues]
 E0  = ["Premier League", "Angleterre"]

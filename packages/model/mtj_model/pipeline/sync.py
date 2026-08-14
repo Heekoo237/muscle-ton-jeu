@@ -51,6 +51,27 @@ def league_worklist(con) -> list[dict]:
         return [{"league_id": r[0], "odds_api_key": r[1], "fd_code": r[2]} for r in cur.fetchall()]
 
 
+class TeamMergeCollision(RuntimeError):
+    """Deux équipes d'un même match tombent sur la même clé canonique.
+
+    Garde-fou de co-occurrence, version SOURCE UNIQUE (feed de cotes) : il ne
+    dépend d'aucun historique football-data, donc il tient même en régime « cote
+    seule ». C'est l'équivalent du test co-occurrence de `checkmap` (deux clubs
+    d'un même match ne fusionnent jamais), appliqué au flux du fournisseur. Une
+    collision est un bug de fusion (jetons de bruit trop agressifs, alias erroné) :
+    on lève au lieu d'écrire un match `home == away` en silence.
+    """
+
+
+def assert_distinct_opponents(home: str, away: str) -> None:
+    """Refuse que les deux adversaires d'un match partagent une clé canonique."""
+    if canonical_key(home) == canonical_key(away):
+        raise TeamMergeCollision(
+            f"« {home} » et « {away} » ont la même clé canonique "
+            f"« {canonical_key(home)} » — deux adversaires ne peuvent pas fusionner."
+        )
+
+
 def canonical_key(nom: str) -> str:
     """Clé canonique d'un club : clé normalisée, remappée par la carte curée.
 
@@ -116,6 +137,9 @@ def upsert_fixture(
 
 def resolve_fixture(con, league_id: int, fx) -> int:
     """Un ProviderFixture/ProviderOdds → fixture_id (équipes créées au besoin)."""
+    # Garde-fou co-occurrence (source unique) : deux adversaires ne fusionnent
+    # jamais. On vérifie AVANT d'écrire quoi que ce soit — pas de match corrompu.
+    assert_distinct_opponents(fx.home, fx.away)
     home_id = upsert_team(con, league_id, fx.home)
     away_id = upsert_team(con, league_id, fx.away)
     return upsert_fixture(

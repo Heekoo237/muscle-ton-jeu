@@ -22,19 +22,34 @@ function normalize(s: string): string {
 		.trim();
 }
 
-/** Retrouve une équipe par nom ou alias (contient l'un dans l'autre). */
+/** Vrai si `needle` apparaît dans `hay` comme une suite de MOTS ENTIERS. */
+function wordPhraseIn(needle: string, hay: string): boolean {
+	return ` ${hay} `.includes(` ${needle} `);
+}
+
+/**
+ * Retrouve l'équipe désignée par un nom de ticket. Garde-fou anti-fusion, version
+ * résolution : deux clubs distincts ne se confondent JAMAIS. On préfère l'exact ;
+ * à défaut, on tolère la contenance par mots entiers mais SEULEMENT si elle
+ * désigne une seule équipe. Deux clubs qui matchent (« Paris » avec « Paris FC »
+ * ET « Paris SG ») → on rend `null` : le nom reste INCONNU, jamais deviné.
+ *
+ * L'ancienne contenance par sous-chaîne (`n.includes(c)`) collait un club sur un
+ * autre dès qu'un nom en contenait un autre — sans danger à 11 ligues, mais la
+ * couverture élargie multiplie les clubs d'une même ville. On l'a retirée.
+ */
 function matchTeam(name: string, teams: Team[]): Team | null {
 	const n = normalize(name);
 	if (!n) return null;
-	let best: Team | null = null;
-	for (const t of teams) {
-		const candidates = [t.nom, ...t.aliases].map(normalize);
-		if (candidates.some((c) => c === n || n.includes(c) || c.includes(n))) {
-			// Préfère la correspondance la plus « exacte » (nom complet).
-			if (!best || normalize(t.nom) === n) best = t;
-		}
-	}
-	return best;
+	// 1) Exact (nom ou alias identique). Un seul club → certain ; plusieurs → ambigu.
+	const exact = teams.filter((t) => [t.nom, ...t.aliases].map(normalize).some((c) => c === n));
+	if (exact.length === 1) return exact[0];
+	if (exact.length > 1) return null;
+	// 2) Contenance par mots entiers, dans un sens ou l'autre, mais UNIQUE.
+	const near = teams.filter((t) =>
+		[t.nom, ...t.aliases].map(normalize).some((c) => wordPhraseIn(c, n) || wordPhraseIn(n, c))
+	);
+	return near.length === 1 ? near[0] : null;
 }
 
 /** Découpe une ligne brute « Match  Marché  Cote » sur les espaces multiples. */

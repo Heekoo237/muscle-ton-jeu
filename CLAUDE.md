@@ -107,13 +107,13 @@ Un marché non couvert est affiché « non analysé » et n'est jamais facturé.
 
 ---
 
-## Univers de couverture — le football EUROPÉEN, jamais l'africain
+## Univers de couverture — ce que le fournisseur price
 
-Nos utilisateurs sont en Afrique francophone. Ce qu'ils **jouent** ne l'est pas : ils parient sur le football **européen**. C'est ce football-là que le produit couvre.
+**La frontière de couverture, c'est le catalogue du fournisseur de cotes** (The Odds API). La règle est unique et **sans exception géographique : on couvre tout ce que le fournisseur price.** Un championnat absent du catalogue n'est pas couvert ; un match dans un championnat absent est `hors_couverture` — gardé dans le ticket, jamais analysé, jamais facturé, jamais deviné.
 
-**On ne couvre PAS les championnats africains domestiques. C'est un choix, pas une limite à lever plus tard.** Personne dans cette cible ne compose son ticket sur la D1 camerounaise. Prétendre couvrir ces ligues nous ferait produire des chiffres sur des matchs qu'aucune source ne price correctement — ce qui viole la règle d'or n°1.
+Nos utilisateurs sont en Afrique francophone. Ce qu'ils **jouent**, c'est le football **européen** (clubs) et les **grands tournois internationaux, Coupe d'Afrique des Nations comprise** — massivement pariée. Le produit suit ce qu'ils jouent, c'est-à-dire le catalogue.
 
-**La frontière de couverture, c'est le catalogue du fournisseur de cotes** (The Odds API). La règle par défaut est simple : **on couvre tout ce que le fournisseur price, sauf raison contraire documentée.** Un championnat absent du catalogue n'est pas couvert ; un match dans un championnat absent est `hors_couverture` — gardé dans le ticket, jamais analysé, jamais facturé, jamais deviné.
+**Les championnats africains DOMESTIQUES (D1 camerounaise, nigériane…) ne sont pas couverts — parce qu'ils sont ABSENTS du catalogue, pas par décision de notre part.** Aucune source ne les price correctement ; en produire des chiffres violerait la règle d'or n°1. Ce n'est pas une frontière qu'on trace, c'est une frontière que la donnée trace. La CAN, elle, **est** dans le catalogue (hors-saison) : elle est couverte comme toute compétition que le fournisseur price. Il n'y a donc **pas** de règle « pas d'Afrique » — il y a une règle « ce que le fournisseur price », et rien d'autre.
 
 **Deux régimes de probabilité, selon ce qu'on sait du championnat :**
 

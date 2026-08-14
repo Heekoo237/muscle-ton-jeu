@@ -103,3 +103,37 @@ describe('resolveTicket — le CHOIX est collé au type (Betclic)', () => {
 		expect(s.fixtureId).toBeNull();
 	});
 });
+
+/* ---- Garde-fou anti-fusion à la résolution (deux clubs d'une même ville) ---- */
+
+describe('resolveTicket — deux clubs distincts ne se confondent jamais', () => {
+	// Paris FC (Ligue 2) et Paris SG (Ligue 1) coexistent en base dès qu'on élargit
+	// la couverture. Un nom de ticket ambigu ne doit JAMAIS être deviné.
+	const paris: Team[] = [
+		{ id: 30, nom: 'Paris FC', aliases: ['paris fc'], leagueId: 3 },
+		{ id: 31, nom: 'Paris SG', aliases: ['psg', 'paris saint-germain'], leagueId: 2 },
+		{ id: 32, nom: 'Lorient', aliases: ['lorient', 'fc lorient'], leagueId: 3 }
+	];
+	const parisFx: Fixture[] = [
+		{ id: 300, dateUtc: '', teamHome: 'Paris FC', teamAway: 'Lorient', leagueId: 3, statut: 'scheduled', scoreHome: null, scoreAway: null },
+		{ id: 301, dateUtc: '', teamHome: 'Paris SG', teamAway: 'Lorient', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+	];
+
+	it('« Paris » seul, ambigu entre deux clubs → INCONNU, jamais deviné', () => {
+		const [s] = resolveTicket(raw('Paris - Lorient  1  1.50'), parisFx, paris);
+		expect(s.etatResolution).toBe('inconnu');
+		expect(s.fixtureId).toBeNull();
+	});
+
+	it('« Paris FC » exact → le bon club, pas le PSG', () => {
+		const [s] = resolveTicket(raw('Paris FC - Lorient  1  2.10'), parisFx, paris);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(300);
+	});
+
+	it('« PSG » (alias exact) → Paris SG, pas Paris FC', () => {
+		const [s] = resolveTicket(raw('PSG - Lorient  1  1.30'), parisFx, paris);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.fixtureId).toBe(301);
+	});
+});
