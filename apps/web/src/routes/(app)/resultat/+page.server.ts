@@ -6,7 +6,7 @@ import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, notifications, stats } from '$lib/server/services';
-import { buildReinforced } from '$lib/server/domain/ticket';
+import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
 import { regimeOf } from '$lib/server/domain/regime';
 import { computeCharge } from '$lib/server/domain/billing';
 import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
@@ -123,13 +123,11 @@ export const load: PageServerLoad = async (event) => {
 
 	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 4).
 	const r = buildReinforced(withProbs);
-	// « Analysable » = résolu ET dont la probabilité EXISTE en base. Une ligne
-	// résolue mais sans prédiction (match/marché absent de `predictions`) n'est PAS
-	// analysable : on ne la compte ni pour la facturation, ni dans « X matchs sur Y »,
-	// ni dans le pourcentage. On vérifie la disponibilité AVANT de compter, jamais après.
-	const nbAnalysables = withProbs.filter(
-		(s) => s.etatResolution === 'certain' && s.probabilite != null
-	).length;
+	// « Analysable » = résolu ET dont la probabilité EXISTE en base (règle UNIQUE,
+	// `isAnalysable`). Une ligne résolue mais sans prédiction n'est PAS analysable :
+	// on ne la compte ni pour la facturation, ni dans « X matchs sur Y », ni dans le
+	// pourcentage. On vérifie la disponibilité AVANT de compter, jamais après.
+	const nbAnalysables = withProbs.filter(isAnalysable).length;
 	const nbTotal = r.selections.length;
 
 	// « Ta sélection la plus serrée » : quand rien n'est retiré, on montre en INFO
@@ -137,9 +135,7 @@ export const load: PageServerLoad = async (event) => {
 	// code (min sur des probabilités déjà affichées), jamais un conseil, jamais un
 	// verbe d'action. On ne l'affiche qu'avec ≥ 2 lignes analysables (avec une seule,
 	// « la plus serrée » n'a pas de sens). Aucun nombre nouveau : pct1 d'une proba lue.
-	const analysablesNonRetirees = r.selections.filter(
-		(s) => s.etatResolution === 'certain' && s.probabilite != null && !s.retireeDuRenforce
-	);
+	const analysablesNonRetirees = r.selections.filter((s) => isAnalysable(s) && !s.retireeDuRenforce);
 	const laPlusSerree =
 		r.rienARetirer && analysablesNonRetirees.length >= 2
 			? analysablesNonRetirees.reduce((min, s) =>
@@ -254,7 +250,8 @@ export const load: PageServerLoad = async (event) => {
 		retiree: s.retireeDuRenforce,
 		// Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre.
 		mentionNeutre: s.retireeDuRenforce && !s.fragile,
-		analysable: s.etatResolution === 'certain',
+		// Booléen calculé UNE fois par la règle unique : le client ne re-dérive jamais.
+		analysable: isAnalysable(s),
 		// Probabilité par ligne : lue en table (jamais calculée ici), affichée dans
 		// la lecture détaillée. null quand la sélection n'est pas analysable.
 		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null

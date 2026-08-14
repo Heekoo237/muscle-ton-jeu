@@ -28,6 +28,7 @@ on:
           - lister-equipes        # dump des équipes en base (lecture seule)
           - diag-fixtures         # que contient fixtures pour les matchs du ticket (lecture seule)
           - diag-teams            # doublons d'équipes pour les clubs du ticket (lecture seule)
+          - diag-ecart            # matchs à venir COTÉS mais SANS probabilité, par régime (lecture seule)
           - reconcilier-dryrun    # RAPPORT réconciliation club_id : intra-modèle + groupes + collisions (lecture)
           - reconcilier           # APPLIQUE club_id (écrit) : groupes − collisions, puis re-teste sur l'état final
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
@@ -117,6 +118,10 @@ jobs:
       - name: Diagnostic équipes — doublons pour les clubs du ticket (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-teams'
         run: python -m mtj_model.pipeline.diag_teams
+
+      - name: Diagnostic écart collecte/nocturne — matchs cotés sans probabilité (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-ecart'
+        run: python -m mtj_model.pipeline.diag_pending
 
       - name: Rapport réconciliation club_id — dry-run, aucune écriture (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier-dryrun'

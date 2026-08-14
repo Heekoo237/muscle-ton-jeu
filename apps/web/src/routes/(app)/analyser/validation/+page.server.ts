@@ -2,23 +2,23 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { marketLabelFr } from '$lib/server/domain/market-map';
-import { creditCost } from '$lib/server/domain/ticket';
+import { creditCost, isAnalysable } from '$lib/server/domain/ticket';
 import { predictions } from '$lib/server/services';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
 
 /**
- * « Analysable » = ligne RÉSOLUE (match + marché reconnus) ET dont la probabilité
- * EXISTE en base. Une ligne résolue sans prédiction (match/marché absent de la
- * table `predictions`) n'est PAS analysable : on ne la compte ni comme « match sur
- * Y », ni pour la facturation. On vérifie la disponibilité de la probabilité AVANT
- * de compter, jamais après — sinon l'écran de validation promet une analyse que le
- * résultat ne peut pas tenir. On lit la table, on ne devine rien (règle d'archi n°2).
+ * Analysable EN BASE : on lit la probabilité de la ligne, puis on tranche avec la
+ * règle UNIQUE `isAnalysable`. Une ligne résolue sans prédiction n'est PAS
+ * analysable : on ne la compte ni comme « match sur Y », ni pour la facturation.
+ * On vérifie la disponibilité de la probabilité AVANT de compter, jamais après —
+ * sinon l'écran de validation promet une analyse que le résultat ne peut pas tenir.
+ * On lit la table, on ne devine rien (règle d'archi n°2).
  */
-async function estAnalysable(s: Selection): Promise<boolean> {
-	if (s.etatResolution !== 'certain' || s.fixtureId === null || s.marche === null) return false;
+async function analysableEnBase(s: Selection): Promise<boolean> {
+	if (s.fixtureId === null || s.marche === null) return false;
 	const p = await predictions.get(s.fixtureId, s.marche);
-	return p?.probabilite != null;
+	return isAnalysable({ ...s, probabilite: p?.probabilite ?? null });
 }
 
 /** Découpe « Home – Away » pour reconstruire le libellé après correction. */
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
 	// Disponibilité de la probabilité vérifiée EN AMONT, une lecture par ligne.
-	const flags = await Promise.all(ticket.selections.map(estAnalysable));
+	const flags = await Promise.all(ticket.selections.map(analysableEnBase));
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
 	const selections: ValidationLineVM[] = ticket.selections.map((s, i) => {
@@ -88,7 +88,7 @@ export const actions: Actions = {
 		// renvoie le drapeau `analysable` pour que le client mette à jour son compteur
 		// sans le deviner. Corriger le marché ne garantit pas qu'on l'analyse.
 		const corrigee = selections.find((s) => s.ordre === ordre);
-		const analysable = corrigee ? await estAnalysable(corrigee) : false;
+		const analysable = corrigee ? await analysableEnBase(corrigee) : false;
 		// Appelée en arrière-plan (fetch) depuis un affichage déjà à jour : succès +
 		// drapeau, aucune redirection (l'écran ne se recharge jamais).
 		return { success: true, analysable };

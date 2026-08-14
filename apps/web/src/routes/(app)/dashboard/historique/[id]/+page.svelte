@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
-	import { ligneNote, estAnalysee } from '$lib/lineStatus';
+	import { ligneNote } from '$lib/lineStatus';
 
 	let { data }: { data: PageData } = $props();
 
@@ -24,7 +24,8 @@
 			fragile: l.fragile,
 			retiree: l.retiree,
 			mentionNeutre: l.mentionNeutre,
-			analysable: estAnalysee(l)
+			// Booléen déjà tranché côté serveur (règle unique isAnalysable) — on le lit.
+			analysable: l.analysable
 		}))
 	);
 </script>

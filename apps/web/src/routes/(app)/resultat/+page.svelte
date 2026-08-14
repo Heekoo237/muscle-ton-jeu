@@ -8,7 +8,7 @@
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 	import ShareSheet from '$lib/components/ShareSheet.svelte';
-	import { ligneNote, estAnalysee } from '$lib/lineStatus';
+	import { ligneNote } from '$lib/lineStatus';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
@@ -29,7 +29,8 @@
 			fragile: l.fragile,
 			retiree: l.retiree,
 			mentionNeutre: l.mentionNeutre,
-			analysable: estAnalysee(l)
+			// Booléen déjà tranché côté serveur (règle unique isAnalysable) — on le lit.
+			analysable: l.analysable
 		}))
 	);
 
@@ -153,6 +154,8 @@
 							{:else}
 								<span class="mpm-na">non analysé</span>
 							{/if}
+							<!-- l.analysable (règle unique) implique déjà probabilitePct != null ;
+							     le second test reste un garde-fou d'affichage inoffensif. -->
 						</div>
 						<div class="mpm-marche" class:oc={l.fragile}>{l.libelleFr}</div>
 						<div class="mpm-note">{ligneNote(l)}</div>

@@ -17,7 +17,19 @@ import { isUnmeasured } from './regime';
 /** Plancher absolu du ticket renforcé (règle d'or n°3). */
 export const REINFORCED_FLOOR = 4;
 
-/** Une sélection compte dans le calcul si elle est résolue avec certitude et a une proba. */
+/**
+ * RÈGLE UNIQUE « analysable » — résolu ≠ analysable. Une sélection compte (calcul,
+ * comptage « X matchs sur Y », facturation) SI ET SEULEMENT SI elle est résolue
+ * avec certitude ET pourvue d'une probabilité en base. Un match reconnu sans
+ * prédiction n'est PAS analysable.
+ *
+ * Cette fonction est le SEUL endroit où la règle vit. Tout compteur de lignes
+ * analysables passe par elle (côté serveur) ou par le booléen `analysable` du VM
+ * qu'elle a calculé (côté client). La réimplémenter en ligne ailleurs finirait par
+ * diverger — c'est le bug qu'a connu l'écran de validation. Un test statique
+ * (`analysable-single-source.test.ts`) échoue si un autre module recouple
+ * `etatResolution === 'certain'` à une vérification de `probabilite`.
+ */
 export function isAnalysable(s: Selection): boolean {
 	return s.etatResolution === 'certain' && s.marche !== null && typeof s.probabilite === 'number';
 }

@@ -4,6 +4,7 @@ import { getAppSession } from '$lib/server/session';
 import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
+import { isAnalysable } from '$lib/server/domain/ticket';
 import type { ExplicationVM, LineVM } from '$lib/types';
 
 /**
@@ -33,7 +34,9 @@ export const load: PageServerLoad = async (event) => {
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
 		mentionNeutre: s.retireeDuRenforce && !s.fragile,
-		analysable: s.etatResolution === 'certain',
+		// Règle unique : analysable = résolu ET pourvu d'une probabilité (figée au moment
+		// de l'analyse). Un match résolu sans proba reste « non analysé », jamais compté.
+		analysable: isAnalysable(s),
 		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null
 	}));
 
