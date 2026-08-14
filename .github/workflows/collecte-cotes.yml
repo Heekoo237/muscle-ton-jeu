@@ -26,6 +26,7 @@ on:
           - backfill-historique   # charge 3 saisons football-data (une fois)
           - verifier-carte        # TEST 1 co-occurrence de la carte d'alias (lecture)
           - lister-equipes        # dump des équipes en base (lecture seule)
+          - diag-fixtures         # que contient fixtures pour les matchs du ticket (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
           - collecter             # relève les cotes une fois (fréquence graduée)
@@ -100,6 +101,10 @@ jobs:
       - name: Lister les équipes en base (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'lister-equipes'
         run: python -m mtj_model.pipeline.backfill --list-teams
+
+      - name: Diagnostic fixtures — que contient la table pour les matchs du ticket (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-fixtures'
+        run: python -m mtj_model.pipeline.diag_fixtures
 
       - name: Compter les lignes du backfill (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'compter-backfill'
