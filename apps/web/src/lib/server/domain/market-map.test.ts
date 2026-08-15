@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMarket, marketLabelFr } from './market-map';
+import { resolveMarket, marketLabelFr, splitResultMarket } from './market-map';
+
+describe('splitResultMarket — « Résultat du match (t. rég) » Betclic', () => {
+	it('avec l’issue : type 1X2 reconnu, bruit « (t. rég) » retiré, CHOIX conservé', () => {
+		// C'est la notation qui DOIT résoudre : l'issue choisie est présente.
+		expect(splitResultMarket('FC Porto Résultat du match (t. rég)')).toEqual({
+			kind: '1x2',
+			choice: 'fc porto'
+		});
+		expect(splitResultMarket('Nul Résultat du match (t. rég)')).toEqual({ kind: '1x2', choice: 'nul' });
+	});
+
+	it('SANS issue : type reconnu mais CHOIX vide — la ligne restera « à corriger »', () => {
+		// Le bug observé : la vision a renvoyé le libellé de marché SANS l'issue pariée.
+		// Le parseur fait ce qu'il peut (1X2), mais sans choix la sélection est
+		// inanalysable — c'est en AMONT (lecture vision) qu'il faut capter l'issue.
+		expect(splitResultMarket('Résultat du match (t. rég)')).toEqual({ kind: '1x2', choice: '' });
+	});
+});
 
 describe('resolveMarket — table stricte (règle d’archi n°3)', () => {
 	it('reconnaît les notations couvertes avec certitude', () => {

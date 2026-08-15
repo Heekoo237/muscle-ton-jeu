@@ -20,12 +20,18 @@ Règles strictes :
 - Tu renvoies UNIQUEMENT un objet JSON, sans aucun texte autour.
 - Une entrée par sélection lue, dans l'ordre du ticket.
 - Recopie les noms d'équipes et le marché EXACTEMENT comme écrits (pas de traduction, pas de normalisation).
+- Le « marché » d'une sélection, c'est le PARI CHOISI, issue COMPRISE : l'issue sélectionnée
+  (l'équipe, « Nul », « + de 2,5 buts », « Oui/Non »…) AVEC son type de marché. Recopie
+  l'issue MÊME si elle est affichée à part du libellé (équipe surlignée, pastille « 1 »/« N »/« 2 »,
+  ligne au-dessus) : réunis-les dans « marche ». Ex. : « Paris SG Résultat du match »,
+  « Nul Résultat du match », « FC Porto ». Un « Résultat du match » SANS issue est incomplet —
+  cherche l'issue choisie sur la ligne (elle existe toujours, c'est ce qui a été parié).
 Schéma :
 {
   "estTicket": true,        // false si l'image n'est pas un ticket de paris (photo quelconque)
   "manuscrit": false,       // true si le ticket est écrit à la main (pas une capture d'application)
   "lisible": true,          // false si l'image est trop floue ou coupée pour être lue
-  "lignes": [ { "match": "Équipe A - Équipe B", "marche": "marché tel qu'écrit", "cote": "1.85" } ],
+  "lignes": [ { "match": "Équipe A - Équipe B", "marche": "pari choisi, issue COMPRISE (ex. « Paris SG Résultat du match »)", "cote": "1.85" } ],
   "coteTotale": "cote totale du ticket si visible, sinon chaîne vide"
 }`;
 
