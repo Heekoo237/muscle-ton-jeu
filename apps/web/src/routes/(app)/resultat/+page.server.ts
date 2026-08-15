@@ -309,6 +309,10 @@ export const load: PageServerLoad = async (event) => {
 
 	// Invitation à recharger : seulement une fois l'analyse offerte terminée et
 	// tant que l'utilisateur n'a pas encore rechargé — jamais avant le résultat.
+	// Réutilisation VISIBLE : arrivée via `?reutilise=1` (même capture déjà analysée).
+	// On l'affiche pour que l'utilisateur sache qu'il n'est PAS refacturé (le piège
+	// qui coûtait du temps). `analyseLeMs` alimente le « il y a X ».
+	const reutilise = event.url.searchParams.get('reutilise') === '1';
 	return {
 		ticketId: ticket.id,
 		vm,
@@ -316,7 +320,9 @@ export const load: PageServerLoad = async (event) => {
 		montreRecharge: !(await hasRecharged(session.userId)),
 		historique,
 		shareUrl,
-		shareImage
+		shareImage,
+		reutilise,
+		analyseLeMs: ticket.creeLeMs
 	};
 };
 

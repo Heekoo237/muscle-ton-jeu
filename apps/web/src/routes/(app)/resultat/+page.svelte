@@ -19,6 +19,16 @@
 		return `${v.toString().replace('.', ',')} %`;
 	}
 
+	/** « il y a 5 min », « il y a 1 h », « il y a 2 j » — durée depuis l'analyse. */
+	function ilYa(ms: number): string {
+		const min = Math.round(Math.max(0, Date.now() - ms) / 60000);
+		if (min < 1) return "à l'instant";
+		if (min < 60) return `il y a ${min} min`;
+		const h = Math.round(min / 60);
+		if (h < 24) return `il y a ${h} h`;
+		return `il y a ${Math.round(h / 24)} j`;
+	}
+
 	// Toutes les lignes, y compris les non analysées : elles restent dans les deux
 	// tickets (jamais retirées), affichées neutres avec la mention « non analysé ».
 	// « analysable » côté papier = réellement analysée (résolue ET avec proba).
@@ -46,6 +56,18 @@
 		<h1 class="t-h1">Ton ticket, lu</h1>
 		{#if data.gratuit}<span class="offert t-small">Offert</span>{/if}
 	</div>
+
+	{#if data.reutilise}
+		<!-- Réutilisation VISIBLE : même capture déjà analysée, non refacturée. Le
+		     piège qui coûtait du temps — on le dit, avec une sortie claire. -->
+		<div class="reutilise" role="note">
+			<p class="t-body">
+				Tu as déjà analysé ce ticket {ilYa(data.analyseLeMs)}. Voici ton résultat, il n'est pas
+				refacturé.
+			</p>
+			<a class="btn-outline" href="/analyser">Analyser une autre capture</a>
+		</div>
+	{/if}
 
 	{#if vm.conflitMemeMatch}
 		<p class="t-small conflit" role="note">
@@ -506,6 +528,20 @@
 	}
 	.btn-primary:active {
 		transform: scale(0.98);
+	}
+	.reutilise {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+		align-items: flex-start;
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+		padding: var(--s-4);
+	}
+	.reutilise .t-body {
+		margin: 0;
+		color: var(--c-ink-2);
 	}
 	.recharge-invite {
 		display: flex;

@@ -79,11 +79,15 @@ export const actions: Actions = {
 		}
 		const empreinte = await combinedEmpreinte(hashes);
 
-		// 3. Réutilisation : même capture récente → même ticket, sans relancer l'analyse.
+		// 3. Réutilisation : même capture récente (même utilisateur) → même ticket, sans
+		// relancer l'analyse ni refacturer. On la rend VISIBLE (`?reutilise=1`) : un
+		// ticket déjà analysé va droit au résultat avec une bannière ; sinon on reprend
+		// la validation. Jamais de blocage lié aux tickets d'AUTRES utilisateurs.
 		const deja = await findRecentTicketByEmpreinte(session?.userId ?? null, empreinte);
 		if (deja) {
 			setTicketCookie(cookies, deja.id);
-			redirect(303, '/analyser/validation');
+			if (deja.statut === 'analyse') redirect(303, '/resultat?reutilise=1');
+			redirect(303, '/analyser/validation?reutilise=1');
 		}
 
 		// 4. Lecture réelle. Échec explicite = message clair, aucun crédit débité.

@@ -511,6 +511,21 @@ marchés × régions`, soit **240 crédits/mois/compétition** au rythme actuel 
 2 marchés, 1 région). Se lance depuis GitHub Actions
 (`Collecte des cotes` → action `catalogue-competitions`).
 
+**Coupes : auto-activées, aucune intervention.** Les coupes que le fournisseur price
+(EFL Cup, DFB-Pokal, Coppa Italia, Copa Libertadores/Sudamericana déjà collectées ;
+FA Cup, Copa del Rey, Coupe de France, CAN, Coupe du monde + qualifs, Copa América au
+catalogue hors-saison) s'activent **toutes seules** dès qu'elles redeviennent actives :
+`catalogue_sync` (toutes les 6 h) les insère/réactive en **cote seule** (1 relevé/j),
+et le collecteur écrit la prédiction cote-seule dans la foulée. Confiance basse,
+« d'après les cotes » — jamais de modèle pour un match de coupe (pas de backtest).
+
+**Super Coupes : hors catalogue, limite acceptée.** Les Super Coupes — matchs uniques
+annuels : Trophée des Champions, Community Shield, Supercopa — **ne sont PAS au
+catalogue du fournisseur** (vérifié via `catalogue-competitions`). Des affiches (Lens–PSG,
+Arsenal–Man City) rencontrées sur des tickets de test **resteront donc non analysées,
+non facturées** — « on n'a pas retrouvé ce match ». Ce n'est **pas un bug** : c'est la
+donnée qui trace la frontière (règle d'or n°1 — aucun chiffre sans source), pas nous.
+
 ### Feuille de route modèle — 11 → 18, APRÈS le lancement
 
 Le lancement se fait avec **toutes** les compétitions du catalogue en **cote
