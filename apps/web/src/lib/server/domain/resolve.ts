@@ -364,15 +364,8 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 	// MESURE DE VARIABILITÉ VISION — symptôme exact du bug « issue manquante » : un
 	// marché de type 1X2 / double chance RECONNU mais dont l'issue pariée est VIDE.
 	// La vision n'est pas déterministe ; ce compteur rend le taux visible sans
-	// attendre une plainte. Marqueur stable `[résolution] LECTURE INCOMPLÈTE` :
-	// l'agrégat par jour se lit en comptant ces lignes dans les logs.
-	let incompletes = 0;
-	for (let i = 0; i < selections.length; i++) {
-		const s = selections[i];
-		if (s.etatResolution === 'certain' || s.fixtureId == null) continue;
-		const sp = splitResultMarket(lineParts(raw.lignes[i]).marketText);
-		if (sp && (sp.kind === '1x2' || sp.kind === 'dc') && normalize(sp.choice) === '') incompletes++;
-	}
+	// attendre une plainte. Marqueur stable `[résolution] LECTURE INCOMPLÈTE`.
+	const incompletes = incompleteReads(selections, raw);
 	if (incompletes > 0) {
 		console.warn(
 			`[résolution] LECTURE INCOMPLÈTE : ${incompletes}/${selections.length} ligne(s) — ` +
@@ -380,4 +373,23 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 		);
 	}
 	return selections;
+}
+
+/**
+ * Nombre de lignes en « lecture incomplète » : match RÉSOLU (fixtureId présent),
+ * marché de type 1X2 / double chance RECONNU, mais issue pariée VIDE. C'est le
+ * symptôme exact d'une lecture vision qui a omis l'issue. UNE définition, partagée
+ * par le log de résolution, le déclencheur de retry (action analyser) et la mesure
+ * quotidienne (surveillance). Corrélation par index : `selections` est le map de
+ * `raw.lignes` dans le même ordre.
+ */
+export function incompleteReads(selections: Selection[], raw: RawTicketRead): number {
+	let n = 0;
+	for (let i = 0; i < selections.length; i++) {
+		const s = selections[i];
+		if (s.etatResolution === 'certain' || s.fixtureId == null) continue;
+		const sp = splitResultMarket(lineParts(raw.lignes[i]).marketText);
+		if (sp && (sp.kind === '1x2' || sp.kind === 'dc') && normalize(sp.choice) === '') n++;
+	}
+	return n;
 }

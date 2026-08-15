@@ -2,8 +2,9 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { vision, sports } from '$lib/server/services';
 import type { ImageInput } from '$lib/server/services/vision';
-import { resolveTicket } from '$lib/server/domain/resolve';
+import { resolveTicket, incompleteReads } from '$lib/server/domain/resolve';
 import { createTicket } from '$lib/server/fixtures/ticketStore';
+import { recordVisionRead } from '$lib/server/fixtures/visionStatsStore';
 import {
 	sha256Hex,
 	combinedEmpreinte,
@@ -14,6 +15,11 @@ import { getAppSession } from '$lib/server/session';
 
 const SLOTS = ['capture_0', 'capture_1', 'capture_2'];
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+// Retry vision CIBLÉ : une « lecture incomplète » (marché 1X2/DC reconnu, issue
+// vide) signale que la vision a manqué l'issue pariée. On relance la lecture UNE
+// SEULE fois — jamais deux — sur la même capture. Nombre nommé, pas en dur.
+const RETRY_LECTURE_INCOMPLETE = 1;
 
 function setTicketCookie(cookies: import('@sveltejs/kit').Cookies, id: string): void {
 	cookies.set('ticketId', id, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 });
@@ -104,7 +110,44 @@ export const actions: Actions = {
 			sports.resolutionFixtures(),
 			sports.teams()
 		]);
-		const selections = resolveTicket(raw, fixtures, teams);
+		let selections = resolveTicket(raw, fixtures, teams);
+
+		// Retry CIBLÉ sur lecture incomplète : la vision a reconnu le marché mais
+		// manqué l'issue. On relance UNE fois (RETRY_LECTURE_INCOMPLETE) et on garde
+		// la lecture qui laisse le MOINS de lignes incomplètes. Journalisé pour
+		// mesurer l'efficacité : si le retry ne récupère presque rien, on le retire.
+		let incomplets = incompleteReads(selections, raw);
+		let retries = 0;
+		let retryReussi = 0;
+		for (let essai = 0; essai < RETRY_LECTURE_INCOMPLETE && incomplets > 0; essai++) {
+			const avant = incomplets;
+			let raw2;
+			try {
+				raw2 = await vision.readTicket(images);
+			} catch {
+				break; // un retry qui échoue ne casse jamais l'analyse : on garde la 1re lecture
+			}
+			retries += 1;
+			if (raw2.echec) break;
+			const sel2 = resolveTicket(raw2, fixtures, teams);
+			const apres = incompleteReads(sel2, raw2);
+			console.warn(
+				`[vision-retry] tenté : ${avant} incomplète(s) → ${apres} ` +
+					`(récupérées ${Math.max(0, avant - apres)})`
+			);
+			if (apres < avant) {
+				raw = raw2;
+				selections = sel2;
+				incomplets = apres;
+				retryReussi = 1;
+			}
+			break; // un seul retry, quoi qu'il arrive
+		}
+
+		// Mesure quotidienne (best-effort — ne bloque jamais l'analyse) : lignes lues,
+		// incomplètes restantes, retries et leurs succès. Lue par la surveillance.
+		await recordVisionRead(selections.length, incomplets, retries, retryReussi).catch(() => {});
+
 		const ticket = await createTicket(selections, session?.userId ?? null, empreinte);
 
 		// 6. Stockage des captures (best-effort, purge 30 j) — ne bloque jamais.

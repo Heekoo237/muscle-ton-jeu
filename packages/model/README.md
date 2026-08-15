@@ -219,12 +219,36 @@ réfutée : ici, un seul book, un seul instant. **Ne pas corriger le réassembla
 qu'un `[cote invalide]` ne montre pas des books réellement différents sur un même
 groupe.** Le garde-fou (rejet + journal de la marge négative) tient dans les deux cas.
 
-**Décision ouverte : exclure les exchanges de la sélection des cotes ?**
-`provider._pick_bookmaker` / `_pick_totals_book` peuvent retenir un exchange
-(`betfair_ex_*`, `matchbook`, `smarkets`, `betdaq`) quand c'est le seul book EU d'un
-match (coupes, marchés minces). À trancher sur volume : sonde `diag-books` (part des
-prédictions issues d'un exchange). Si non négligeable → exclure les exchanges du
-choix de book dans `provider.py`, jamais les déviger.
+**Décision PRISE : exchanges exclus.** La sonde `diag-books` a mesuré 1,5 % des
+prédictions issues d'un exchange (un seul, matchbook, ≤ 10 matchs par championnat).
+`provider._pick_bookmaker` / `_pick_totals_book` ne retiennent donc plus les
+exchanges (`betfair_ex_*`, `matchbook`, `smarkets`, `betdaq`) : mieux vaut aucune
+cote (→ repli modèle) qu'un prix de carnet vide. Sur une ligue modèle, un match aux
+équipes connues privé d'exchange tombe sur le repli MODÈLE, jamais « non analysé ».
+À noter : Pinnacle sert plus de la moitié des prédictions cotées — la référence de
+calibration domine.
+
+## Fast-follow post-lancement — cache de rédaction
+
+**À construire APRÈS le paiement, jamais avant le lancement.** Aujourd'hui le
+rédacteur (LLM) génère un texte PAR ticket : dix joueurs, même combiné, même jour →
+dix générations (~1,5 F chacune). La lecture de capture (≈ 2 F) et les probabilités
+(lues en base, coût nul) ne se mutualisent pas ; seul le TEXTE le peut.
+
+Le gain n'existe qu'à l'échelle (gros week-end, mêmes favoris) — d'où le report.
+Quand on le fera, la clé de cache est **la combinaison EXACTE**, pas la liste des
+matchs :
+
+> `hash( trié[ (fixtureId, marché) ] ) + jour_calcul`
+
+- `(fixtureId, marché)` capture match + marché + **choix** : dans notre modèle le
+  choix EST le marché (`WIN_HOME` ≠ `DC_DRAW_AWAY`), donc deux joueurs aux mêmes
+  matchs mais paris différents ont des clés différentes — textes différents.
+- `+ jour_calcul` est INDISPENSABLE : les probabilités changent chaque nuit (nocturne),
+  donc le renforcé ET le texte aussi. Sans le jour, on servirait un texte périmé.
+
+Orthogonal à la facturation (chaque joueur reste facturé selon ses règles) et au
+garde-fou n°1 (même combo + même jour → mêmes nombres autorisés).
 
 ## Pistes d'amélioration (à évaluer à la recalibration)
 

@@ -21,6 +21,8 @@ from ..constants import (
     REPLI_PROMU_ALERT,
     REPLI_PROMU_MIN_MATCHS,
     REPLI_PROMU_MIN_RUNS,
+    VISION_INCOMPLETE_ALERT,
+    VISION_INCOMPLETE_MIN_LIGNES,
 )
 from .db import connect
 from .nightly import NIGHTLY_SKIP_ALERT, leagues_over_totals_margin
@@ -252,6 +254,39 @@ def _repli_promu_rate(cur, alerts: list[str]) -> None:
         print(f"repli promu OK — aucun championnat modèle ≥ {REPLI_PROMU_ALERT:.0%} sur 30 j")
 
 
+def vision_incomplete_alert(lignes: int, incompletes: int) -> str | None:
+    """Message d'alerte si le taux de lectures incomplètes dépasse le seuil sur la
+    journée, ou None. Fonction PURE (testable). Sous garde-fou d'échantillon."""
+    if lignes < VISION_INCOMPLETE_MIN_LIGNES:
+        return None
+    taux = incompletes / lignes
+    if taux > VISION_INCOMPLETE_ALERT:
+        return (
+            f"vision : {taux:.0%} de lectures incomplètes aujourd'hui "
+            f"({incompletes}/{lignes} lignes, > {VISION_INCOMPLETE_ALERT:.0%}) — la lecture "
+            f"des issues dérive ; vérifie le prompt vision ou le fournisseur."
+        )
+    return None
+
+
+def _vision_incomplete_rate(cur, alerts: list[str]) -> None:
+    """Alerte si le taux de lectures VISION incomplètes du jour dépasse le seuil.
+    Lit le seau quotidien `vision_stats` alimenté par l'app (record_vision_read)."""
+    try:
+        cur.execute("select lignes, incompletes from vision_stats where jour = current_date")
+    except Exception:  # noqa: BLE001 — table absente (migration non appliquée) : on saute
+        return
+    row = cur.fetchone()
+    if not row:
+        return
+    lignes, incompletes = int(row[0]), int(row[1])
+    msg = vision_incomplete_alert(lignes, incompletes)
+    if msg:
+        alerts.append(msg)
+    elif lignes >= VISION_INCOMPLETE_MIN_LIGNES:
+        print(f"vision      OK — {incompletes}/{lignes} lectures incomplètes aujourd'hui")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -263,6 +298,7 @@ def check() -> list[str]:
         _totals_escalation(cur, alerts)
         _nightly_coverage(cur, alerts)
         _repli_promu_rate(cur, alerts)
+        _vision_incomplete_rate(cur, alerts)
     return alerts
 
 

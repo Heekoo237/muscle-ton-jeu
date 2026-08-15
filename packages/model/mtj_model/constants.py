@@ -72,6 +72,13 @@ REPLI_PROMU_ALERT = 0.40
 REPLI_PROMU_MIN_RUNS = 5     # au moins 5 nocturnes dans la fenêtre avant d'alerter
 REPLI_PROMU_MIN_MATCHS = 30  # au moins 30 matchs-fenêtre cumulés (anti-bruit)
 
+# Lecture VISION incomplète (marché reconnu, issue vide) : la vision n'est pas
+# déterministe ; un taux qui grimpe = une dérive qu'on ne verrait jamais en lisant
+# les logs à la main. Au-delà du seuil sur la journée, la surveillance alerte. Sous
+# garde-fou d'échantillon (assez de lignes lues) pour ne pas crier sur deux tickets.
+VISION_INCOMPLETE_ALERT = 0.20
+VISION_INCOMPLETE_MIN_LIGNES = 20
+
 # ── Escalade vers alternate_totals (Pinnacle 2,5 garanti) — critère CHIFFRÉ ───
 # Le plus/moins 2,5 est pris chez le book EU le plus serré qui le poste (gratuit).
 # On n'escalade vers `alternate_totals` (+50 % de crédits sur l'appel cotes) que
