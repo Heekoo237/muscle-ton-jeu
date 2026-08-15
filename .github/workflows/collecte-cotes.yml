@@ -9,8 +9,9 @@ name: Collecte des cotes
 # par défaut du dépôt (main). Sur une autre branche, seul le bouton manuel marche.
 on:
   schedule:
-    - cron: '0 */6 * * *'      # collecteur + catalogue + surveillance, toutes les 6 h (UTC)
+    - cron: '0 */6 * * *'      # collecteur + catalogue + surveillance + règlement, toutes les 6 h (UTC)
     - cron: '0 4 * * *'        # NOCTURNE, 1×/jour à 4 h UTC — APRÈS le collecteur de 00 h
+    - cron: '0 7 * * *'        # RENDEZ-VOUS DU MATIN, 7 h UTC = 8 h locale (UTC+1)
   workflow_dispatch:
     inputs:
       action:
@@ -43,6 +44,8 @@ on:
           - nocturne              # calcule et remplit predictions + échantillon
           - echantillon           # relit predictions + état de source (lecture seule)
           - diag-totals           # diagnostic couverture plus/moins 2,5 (lecture fournisseur)
+          - regler-scores         # sonde les scores des tickets en attente + déclenche le règlement/notifs (app)
+          - notif-matin           # déclenche le rendez-vous du matin (app), à la demande
 
 concurrency:
   group: collecte-cotes          # jamais deux collectes en même temps
@@ -58,6 +61,9 @@ jobs:
       MTJ_PROVIDER: oddsapi
       MTJ_PROVIDER_KEY: ${{ secrets.MTJ_PROVIDER_KEY }}
       MTJ_DATABASE_URL: ${{ secrets.MTJ_DATABASE_URL }}
+      # Déclenchement des jobs de notification côté app (règlement + matin).
+      MTJ_APP_URL: ${{ secrets.MTJ_APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -170,6 +176,29 @@ jobs:
       - name: Collecter TOUTES les compétitions (forcé, validation à la demande)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'collecter-tout'
         run: python -m mtj_model.pipeline.collector --all
+
+      # ---- SUIVI DE RÉSULTAT (toutes les 6 h) ------------------------------
+      # 1) Scores : on ne sonde QUE les ligues avec un ticket en attente (0 crédit
+      #    les jours sans attente) ; le coût est journalisé À PART (« [settle-scores] »).
+      - name: Rafraîchir les scores des tickets en attente (payant, ciblé)
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 */6 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'regler-scores')
+        run: python -m mtj_model.pipeline.settle_scores
+      # 2) Règlement + notifications : l'app LIT la base (gratuit), règle et notifie.
+      #    Secret partagé ; l'étape échoue bruyamment si l'URL/secret manque.
+      - name: Déclencher le règlement + le suivi de résultat (app)
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 */6 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'regler-scores')
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${MTJ_APP_URL%/}/api/cron/settle"
+
+      # ---- RENDEZ-VOUS DU MATIN (7 h UTC = 8 h locale) ---------------------
+      - name: Rendez-vous du matin (app)
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'notif-matin')
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${MTJ_APP_URL%/}/api/cron/matin"
 
       - name: Pipeline nocturne (remplit predictions) + échantillon
         # Automatique au cron 4 h UTC, OU à la main. Un résumé lisible est écrit sur
