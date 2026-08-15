@@ -26,6 +26,7 @@ from __future__ import annotations
 from .catalogue import classify
 from .db import connect
 from .provider import NullProvider, get_provider
+from .version import print_banner
 
 
 def plan_sync(active_keys: set[str], existing: dict[str, str]) -> dict[str, list[str]]:
@@ -102,6 +103,7 @@ def sync_catalogue() -> dict:
 
 
 def main() -> None:
+    print_banner("catalogue_sync")
     sync_catalogue()
 
 

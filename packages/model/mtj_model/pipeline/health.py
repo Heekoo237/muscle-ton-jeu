@@ -20,6 +20,7 @@ from ..constants import (
 )
 from .db import connect
 from .nightly import NIGHTLY_SKIP_ALERT, leagues_over_totals_margin
+from .version import print_banner
 
 # Seuils de fraîcheur par job. La nocturne tourne 1×/jour → 36 h laisse rater une
 # nuit sans alerter, mais pas deux. Le collecteur tourne toutes les 6 h.
@@ -209,6 +210,7 @@ def check() -> list[str]:
 
 
 def main() -> None:
+    print_banner("health")
     alerts = check()
     if alerts:
         print("\nALERTE — pipeline potentiellement mort :", file=sys.stderr)

@@ -29,6 +29,7 @@ from .db import connect
 from .predictions_io import fetch_latest_odds, write_predictions
 from .provider import NullProvider, get_provider
 from .source_mode import next_mode
+from .version import print_banner
 
 # Fenêtre d'analyse (jours à venir). DOIT rester égale à ANALYSIS_WINDOW_DAYS côté
 # app (apps/web/src/lib/server/domain/window.ts) : le nocturne calcule les probas
@@ -482,6 +483,7 @@ def sample_predictions(limit: int = 30) -> None:
 
 
 def main() -> None:
+    print_banner("nightly")
     ap = argparse.ArgumentParser(description="Pipeline nocturne — calcule et écrit predictions.")
     ap.add_argument("--days", type=int, default=DEFAULT_DAYS, help="fenêtre de matchs à venir (jours)")
     ap.add_argument("--sample", type=int, metavar="N", help="n'affiche qu'un échantillon de N predictions")

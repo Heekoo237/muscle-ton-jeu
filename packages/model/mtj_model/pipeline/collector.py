@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 
 from .db import connect, window_6h
 from .predictions_io import cote_seule_rows, write_predictions
+from .version import print_banner
 from .provider import NullProvider, get_provider
 from .quota import assert_quota_ok, planned_monthly_credits
 from .sync import league_worklist, resolve_fixture, slots_for
@@ -199,6 +200,7 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
 
 
 def main() -> None:
+    print_banner("collector")
     ap = argparse.ArgumentParser(description="Collecteur de cotes (6 h) — historise les mouvements.")
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--all", action="store_true",
