@@ -20,6 +20,8 @@ import {
 } from './market-map';
 import { aliasFor } from './team-aliases';
 import { ANALYSIS_WINDOW_DAYS } from './window';
+import { pairMatchFixture, TAU_PAIRE, MARGE_PAIRE } from './pair-match';
+import { teamSimilarity } from './similarity';
 
 function normalize(s: string): string {
 	return s
@@ -122,11 +124,36 @@ type MatchDiag =
 	| { kind: 'hors_couverture' }
 	| { kind: 'illisible' };
 
+/**
+ * Fixture résolu + équipes → diagnostic daté : déjà commencé, hors fenêtre, ou ok.
+ * Extrait pour être PARTAGÉ par le chemin nom-par-nom ET le rattrapage par paire
+ * (même règle temporelle, une seule fois).
+ */
+function windowDiag(fixture: Fixture, home: Team, away: Team, matchText: string): MatchDiag {
+	const t = Date.parse(fixture.dateUtc);
+	const now = Date.now();
+	// Coup d'envoi PASSÉ → on n'analyse pas (une analyse d'avant-match n'a plus de
+	// sens, et laisserait croire qu'on prédit un résultat déjà en cours).
+	if (!Number.isNaN(t) && t <= now) {
+		console.warn(`[résolution] DÉJÀ COMMENCÉ « ${matchText} » — coup d'envoi ${fixture.dateUtc}, passé`);
+		return { kind: 'commence', homeTeam: home, awayTeam: away };
+	}
+	// Trouvé mais au-delà de la période analysée.
+	if (!Number.isNaN(t) && t > now + ANALYSIS_WINDOW_DAYS * 86_400_000) {
+		console.warn(
+			`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
+		);
+		return { kind: 'hors_fenetre', homeTeam: home, awayTeam: away };
+	}
+	return { kind: 'ok', fixture, homeTeam: home, awayTeam: away };
+}
+
 function diagnoseMatch(
 	matchText: string,
 	fixtures: Fixture[],
 	teams: Team[],
-	clubByName: Map<string, number>
+	clubByName: Map<string, number>,
+	teamByName: Map<string, Team>
 ): MatchDiag {
 	const sides = matchText.split(/\s+[-–]\s+/).map((s) => s.trim());
 	if (sides.filter((s) => s.length >= 2).length < 2) return { kind: 'illisible' };
@@ -163,43 +190,64 @@ function diagnoseMatch(
 		// est l'extérieur réel — sans ce redressement, whichSide se tromperait de camp.
 		const trueHome = fixture && fxHomeClub(fixture) === homeClub ? homeTeam : awayTeam;
 		const trueAway = trueHome === homeTeam ? awayTeam : homeTeam;
-		// « Hors fenêtre » N'EST vrai que si un match existe RÉELLEMENT entre ces deux
-		// équipes, à une date au-delà de la période analysée. Sinon (aucun match entre
-		// elles), c'est « on n'a pas retrouvé ce match » — pas « hors fenêtre ». Ce
-		// libellé m'avait induit en erreur ; il colle maintenant à la donnée.
 		if (fixture) {
-			const t = Date.parse(fixture.dateUtc);
-			const now = Date.now();
-			// Coup d'envoi PASSÉ → on n'analyse pas (une analyse d'avant-match n'a plus
-			// de sens, et laisserait croire qu'on prédit un résultat déjà en cours).
-			if (!Number.isNaN(t) && t <= now) {
+			// OBSERVATION (mode B) : on calcule aussi ce que la PAIRE aurait donné et on
+			// journalise les DÉSACCORDS. Cas dangereux : le nom-par-nom réussit avec la
+			// MAUVAISE équipe et la paire n'est jamais consultée. Cette mesure (quelques ms)
+			// décidera du passage au chemin principal (mode A) sur des données, pas au juger.
+			const pair = pairMatchFixture(rawHome, rawAway, fixtures);
+			if (pair.decision === 'ok' && pair.fixture.id !== fixture.id) {
 				console.warn(
-					`[résolution] DÉJÀ COMMENCÉ « ${matchText} » — coup d'envoi ${fixture.dateUtc}, passé`
+					`[résolution] DÉSACCORD PAIRE « ${matchText} » — nom-par-nom → fixture ${fixture.id}, ` +
+						`paire → fixture ${pair.fixture.id} (${pair.fixture.teamHome} - ${pair.fixture.teamAway}, ` +
+						`score ${pair.score.toFixed(2)}). À examiner.`
 				);
-				return { kind: 'commence', homeTeam: trueHome, awayTeam: trueAway };
 			}
-			// Trouvé mais au-delà de la période analysée.
-			if (!Number.isNaN(t) && t > now + ANALYSIS_WINDOW_DAYS * 86_400_000) {
-				console.warn(
-					`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
-				);
-				return { kind: 'hors_fenetre', homeTeam: trueHome, awayTeam: trueAway };
-			}
-			return { kind: 'ok', fixture, homeTeam: trueHome, awayTeam: trueAway };
+			// « Hors fenêtre » N'EST vrai que si un match existe RÉELLEMENT entre ces deux
+			// équipes, à une date au-delà de la période analysée. Sinon → non_resolu.
+			return windowDiag(fixture, trueHome, trueAway, matchText);
 		}
+		// Les deux équipes sont reconnues mais elles ne jouent PAS l'une contre l'autre.
+		// On ne lance PAS le rattrapage par paire ici : rapprocher un AUTRE match par
+		// ressemblance fusionnerait deux clubs distincts (« Paris SG » n'est pas
+		// « Paris FC »). Le rattrapage est réservé aux NOMS non résolus, ci-dessous.
 		console.warn(
 			`[résolution] NON RETROUVÉ « ${matchText} » — équipes reconnues, mais aucun match entre elles en base`
 		);
 		return { kind: 'non_resolu' };
 	}
 
-	// Au moins un côté non résolu : on diagnostique CHAQUE côté manquant.
+	// AU MOINS UN NOM NON RÉSOLU → RATTRAPAGE PAR PAIRE. On cherche l'unique fixture
+	// dont les DEUX équipes ressemblent aux deux noms du ticket. Le contexte du match
+	// lève l'ambiguïté qu'un nom seul ne peut pas lever (« Séville »/« Sevilla »). Sûr
+	// parce que : score = min des deux côtés, un seul candidat franc requis (marge),
+	// et le côté est lu sur le fixture. Deux candidats proches → on ne devine pas.
+	const pair = pairMatchFixture(rawHome, rawAway, fixtures);
+	if (pair.decision === 'ok') {
+		const ph = teamByName.get(normalize(pair.fixture.teamHome));
+		const pa = teamByName.get(normalize(pair.fixture.teamAway));
+		if (ph && pa) {
+			console.warn(
+				`[résolution] RÉSOLU PAR PAIRE « ${matchText} » → ${pair.fixture.teamHome} - ${pair.fixture.teamAway} ` +
+					`(fixture ${pair.fixture.id}, score ${pair.score.toFixed(2)}, marge ${(pair.score - pair.second).toFixed(2)})`
+			);
+			return windowDiag(pair.fixture, ph, pa, matchText);
+		}
+	} else if (pair.decision === 'ambigu') {
+		console.warn(
+			`[résolution] PAIRE AMBIGUË « ${matchText} » — deux matchs proches ` +
+				`(meilleur ${pair.score.toFixed(2)}, second ${pair.second.toFixed(2)}), on ne devine pas`
+		);
+		return { kind: 'non_resolu' };
+	}
+
+	// Ni nom-par-nom ni paire : on diagnostique CHAQUE côté manquant (alias vs couverture).
 	const manquants = ([[rawHome, homeTeam], [rawAway, awayTeam]] as const)
 		.filter(([, t]) => !t)
 		.map(([raw]) => ({ raw, key: aliasFor(normalize(raw)), cands: candidatesFor(raw, teams) }));
 	const avecCandidat = manquants.some((m) => m.cands.length > 0);
 	const label = avecCandidat ? 'NON RÉSOLU (alias manquant probable)' : 'HORS COUVERTURE (aucun candidat)';
-	console.warn(`[résolution] ${label} « ${matchText} »`);
+	console.warn(`[résolution] ${label} « ${matchText} » (paire: ${pair.decision}, score ${pair.score.toFixed(2)})`);
 	for (const m of manquants) {
 		const c = m.cands.length ? m.cands.map((t) => t.nom).join(', ') : '(aucun candidat en base)';
 		console.warn(`    côté « ${m.raw} » → clé « ${m.key} » → candidats : ${c}`);
@@ -209,11 +257,20 @@ function diagnoseMatch(
 
 const DRAW_WORDS = new Set(['nul', 'match nul', 'draw', 'x', 'egalite']);
 
-/** À quel camp du match correspond ce choix ? (mêmes alias que les noms d'équipe) */
+/**
+ * À quel camp du match correspond ce choix ? Exact/alias d'abord ; à défaut, repli
+ * par RESSEMBLANCE — nécessaire quand le fixture a été résolu par paire (nom flou
+ * comme « FC Séville ») : le choix est alors l'un des deux noms du ticket et ressemble
+ * fortement à l'une des deux équipes. Choix BINAIRE, même garde-fou de marge que la
+ * paire : on ne tranche que si un côté domine nettement l'autre, sinon null.
+ */
 function whichSide(choice: string, home: Team, away: Team): 'home' | 'away' | null {
 	const t = matchTeam(choice, [home, away]);
-	if (!t) return null;
-	return normalize(t.nom) === normalize(home.nom) ? 'home' : 'away';
+	if (t) return normalize(t.nom) === normalize(home.nom) ? 'home' : 'away';
+	const sh = teamSimilarity(choice, home.nom);
+	const sa = teamSimilarity(choice, away.nom);
+	if (Math.max(sh, sa) >= TAU_PAIRE && Math.abs(sh - sa) >= MARGE_PAIRE) return sh > sa ? 'home' : 'away';
+	return null;
 }
 
 /**
@@ -375,11 +432,15 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 	// retrouver un match par CLUB quelle que soit l'entité (compétition) qui le porte.
 	const clubByName = new Map<string, number>();
 	for (const t of teams) clubByName.set(normalize(t.nom), clubOf(t));
+	// Nom normalisé → équipe : sert au rattrapage par paire à récupérer les Team du
+	// fixture résolu (pour whichSide et le libellé), sans re-résoudre les noms.
+	const teamByName = new Map<string, Team>();
+	for (const t of teams) teamByName.set(normalize(t.nom), t);
 
 	const selections = raw.lignes.map((ligne, i): Selection => {
 		const ordre = i + 1;
 		const { matchText, marketText, odds } = lineParts(ligne);
-		const diag = diagnoseMatch(matchText, fixtures, teams, clubByName);
+		const diag = diagnoseMatch(matchText, fixtures, teams, clubByName, teamByName);
 
 		// Match non résolu : QUATRE causes distinctes, quatre messages honnêtes.
 		// « hors_couverture » n'est plus le fourre-tout — il est réservé au cas où

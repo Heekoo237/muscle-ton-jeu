@@ -139,6 +139,73 @@
         { "matchText": "Alverca - CF Estrela", "marketText": "1X", "coteText": "1,40" }
       ],
       "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "DC_HOME_DRAW", "fixtureId": 101 }]
+    },
+
+    {
+      "nom": "PAIRE — « FC Séville – Rayo Vallecano » résout SANS alias (exonyme)",
+      "note": "« FC Séville » n'a aucun alias vers « Sevilla » ici : le nom-par-nom échoue, la paire retrouve l'unique fixture. Le côté est lu sur le fixture ; le choix « FC Séville » est rattaché à domicile par ressemblance.",
+      "teams": [
+        { "id": 40, "nom": "Sevilla", "aliases": [], "leagueId": 5 },
+        { "id": 41, "nom": "Rayo Vallecano", "aliases": [], "leagueId": 5 },
+        { "id": 42, "nom": "Valencia", "aliases": [], "leagueId": 5 }
+      ],
+      "fixtures": [
+        { "id": 501, "dateUtc": "", "teamHome": "Sevilla", "teamAway": "Rayo Vallecano", "leagueId": 5, "statut": "scheduled", "scoreHome": null, "scoreAway": null }
+      ],
+      "lignes": [
+        { "matchText": "FC Séville - Rayo Vallecano", "marketText": "FC Séville 1 N 2", "coteText": "2,10", "concept": { "famille": "RESULTAT_1X2", "choix": "FC Séville" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_HOME", "fixtureId": 501 }]
+    },
+    {
+      "nom": "PAIRE PIÈGE — deux fixtures candidats trop proches → INCONNU",
+      "note": "« Sporting » ressemble autant à « Sporting Lisbon » qu'à « Sporting Braga » ; les deux jouent Porto. Deux candidats à égalité, marge nulle → on ne devine pas.",
+      "teams": [
+        { "id": 50, "nom": "Sporting Lisbon", "aliases": [], "leagueId": 6 },
+        { "id": 51, "nom": "Sporting Braga", "aliases": [], "leagueId": 6 },
+        { "id": 52, "nom": "FC Porto", "aliases": [], "leagueId": 6 }
+      ],
+      "fixtures": [
+        { "id": 601, "dateUtc": "", "teamHome": "Sporting Lisbon", "teamAway": "FC Porto", "leagueId": 6, "statut": "scheduled", "scoreHome": null, "scoreAway": null },
+        { "id": 602, "dateUtc": "", "teamHome": "Sporting Braga", "teamAway": "FC Porto", "leagueId": 6, "statut": "scheduled", "scoreHome": null, "scoreAway": null }
+      ],
+      "lignes": [
+        { "matchText": "Sporting - Porto", "marketText": "Porto 1 N 2", "coteText": "1,80", "concept": { "famille": "RESULTAT_1X2", "choix": "Porto" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "fixtureId": null }]
+    },
+    {
+      "nom": "PAIRE — Cercle Brugge / Club Brugge jamais confondus",
+      "note": "« Cercle Bruges » (orthographe française, pas d'alias) doit retrouver Cercle Brugge, JAMAIS Club Brugge. L'autre côté (Anderlecht vs Genk) écarte le mauvais match.",
+      "teams": [
+        { "id": 60, "nom": "Cercle Brugge KSV", "aliases": [], "leagueId": 7 },
+        { "id": 61, "nom": "Club Brugge", "aliases": [], "leagueId": 7 },
+        { "id": 62, "nom": "Anderlecht", "aliases": [], "leagueId": 7 },
+        { "id": 63, "nom": "Genk", "aliases": [], "leagueId": 7 }
+      ],
+      "fixtures": [
+        { "id": 701, "dateUtc": "", "teamHome": "Cercle Brugge KSV", "teamAway": "Anderlecht", "leagueId": 7, "statut": "scheduled", "scoreHome": null, "scoreAway": null },
+        { "id": 702, "dateUtc": "", "teamHome": "Club Brugge", "teamAway": "Genk", "leagueId": 7, "statut": "scheduled", "scoreHome": null, "scoreAway": null }
+      ],
+      "lignes": [
+        { "matchText": "Cercle Bruges - Anderlecht", "marketText": "Anderlecht 1 N 2", "coteText": "2,40", "concept": { "famille": "RESULTAT_1X2", "choix": "Anderlecht" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_AWAY", "fixtureId": 701 }]
+    },
+    {
+      "nom": "PAIRE — un match hors catalogue reste hors catalogue",
+      "note": "Championnat domestique africain absent du catalogue : aucun fixture ne ressemble à la paire. La ressemblance reste sous le seuil → hors_couverture, jamais un match européen deviné.",
+      "teams": [
+        { "id": 70, "nom": "Sevilla", "aliases": [], "leagueId": 5 },
+        { "id": 71, "nom": "Valencia", "aliases": [], "leagueId": 5 }
+      ],
+      "fixtures": [
+        { "id": 801, "dateUtc": "", "teamHome": "Sevilla", "teamAway": "Valencia", "leagueId": 5, "statut": "scheduled", "scoreHome": null, "scoreAway": null }
+      ],
+      "lignes": [
+        { "matchText": "Canon Yaoundé - Coton Sport", "marketText": "Canon Yaoundé 1 N 2", "coteText": "2,00", "concept": { "famille": "RESULTAT_1X2", "choix": "Canon Yaoundé" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "raison": "hors_couverture", "fixtureId": null }]
     }
   ]
 }

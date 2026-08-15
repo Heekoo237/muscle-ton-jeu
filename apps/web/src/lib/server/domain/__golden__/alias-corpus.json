@@ -1,0 +1,241 @@
+{
+  "_note": "Corpus de calibration — vérité terrain pour la ressemblance de paire. Couples (nom source normalisé -> nom de référence normalisé) CURÉS, extraits de packages/model/mtj_model/pipeline/team_aliases.py (football-data <-> The Odds API). Chaque couple est un MÊME club sous deux noms : un vrai positif. Régénérer quand la carte Python grandit. Utilisé par pair-calibration.test.ts.",
+  "pairs": [
+    {
+      "source": "brighton",
+      "reference": "brighton and hove albion"
+    },
+    {
+      "source": "ipswich",
+      "reference": "ipswich town"
+    },
+    {
+      "source": "leeds",
+      "reference": "leeds united"
+    },
+    {
+      "source": "newcastle",
+      "reference": "newcastle united"
+    },
+    {
+      "source": "nott m forest",
+      "reference": "nottingham forest"
+    },
+    {
+      "source": "tottenham",
+      "reference": "tottenham hotspur"
+    },
+    {
+      "source": "antwerp",
+      "reference": "royal antwerp"
+    },
+    {
+      "source": "cercle brugge",
+      "reference": "cercle brugge ksv"
+    },
+    {
+      "source": "kortrijk",
+      "reference": "kv kortrijk"
+    },
+    {
+      "source": "mechelen",
+      "reference": "kv mechelen"
+    },
+    {
+      "source": "leuven",
+      "reference": "oud heverlee leuven"
+    },
+    {
+      "source": "standard",
+      "reference": "standard liege"
+    },
+    {
+      "source": "waregem",
+      "reference": "zulte waregem"
+    },
+    {
+      "source": "st truiden",
+      "reference": "sint truiden"
+    },
+    {
+      "source": "st gilloise",
+      "reference": "union saint gilloise"
+    },
+    {
+      "source": "koln",
+      "reference": "1 koln"
+    },
+    {
+      "source": "leverkusen",
+      "reference": "bayer leverkusen"
+    },
+    {
+      "source": "dortmund",
+      "reference": "borussia dortmund"
+    },
+    {
+      "source": "m gladbach",
+      "reference": "borussia monchengladbach"
+    },
+    {
+      "source": "ein frankfurt",
+      "reference": "eintracht frankfurt"
+    },
+    {
+      "source": "mainz",
+      "reference": "fsv mainz 05"
+    },
+    {
+      "source": "hoffenheim",
+      "reference": "tsg hoffenheim"
+    },
+    {
+      "source": "stuttgart",
+      "reference": "vfb stuttgart"
+    },
+    {
+      "source": "ath bilbao",
+      "reference": "athletic bilbao"
+    },
+    {
+      "source": "ath madrid",
+      "reference": "atletico madrid"
+    },
+    {
+      "source": "celta",
+      "reference": "celta vigo"
+    },
+    {
+      "source": "espanol",
+      "reference": "espanyol"
+    },
+    {
+      "source": "ca osasuna",
+      "reference": "osasuna"
+    },
+    {
+      "source": "vallecano",
+      "reference": "rayo vallecano"
+    },
+    {
+      "source": "betis",
+      "reference": "real betis"
+    },
+    {
+      "source": "sociedad",
+      "reference": "real sociedad"
+    },
+    {
+      "source": "roma",
+      "reference": "as roma"
+    },
+    {
+      "source": "atalanta",
+      "reference": "atalanta bc"
+    },
+    {
+      "source": "inter",
+      "reference": "inter milan"
+    },
+    {
+      "source": "monaco",
+      "reference": "as monaco"
+    },
+    {
+      "source": "paris sg",
+      "reference": "paris saint germain"
+    },
+    {
+      "source": "sp braga",
+      "reference": "braga"
+    },
+    {
+      "source": "sp lisbon",
+      "reference": "sporting lisbon"
+    },
+    {
+      "source": "maritimo",
+      "reference": "cs maritimo"
+    },
+    {
+      "source": "guimaraes",
+      "reference": "vitoria"
+    },
+    {
+      "source": "aek",
+      "reference": "aek athens"
+    },
+    {
+      "source": "aris",
+      "reference": "aris thessaloniki"
+    },
+    {
+      "source": "olympiakos",
+      "reference": "olympiakos piraeus"
+    },
+    {
+      "source": "paok",
+      "reference": "paok thessaloniki"
+    },
+    {
+      "source": "panetolikos",
+      "reference": "panetolikos agrinio"
+    },
+    {
+      "source": "volos",
+      "reference": "volos nfc"
+    },
+    {
+      "source": "kifisia",
+      "reference": "ae kifisia"
+    },
+    {
+      "source": "atromitos",
+      "reference": "atromitos athens"
+    },
+    {
+      "source": "levadeiakos",
+      "reference": "levadiakos"
+    },
+    {
+      "source": "twente",
+      "reference": "twente enschede"
+    },
+    {
+      "source": "nijmegen",
+      "reference": "nec nijmegen"
+    },
+    {
+      "source": "for sittard",
+      "reference": "fortuna sittard"
+    },
+    {
+      "source": "rizespor",
+      "reference": "caykur rizespor"
+    },
+    {
+      "source": "goztep",
+      "reference": "goztepe"
+    },
+    {
+      "source": "kasimpasa",
+      "reference": "kasimpasa sk"
+    },
+    {
+      "source": "torku konyaspor",
+      "reference": "konyaspor"
+    },
+    {
+      "source": "besiktas",
+      "reference": "besiktas jk"
+    },
+    {
+      "source": "gaziantep",
+      "reference": "gazisehir gaziantep"
+    },
+    {
+      "source": "buyuksehyr",
+      "reference": "basaksehir"
+    }
+  ]
+}

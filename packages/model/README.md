@@ -495,6 +495,46 @@ match **par club_id**, quelle que soit l'entité (compétition) qui le porte.
 > `team_id` : la réconciliation `club_id` ne touche donc NI les probabilités NI
 > l'historique. Aucun recalcul nocturne nécessaire après réconciliation.
 
+#### Résolution du ticket : d'abord l'alias, puis la PAIRE, sinon INCONNU
+
+Côté app (`apps/web/src/lib/server/domain/`), un nom de bookmaker se résout dans
+cet ordre :
+
+1. **Exact + alias** (`team-aliases.ts`, `matchTeam`) — rapide, certain, risque nul.
+2. **Ressemblance de PAIRE** (`pair-match.ts`, `similarity.ts`) — quand un nom n'est
+   PAS résolu, on cherche l'unique fixture dont les DEUX équipes ressemblent aux deux
+   noms du ticket. Le contexte du match lève l'ambiguïté qu'un nom seul ne peut pas
+   lever (« Séville »/« Sevilla »). Sûr parce que : score = **min** des deux côtés
+   (un côté excellent ne rachète pas un côté faible), **un seul candidat franc** requis
+   (marge sur le second, sinon INCONNU), et le côté domicile/extérieur est lu sur le
+   **fixture**, jamais sur l'ordre du ticket. Le rattrapage ne s'active QUE sur un nom
+   non résolu — jamais quand les deux équipes sont connues mais ne jouent pas l'une
+   contre l'autre (sinon on fusionnerait « Paris SG » et « Paris FC »).
+3. Sinon → INCONNU, avec le meilleur score journalisé (pour aliaser ou confirmer
+   l'absence de couverture).
+
+**La carte d'alias ne disparaît jamais — et le cas d'école, c'est Çorum FK.** La
+ressemblance de paire est calibrée sur la carte d'alias comme vérité terrain
+(`pair-calibration.test.ts`, même méthode que l'ECE du modèle) : à TAU 0,50, **rappel
+94,9 %, taux de fausse paire 0,0 %**. Les 5 % qu'elle NE rattrape pas sont exactement
+les cas SÉMANTIQUES et de TRANSLITTÉRATION, mesurés :
+
+| Couple | Ressemblance | Verdict |
+|---|---|---|
+| `seville` / `sevilla` | 0,71 | rattrapée par la paire (orthographe) |
+| `corum belediyespor` / `corum fk` | **0,38** | **alias requis** — « belediyespor » (« club municipal ») est un mot différent, aucun caractère commun exploitable |
+| `guimaraes` / `vitoria` | **0,00** | **alias requis** — sémantique pur, zéro chevauchement |
+
+C'est la preuve chiffrée que la ressemblance tue le tapis roulant des variantes
+d'orthographe, mais que la carte reste indispensable pour l'inguessable. On n'ajoute
+plus un alias par faute de frappe ; on en ajoute un quand le nom est un AUTRE mot.
+
+Une mesure d'**observation** tourne en parallèle : sur chaque ligne résolue par le
+nom-par-nom, on calcule aussi ce que la paire aurait donné et on journalise les
+DÉSACCORDS (`[résolution] DÉSACCORD PAIRE`). C'est le cas dangereux — le nom-par-nom
+réussit avec la MAUVAISE équipe — et ces logs décideront, sur données, du passage de
+la paire en chemin principal.
+
 ### Catalogue de couverture (`pipeline/catalogue.py`)
 
 `python -m mtj_model.pipeline.catalogue` liste **toutes** les compétitions
