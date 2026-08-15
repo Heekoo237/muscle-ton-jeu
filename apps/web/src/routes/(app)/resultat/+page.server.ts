@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 import {
 	getTicket,
 	updateTicket,
@@ -10,7 +10,7 @@ import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
-import { predictions, writing, notifications, stats } from '$lib/server/services';
+import { predictions, writing, stats } from '$lib/server/services';
 import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
 import { regimeOf } from '$lib/server/domain/regime';
 import { computeCharge } from '$lib/server/domain/billing';
@@ -366,20 +366,7 @@ export const load: PageServerLoad = async (event) => {
 	};
 };
 
-export const actions: Actions = {
-	// Autorisation de notification demandée sur l'écran de résultat (PRD §10).
-	// En factice : on enregistre un abonnement fictif. Le vrai Web Push (VAPID,
-	// permission navigateur) est branché en Session 8.
-	notifier: async (event) => {
-		const session = await getAppSession(event);
-		if (session) {
-			await notifications.saveSubscription(session.userId, {
-				endpoint: 'fake-endpoint',
-				p256dh: 'fake',
-				auth: 'fake'
-			});
-		}
-		return { notifie: true };
-	}
-};
+// L'autorisation de notification passe désormais par le NAVIGATEUR (Web Push réel,
+// permission + abonnement côté client → POST /api/push/subscribe). Plus d'action
+// serveur factice « notifier » : la demande se fait au clic, sur l'écran de résultat.
 

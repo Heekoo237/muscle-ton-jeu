@@ -22,10 +22,15 @@ export interface NotificationsService {
 }
 
 import { FakeNotifications } from './fake';
+import { WebPushNotifications, webPushConfigured } from './webpush';
 
-/** ← Point de bascule vers web-push réel (Session 8). */
+/**
+ * Bascule : Web Push RÉEL si les clés VAPID sont présentes, sinon file factice
+ * (local, tests). Renseigner PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY /
+ * VAPID_SUBJECT = passer en réel, sans refonte.
+ */
 function createNotificationsService(): NotificationsService {
-	return new FakeNotifications();
+	return webPushConfigured() ? new WebPushNotifications() : new FakeNotifications();
 }
 
 export const notifications: NotificationsService = createNotificationsService();

@@ -3,15 +3,42 @@
 	// est en vue PAPIER (même langage que la landing) ; tout le reste est conservé :
 	// analyse, verdict, lecture détaillée match par match, partage, recharge,
 	// notifications, bandeau d'historique.
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 	import ShareSheet from '$lib/components/ShareSheet.svelte';
 	import { ligneNote, resumeNonAnalyse, type RaisonNonAnalyse } from '$lib/lineStatus';
+	import { onMount } from 'svelte';
+	import { activerNotifications, pushCapability, envoyerTest, type PushEtat } from '$lib/push';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 	const vm = $derived(data.vm);
+
+	// Notifications : capacité calculée côté navigateur (jamais au SSR). Refus =
+	// on ne redemande jamais (l'état 'refuse' n'offre pas de bouton).
+	let notifEtat = $state<PushEtat | 'chargement'>('chargement');
+	let enCours = $state(false);
+	let testEnvoye = $state(false);
+	let notifErreur = $state(false);
+	onMount(() => {
+		notifEtat = pushCapability();
+	});
+	async function activer() {
+		enCours = true;
+		notifErreur = false;
+		const r = await activerNotifications();
+		enCours = false;
+		if (r === 'ok') notifEtat = 'active';
+		else if (r === 'refuse') notifEtat = 'refuse';
+		else if (r === 'non-supporte') notifEtat = 'non-supporte';
+		else notifErreur = true;
+	}
+	async function test() {
+		enCours = true;
+		testEnvoye = await envoyerTest();
+		enCours = false;
+	}
 
 	// Résumé HONNÊTE des lignes non analysées : la vraie raison, jamais « non couvert »
 	// par défaut. Une cause → message précis ; plusieurs → compte neutre.
@@ -230,16 +257,39 @@
 		</div>
 	{/if}
 
-	<!-- Rétention : opt-in notifications (PRD §10) -->
+	<!-- Rétention : opt-in notifications (PRD §10). Demande au PIC émotionnel (résultat),
+	     jamais à l'arrivée. Refus = on ne redemande jamais. Cas iOS géré explicitement. -->
 	<div class="notif">
-		{#if form?.notifie}
+		{#if notifEtat === 'active'}
 			<p class="t-body ok">On te prévient quand ton ticket est joué.</p>
-		{:else}
-			<form method="POST" action="?/notifier">
-				<p class="t-body texte">On te prévient quand ton ticket est joué ?</p>
-				<button class="btn-outline" type="submit">Activer les notifications</button>
-			</form>
+			{#if !testEnvoye}
+				<button class="btn-outline" type="button" onclick={test} disabled={enCours}>
+					Recevoir une notification de test
+				</button>
+			{:else}
+				<p class="t-small texte">Notification de test envoyée. Regarde ton téléphone.</p>
+			{/if}
+		{:else if notifEtat === 'ios-a-installer'}
+			<p class="t-body texte">On te prévient quand ton ticket est joué.</p>
+			<p class="t-small texte">
+				Sur iPhone, ajoute d'abord Muscle Ton Jeu à ton écran d'accueil (bouton Partager → « Sur
+				l'écran d'accueil »), puis reviens ici pour activer.
+			</p>
+		{:else if notifEtat === 'refuse'}
+			<p class="t-small texte">
+				Les notifications sont bloquées pour ce site. Tu peux les réautoriser dans les réglages de
+				ton navigateur.
+			</p>
+		{:else if notifEtat === 'pret'}
+			<p class="t-body texte">On te prévient quand ton ticket est joué ?</p>
+			<button class="btn-outline" type="button" onclick={activer} disabled={enCours}>
+				{enCours ? 'Activation…' : 'Activer les notifications'}
+			</button>
+			{#if notifErreur}
+				<p class="t-small texte">Ça n'a pas marché. Réessaie dans un instant.</p>
+			{/if}
 		{/if}
+		<!-- 'non-supporte' / 'chargement' : on n'affiche rien (pas d'échec, pas de bruit). -->
 	</div>
 
 	{#if data.historique.length >= 20}
