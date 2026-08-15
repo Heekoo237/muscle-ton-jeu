@@ -252,37 +252,41 @@ def coverage_report(model_codes, groups) -> tuple[dict, bool, dict]:
     """
     couverture: dict = {}
     vus: set = set()
-    tot_fen = tot_tr = 0
+    tot_fen = tot_tr = tot_inv = 0
     abandons: list = []
     for g in groups:
         fd = g["fd"]
         vus.add(fd)
         fenetre, traites = g["fenetre"], g["traites"]
+        invalides = g.get("cotes_invalides", 0)
         sautes = max(0, fenetre - traites)
         if sautes == 0:
             raison = None
+        elif invalides and g["regime"] == "cote_seule":
+            raison = "cote_invalide"  # rejetée en amont (marge négative, cote ≤ 1…)
         elif g["regime"] == "cote_seule":
             raison = "cote_absente"
         elif g.get("hist_thin"):
             raison = "historique_insuffisant"
         else:
             raison = "equipe_inconnue"
-        couverture[fd] = {"regime": g["regime"], "fenetre": fenetre,
-                          "traites": traites, "sautes": sautes, "raison": raison}
+        couverture[fd] = {"regime": g["regime"], "fenetre": fenetre, "traites": traites,
+                          "sautes": sautes, "cotes_invalides": invalides, "raison": raison}
         tot_fen += fenetre
         tot_tr += traites
+        tot_inv += invalides
         if g["regime"] == "modele" and fenetre > 0 and traites == 0:
             abandons.append(fd)
     # Ligues modèle attendues SANS aucun match en fenêtre : bénin (pré-saison), mais
     # tracé — pour que « pas de ligne » ne se confonde jamais avec « abandon ».
     for fd in sorted(set(model_codes) - vus):
         couverture[fd] = {"regime": "modele", "fenetre": 0, "traites": 0,
-                          "sautes": 0, "raison": "aucun_match_fenetre"}
+                          "sautes": 0, "cotes_invalides": 0, "raison": "aucun_match_fenetre"}
     tot_sautes = tot_fen - tot_tr
     taux = round(tot_sautes / tot_fen, 3) if tot_fen else 0.0
     degrade = bool(abandons) or taux > NIGHTLY_SKIP_ALERT
     resume = {"fenetre": tot_fen, "traites": tot_tr, "sautes": tot_sautes,
-              "taux_saut": taux, "abandons": abandons}
+              "taux_saut": taux, "cotes_invalides": tot_inv, "abandons": abandons}
     return couverture, degrade, resume
 
 
@@ -312,19 +316,27 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             # mesure au fil du groupby pour qu'un statut vert ne masque jamais une
             # ligue trouée (le problème qui a duré invisible).
             groups: list[dict] = []
+            invalides: list[dict] = []  # cotes rejetées (fixture, marché, valeurs) — rapport
             for league_code, up in upcoming.groupby("league_code"):
                 fd = str(league_code)
                 cote_seule = regimes.get(fd) == "cote_seule"
                 hist_thin = False
-                if cote_seule:
-                    # Non backtesté : cote dé-vigée seule + double chance dérivée.
-                    rows = league_predictions_cote_seule(up, fd, odds, books)
-                else:
-                    hist = history[history["league_code"] == league_code]
-                    # Même garde que le fit (compute.league_predictions) : historique
-                    # trop mince → aucune ligne pour TOUTE la ligue. On le NOMME.
-                    hist_thin = hist.empty or hist["home"].nunique() < 4
-                    rows = league_predictions(hist, up, fd, ref_date, odds, books, margin_override=fd in model_leagues)
+                inv_ligue: list[dict] = []
+                try:
+                    if cote_seule:
+                        # Non backtesté : cote dé-vigée seule + double chance dérivée.
+                        rows = league_predictions_cote_seule(up, fd, odds, books, invalides=inv_ligue)
+                    else:
+                        hist = history[history["league_code"] == league_code]
+                        # Même garde que le fit (compute.league_predictions) : historique
+                        # trop mince → aucune ligne pour TOUTE la ligue. On le NOMME.
+                        hist_thin = hist.empty or hist["home"].nunique() < 4
+                        rows = league_predictions(hist, up, fd, ref_date, odds, books,
+                                                  margin_override=fd in model_leagues, invalides=inv_ligue)
+                except Exception as exc:  # noqa: BLE001 — une ligue ne fait JAMAIS tomber le run
+                    print(f"  ⚠ ligue {fd} IGNORÉE (erreur non rattrapée) : {type(exc).__name__}: {exc}")
+                    rows = []
+                invalides.extend(inv_ligue)
                 for r in rows:
                     detail[fd][r.source] += 1
                     if r.marche in ODDS_MARKETS and r.source in ("odds", "repli"):
@@ -336,6 +348,8 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                     "fd": fd, "regime": "cote_seule" if cote_seule else "modele",
                     "fenetre": int(len(up)), "traites": len({r.fixture_id for r in rows}),
                     "hist_thin": hist_thin,
+                    # Matchs distincts dont AU MOINS un groupe de cotes a été rejeté.
+                    "cotes_invalides": len({i["fixture_id"] for i in inv_ligue}),
                 })
 
             write_predictions(con, all_rows, jour)
@@ -373,6 +387,9 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     r = resume_cv
     print(f"  couverture : {r['traites']}/{r['fenetre']} matchs traités "
           f"(sautés {r['sautes']}, {r['taux_saut']:.0%}).")
+    if r.get("cotes_invalides"):
+        print(f"  ⚠ {r['cotes_invalides']} match(s) à cote INVALIDE rejetés "
+              f"(détail « [cote invalide] » ci-dessus).")
     if r["abandons"]:
         print(f"  ⚠ LIGUES ABANDONNÉES (matchs en fenêtre, AUCUNE ligne) : {', '.join(r['abandons'])}")
     for fd in sorted(couverture):

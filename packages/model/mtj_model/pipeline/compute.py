@@ -50,19 +50,62 @@ class PredictionRow:
     bookmaker: str | None = None  # book source pour "odds" ; None pour "model"/"repli"
 
 
+def valid_odds_group(vals: list) -> tuple[bool, str]:
+    """Un groupe de cotes est-il DÉVIGEABLE ? `(ok, raison)`.
+
+    Rejette ce qui n'a pas de sens sur un vrai marché — AVANT de chercher une racine
+    (sinon `brentq` plante « f(a) et f(b) de même signe ») :
+      - une cote absente du groupe → « cote_manquante » ;
+      - une cote ≤ 1.00 → « cote_sous_1 » (impossible : gain nul ou négatif) ;
+      - Σ des probabilités implicites < 1 → « marge_negative » (impossible sur un
+        vrai book ; c'est le cas qui faisait planter le nocturne).
+    """
+    if any(v is None for v in vals):
+        return False, "cote_manquante"
+    if any(v <= 1.0 for v in vals):
+        return False, "cote_sous_1"
+    if sum(1.0 / v for v in vals) < 1.0 - 1e-9:
+        return False, "marge_negative"
+    return True, ""
+
+
+def devig_fixture_odds_report(raw: dict[str, float]) -> tuple[dict[str, float], list[dict]]:
+    """Comme `devig_fixture_odds`, mais renvoie AUSSI les groupes rejetés, avec la
+    raison et les cotes exactes — de quoi voir une cote aberrante et la compter.
+
+    Un groupe ENTIÈREMENT absent (aucune cote collectée) est silencieux : c'est un
+    marché non relevé, pas une cote invalide. On ne rapporte que ce qui a AU MOINS
+    une cote présente mais reste indévigeable.
+    """
+    out: dict[str, float] = {}
+    invalides: list[dict] = []
+    for nom, group in ODDS_GROUPS.items():
+        vals = [raw.get(m) for m in group]
+        if all(v is None for v in vals):
+            continue  # marché non collecté — normal, silencieux
+        cotes = {m: raw.get(m) for m in group}
+        ok, raison = valid_odds_group(vals)
+        if not ok:
+            invalides.append({"groupe": nom, "raison": raison, "cotes": cotes})
+            continue
+        try:
+            probs = devig_power(vals)
+        except Exception as exc:  # noqa: BLE001 — filet ultime : un match ne plante jamais
+            invalides.append({"groupe": nom, "raison": f"devig_echec:{type(exc).__name__}",
+                              "cotes": cotes})
+            continue
+        out.update({m: float(p) for m, p in zip(group, probs)})
+    return out, invalides
+
+
 def devig_fixture_odds(raw: dict[str, float]) -> dict[str, float]:
     """Cotes décimales brutes → probabilités dé-vigées, par groupe mutuel.
 
-    Un groupe n'est retenu que si TOUTES ses cotes sont présentes et valides
-    (> 1). Une cote manquante laisse le marché sans probabilité de marché → repli.
+    Un groupe n'est retenu que s'il est VALIDE (toutes présentes, > 1, marge ≥ 0).
+    Une cote manquante ou aberrante laisse le marché sans probabilité → repli. Ne
+    lève JAMAIS : un groupe indévigeable est simplement absent du résultat.
     """
-    out: dict[str, float] = {}
-    for group in ODDS_GROUPS.values():
-        vals = [raw.get(m) for m in group]
-        if all(v is not None and v > 1.0 for v in vals):
-            probs = devig_power(vals)
-            out.update({m: float(p) for m, p in zip(group, probs)})
-    return out
+    return devig_fixture_odds_report(raw)[0]
 
 
 def _resolve(marche: str, model_probs: dict[str, float], market_probs: dict[str, float], margin_override: bool):
@@ -82,6 +125,23 @@ def _resolve(marche: str, model_probs: dict[str, float], market_probs: dict[str,
     return model_probs[marche], "model"
 
 
+def _log_and_collect_invalid(bad: list[dict], league_code: str, fid: int,
+                             books: dict, sink: list | None) -> None:
+    """Journalise chaque groupe de cotes invalide (fixture, marché, valeurs EXACTES,
+    books d'où viennent les cotes) et l'ajoute au collecteur pour le rapport de
+    couverture. Une cote invalide fait sauter CE match, pas le nocturne — et elle se
+    voit : on ne masque jamais une donnée qu'on refuse d'utiliser."""
+    for b in bad:
+        cotes_txt = ", ".join(f"{m}={v}" for m, v in b["cotes"].items())
+        books_txt = ", ".join(f"{m}:{books.get(m, '?')}" for m in b["cotes"])
+        print(f"[cote invalide] {league_code} fixture={fid} {b['groupe']} "
+              f"{b['raison']} — {cotes_txt}  (books: {books_txt})")
+        if sink is not None:
+            sink.append({"fixture_id": fid, "league": league_code,
+                         "groupe": b["groupe"], "raison": b["raison"],
+                         "cotes": b["cotes"], "books": {m: books.get(m) for m in b["cotes"]}})
+
+
 # Double chance DÉRIVÉE du 1X2 dé-vigé (arithmétique, pas une cote lue) : c'est le
 # marché le plus joué, couvert partout, gratuitement. Source « cote_derivee »,
 # distincte de « cote_seule », pour séparer le coté du déduit à la calibration.
@@ -97,6 +157,7 @@ def league_predictions_cote_seule(
     league_code: str,
     odds_by_fixture: dict[int, dict[str, float]] | None = None,
     book_by_fixture: dict[int, dict[str, str]] | None = None,
+    invalides: list | None = None,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat en RÉGIME COTE SEULE (non backtesté).
 
@@ -113,8 +174,11 @@ def league_predictions_cote_seule(
     rows: list[PredictionRow] = []
     for m in upcoming.itertuples(index=False):
         fid = int(m.fixture_id)
-        market_probs = devig_fixture_odds(odds_by_fixture.get(fid, {}))
         books = book_by_fixture.get(fid, {})
+        # Dévigage TOLÉRANT : les groupes aberrants (marge négative, cote ≤ 1…) sont
+        # rejetés et JOURNALISÉS, jamais dévigés — un match ne fait plus planter le run.
+        market_probs, bad = devig_fixture_odds_report(odds_by_fixture.get(fid, {}))
+        _log_and_collect_invalid(bad, league_code, fid, books, invalides)
         # 1X2 et plus/moins 2,5 : cote lue et dé-vigée → « cote_seule ».
         for marche, proba in market_probs.items():
             rows.append(PredictionRow(
@@ -142,6 +206,7 @@ def league_predictions(
     odds_by_fixture: dict[int, dict[str, float]] | None = None,
     book_by_fixture: dict[int, dict[str, str]] | None = None,
     margin_override: bool = False,
+    invalides: list | None = None,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat pour ses matchs à venir.
 
@@ -164,9 +229,11 @@ def league_predictions(
         if eg is None:
             continue  # équipe inconnue → marchés inconnus, on n'écrit rien
         model_probs = market_probabilities(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
-        market_probs = devig_fixture_odds(odds_by_fixture.get(m.fixture_id, {}))
         books = book_by_fixture.get(int(m.fixture_id), {})  # {marché: book} — le 1X2 et
         # le plus/moins 2,5 peuvent venir de books différents (voir provider.parse_odds).
+        # Dévigage tolérant : une cote aberrante → repli modèle, journalisée, jamais un crash.
+        market_probs, bad = devig_fixture_odds_report(odds_by_fixture.get(m.fixture_id, {}))
+        _log_and_collect_invalid(bad, league_code, int(m.fixture_id), books, invalides)
         for marche in PROBABILITY_SOURCE:  # marchés couverts non-BTTS
             proba, source = _resolve(marche, model_probs, market_probs, margin_override)
             rows.append(PredictionRow(
