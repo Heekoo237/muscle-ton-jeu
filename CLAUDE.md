@@ -43,6 +43,10 @@ Un LLM à qui l'on demande une probabilité produit un nombre plausible et fabri
 
 Il n'a le droit de rien d'autre. Pas de calcul, pas d'estimation, pas de sélection, pas de jugement.
 
+**Ce que « lire » recouvre.** Le droit de LIRE inclut nommer un concept dans une LISTE FERMÉE définie par nous. Le code vérifie l'appartenance à la liste et redresse toujours le côté domicile/extérieur depuis la donnée en base, jamais depuis l'ordre d'affichage.
+
+Le seul nombre que la vision peut émettre est un seuil de marché, contraint à {1.5, 2.5, 3.5} ET recoupé contre le texte lu. Aucun autre nombre ne sort d'un LLM.
+
 **Contrôle automatique obligatoire** après chaque génération de texte : extraire tous les nombres du texte, vérifier que chacun figure dans le JSON d'entrée, régénérer sinon.
 
 **Exception unique et documentée : la cote transcrite depuis la capture de l'utilisateur.** Elle est affichée pour vérification (l'utilisateur regarde son propre ticket), jamais utilisée dans un calcul. Une cote mal lue est visible et contestable ; une probabilité inventée serait invisible et incontestable — ce n'est pas comparable. **Toute évolution qui ferait entrer `coteSaisie` dans un calcul viole la règle d'or n°1.** Un test (`no-cote-in-calc.test.ts`) échoue si `coteSaisie` apparaît dans un module de calcul.
