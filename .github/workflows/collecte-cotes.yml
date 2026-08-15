@@ -9,7 +9,8 @@ name: Collecte des cotes
 # par défaut du dépôt (main). Sur une autre branche, seul le bouton manuel marche.
 on:
   schedule:
-    - cron: '0 */6 * * *'      # toutes les 6 h (heure UTC)
+    - cron: '0 */6 * * *'      # collecteur + catalogue + surveillance, toutes les 6 h (UTC)
+    - cron: '0 4 * * *'        # NOCTURNE, 1×/jour à 4 h UTC — APRÈS le collecteur de 00 h
   workflow_dispatch:
     inputs:
       action:
@@ -157,11 +158,13 @@ jobs:
         run: python -m mtj_model.pipeline.backfill --reset
 
       - name: Synchroniser le catalogue (auto-activation, gratuit /sports)
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'synchro-catalogue')
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 */6 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'synchro-catalogue')
         run: python -m mtj_model.pipeline.catalogue_sync
 
       - name: Collecter les cotes
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')
+        # UNIQUEMENT sur le cron 6 h : au cron 4 h (nocturne) on ne recollecte pas
+        # (ce serait recollecter la fenêtre de 00 h, des crédits pour rien).
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 */6 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'collecter')
         run: python -m mtj_model.pipeline.collector
 
       - name: Collecter TOUTES les compétitions (forcé, validation à la demande)
@@ -169,11 +172,24 @@ jobs:
         run: python -m mtj_model.pipeline.collector --all
 
       - name: Pipeline nocturne (remplit predictions) + échantillon
-        if: github.event_name == 'workflow_dispatch' && inputs.action == 'nocturne'
+        # Automatique au cron 4 h UTC, OU à la main. Un résumé lisible est écrit sur
+        # la page du run (onglet Actions) : on confirme d'un coup d'œil, sans logs.
+        if: (github.event_name == 'schedule' && github.event.schedule == '0 4 * * *') || (github.event_name == 'workflow_dispatch' && inputs.action == 'nocturne')
+        env:
+          DECLENCHEUR: "${{ github.event_name }} ${{ github.event.schedule }}"
         run: |
-          python -m mtj_model.pipeline.nightly
+          python -m mtj_model.pipeline.nightly | tee /tmp/nocturne.log
           echo "----- échantillon -----"
           python -m mtj_model.pipeline.nightly --sample 24
+          {
+            echo "### 🌙 Nocturne exécuté ($(date -u '+%Y-%m-%d %H:%M UTC'))"
+            echo ""
+            echo "Déclencheur : **${DECLENCHEUR}**"
+            echo ""
+            echo '```'
+            grep -E '^\[nightly\] commit|^Nocturne |^  couverture |^  crédits |repli COTE SEULE' /tmp/nocturne.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Échantillon predictions + état de source (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'echantillon'
