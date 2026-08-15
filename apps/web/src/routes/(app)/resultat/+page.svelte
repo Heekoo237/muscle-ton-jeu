@@ -122,8 +122,8 @@
 				<span class="cv-pct">{pctBig(vm.probaRenforceePct)}</span> — sur les {vm.nbAnalysables} match{vm.nbAnalysables
 					> 1
 					? 's'
-					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}.{#if resumeAutres}
-					{resumeAutres}.{/if} Ton ticket entier a moins de chances.
+					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}.{resumeAutres ? ` ${resumeAutres}.` : ''} Ton
+				ticket entier a moins de chances.
 			</p>
 		{/if}
 	</div>
@@ -206,7 +206,7 @@
 							     le second test reste un garde-fou d'affichage inoffensif. -->
 						</div>
 						<div class="mpm-marche" class:oc={l.fragile}>{l.libelleFr}</div>
-						<div class="mpm-note">{ligneNote(l)}</div>
+						<div class="mpm-note">{ligneNote(l, { retraitUnique: vm.nbRetirees === 1 })}</div>
 					</article>
 				{/each}
 			</div>

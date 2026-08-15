@@ -29,6 +29,20 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote({ ...base, fragile: true, retiree: true })).toContain('Retirée');
 	});
 
+	it('« la plus fragile » UNIQUEMENT s’il n’y a qu’un seul retrait', () => {
+		const retiree = { analysable: true, retiree: true, fragile: true };
+		// Un seul retrait → superlatif autorisé.
+		expect(ligneNote(retiree, { retraitUnique: true })).toBe(
+			'Retirée du ticket renforcé — sélection la plus fragile.'
+		);
+		// Plusieurs retraits (ou inconnu) → pas de « LA plus » : deux lignes ne peuvent
+		// pas être toutes deux la plus fragile.
+		expect(ligneNote(retiree, { retraitUnique: false })).toBe(
+			'Retirée du ticket renforcé — sélection fragile.'
+		);
+		expect(ligneNote(retiree)).not.toContain('la plus');
+	});
+
 	it('non analysée AVEC raison → la VRAIE cause, jamais « non couvert » par défaut', () => {
 		expect(ligneNote({ analysable: false, retiree: false, fragile: false, raisonNonAnalyse: 'commence' })).toBe(
 			'Non analysé — ce match a déjà commencé. Non facturé.'

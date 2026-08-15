@@ -56,14 +56,22 @@ export interface LigneStatutIn {
 	raisonNonAnalyse?: RaisonNonAnalyse;
 }
 
-/** Note factuelle par ligne. Jamais de jugement sur une ligne non analysée. */
-export function ligneNote(l: LigneStatutIn): string {
+/**
+ * Note factuelle par ligne. Jamais de jugement sur une ligne non analysée.
+ * `retraitUnique` : « la plus fragile » n'est vrai que s'il n'y a QU'UN retrait ;
+ * avec plusieurs retraits, aucun n'est « LA plus » — on dit « fragile », sans superlatif.
+ */
+export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }): string {
 	if (!l.analysable) {
 		// On connaît la cause exacte : on la dit. Repli sobre si elle manque (vieux ticket).
 		const cause = l.raisonNonAnalyse ? RAISON_LIGNE[l.raisonNonAnalyse] : null;
 		return cause ? `Non analysé — ${cause}. Non facturé.` : 'Non analysé — non facturé.';
 	}
-	if (l.retiree) return 'Retirée du ticket renforcé — sélection la plus fragile.';
+	if (l.retiree) {
+		return opts?.retraitUnique
+			? 'Retirée du ticket renforcé — sélection la plus fragile.'
+			: 'Retirée du ticket renforcé — sélection fragile.';
+	}
 	if (l.fragile) return 'Sélection fragile — probabilité sous le seuil.';
 	return 'Sélection solide.';
 }

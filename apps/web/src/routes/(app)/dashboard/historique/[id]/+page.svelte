@@ -15,6 +15,8 @@
 	}
 
 	const nbFragiles = $derived(data.lignes.filter((l) => l.fragile).length);
+	// « la plus fragile » n'a de sens que s'il n'y a QU'UN retrait (cf. lineStatus).
+	const retraitUnique = $derived(data.lignes.filter((l) => l.retiree).length === 1);
 	// Toutes les lignes, non analysées comprises : neutres, jamais retirées.
 	// « analysable » côté papier = réellement analysée (résolue ET avec proba).
 	const paperLines = $derived(
@@ -100,7 +102,7 @@
 					{/if}
 				</div>
 				<div class="mpm-marche" class:oc={l.fragile}>{l.libelleFr}</div>
-				<div class="mpm-note">{ligneNote(l)}</div>
+				<div class="mpm-note">{ligneNote(l, { retraitUnique })}</div>
 			</article>
 		{/each}
 	</section>
