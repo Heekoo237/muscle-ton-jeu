@@ -62,6 +62,16 @@ ODDS_MARKETS = frozenset(m for m, s in PROBABILITY_SOURCE.items() if s == "odds"
 # lire un échantillon. Seuil à 50 % : on veut le voir monter, pas attendre pire.
 REPLI_ALERT = 0.50
 
+# Repli COTE SEULE des promus dans un championnat MODÈLE : normal en début de saison
+# (équipes montées, pas encore d'historique), mais un tiers durablement en repli veut
+# dire qu'on ne modélise plus vraiment ce championnat. Au-delà de ce seuil, sur un
+# MOIS GLISSANT (pas un run isolé, trop bruité en début de saison), la surveillance
+# alerte. Sous garde-fous d'échantillon (assez de runs et de matchs) pour ne pas
+# crier au jour 2.
+REPLI_PROMU_ALERT = 0.40
+REPLI_PROMU_MIN_RUNS = 5     # au moins 5 nocturnes dans la fenêtre avant d'alerter
+REPLI_PROMU_MIN_MATCHS = 30  # au moins 30 matchs-fenêtre cumulés (anti-bruit)
+
 # ── Escalade vers alternate_totals (Pinnacle 2,5 garanti) — critère CHIFFRÉ ───
 # Le plus/moins 2,5 est pris chez le book EU le plus serré qui le poste (gratuit).
 # On n'escalade vers `alternate_totals` (+50 % de crédits sur l'appel cotes) que

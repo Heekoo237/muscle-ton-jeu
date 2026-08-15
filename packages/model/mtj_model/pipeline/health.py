@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import defaultdict
 from datetime import timedelta
 
 from ..constants import (
@@ -17,6 +18,9 @@ from ..constants import (
     ALT_TOTALS_MIN_LEAGUES,
     ALT_TOTALS_MIN_NIGHTS,
     REPLI_ALERT,
+    REPLI_PROMU_ALERT,
+    REPLI_PROMU_MIN_MATCHS,
+    REPLI_PROMU_MIN_RUNS,
 )
 from .db import connect
 from .nightly import NIGHTLY_SKIP_ALERT, leagues_over_totals_margin
@@ -196,6 +200,58 @@ def _nightly_coverage(cur, alerts: list[str]) -> None:
               f"({taux:.0%} sautés)")
 
 
+def repli_promu_offenders(couvertures: list[dict]) -> list[dict]:
+    """Championnats MODÈLE au-delà du seuil de repli promu, agrégés sur les
+    `couverture` fournies (un mois de nocturnes). Fonction PURE (testable sans base).
+
+    Ne compte QUE les ligues modèle en fenêtre (repli_promu / fenêtre), et n'alerte
+    qu'avec assez d'échantillon (runs + matchs cumulés) : un run isolé de début de
+    saison ne doit pas déclencher. Renvoie une liste triée {fd, taux, repli, fen, runs}.
+    """
+    acc: dict[str, dict] = defaultdict(lambda: {"repli": 0, "fen": 0, "runs": 0})
+    for cov in couvertures:
+        for fd, c in (cov or {}).items():
+            if not isinstance(c, dict) or c.get("regime") != "modele":
+                continue
+            if int(c.get("fenetre", 0)) == 0:
+                continue  # ligue hors fenêtre (pré-saison) : pas d'observation
+            acc[fd]["repli"] += int(c.get("repli_promu", 0))
+            acc[fd]["fen"] += int(c.get("fenetre", 0))
+            acc[fd]["runs"] += 1
+    chauds = []
+    for fd, a in acc.items():
+        if a["runs"] < REPLI_PROMU_MIN_RUNS or a["fen"] < REPLI_PROMU_MIN_MATCHS:
+            continue  # pas assez d'échantillon pour trancher
+        taux = a["repli"] / a["fen"]
+        if taux > REPLI_PROMU_ALERT:
+            chauds.append({"fd": fd, "taux": taux, "repli": a["repli"],
+                           "fen": a["fen"], "runs": a["runs"]})
+    return sorted(chauds, key=lambda d: -d["taux"])
+
+
+def _repli_promu_rate(cur, alerts: list[str]) -> None:
+    """Alerte si un championnat MODÈLE dépasse le seuil de repli promu sur un MOIS
+    GLISSANT — agrège les `couverture` des nocturnes des 30 derniers jours."""
+    cur.execute(
+        """select detail->'couverture'
+             from pipeline_runs
+            where job = 'nightly' and demarre_le > now() - interval '30 days'
+              and detail ? 'couverture'"""
+    )
+    couvertures = [
+        (cov if isinstance(cov, dict) else json.loads(cov or "{}")) for (cov,) in cur.fetchall()
+    ]
+    chauds = repli_promu_offenders(couvertures)
+    for d in chauds:
+        alerts.append(
+            f"nocturne : {d['fd']} à {d['taux']:.0%} de repli promu sur 30 j "
+            f"({d['repli']}/{d['fen']} matchs, {d['runs']} runs) — trop d'équipes hors "
+            f"modèle ; vérifie l'historique du championnat (promus non backfillés ?)."
+        )
+    if couvertures and not chauds:
+        print(f"repli promu OK — aucun championnat modèle ≥ {REPLI_PROMU_ALERT:.0%} sur 30 j")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -206,6 +262,7 @@ def check() -> list[str]:
         _repli_coverage(cur, alerts)
         _totals_escalation(cur, alerts)
         _nightly_coverage(cur, alerts)
+        _repli_promu_rate(cur, alerts)
     return alerts
 
 
