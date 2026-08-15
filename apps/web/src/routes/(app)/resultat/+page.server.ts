@@ -130,14 +130,14 @@ export const load: PageServerLoad = async (event) => {
 	const nbAnalysables = withProbs.filter(isAnalysable).length;
 	const nbTotal = r.selections.length;
 
-	// « Ta sélection la plus serrée » : quand rien n'est retiré, on montre en INFO
-	// NEUTRE la ligne analysable à la probabilité la plus basse — un fait calculé en
-	// code (min sur des probabilités déjà affichées), jamais un conseil, jamais un
-	// verbe d'action. On ne l'affiche qu'avec ≥ 2 lignes analysables (avec une seule,
-	// « la plus serrée » n'a pas de sens). Aucun nombre nouveau : pct1 d'une proba lue.
+	// La ligne analysable la plus SERRÉE (probabilité la plus basse) quand rien n'est
+	// retiré — fait calculé en code (min sur des probabilités lues), jamais un conseil.
+	// Calculée dès 1 ligne analysable : le cas « retrait bloqué » (une seule ligne,
+	// fragile) en a besoin. Le cas « tient debout » n'en affiche qu'avec ≥ 2 (géré à
+	// l'affichage). Aucun nombre nouveau : pct1 d'une proba déjà lue.
 	const analysablesNonRetirees = r.selections.filter((s) => isAnalysable(s) && !s.retireeDuRenforce);
 	const laPlusSerree =
-		r.rienARetirer && analysablesNonRetirees.length >= 2
+		r.rienARetirer && analysablesNonRetirees.length >= 1
 			? analysablesNonRetirees.reduce((min, s) =>
 					(s.probabilite ?? 1) < (min.probabilite ?? 1) ? s : min
 				)
@@ -181,7 +181,8 @@ export const load: PageServerLoad = async (event) => {
 		nbMatchs: nbAnalysables,
 		nbFragiles: r.selections.filter((s) => s.fragile).length,
 		retraits,
-		rienARetirer: r.rienARetirer
+		rienARetirer: r.rienARetirer,
+		retraitBloqueParPlancher: r.retraitBloqueParPlancher
 	};
 	const analyse = await writeSafely(writingInput, ticketNames(r.selections));
 
@@ -283,12 +284,14 @@ export const load: PageServerLoad = async (event) => {
 		synthese: analyse.synthese,
 		explications,
 		rienARetirer: r.rienARetirer,
+		retraitBloqueParPlancher: r.retraitBloqueParPlancher,
 		conflitMemeMatch: r.conflitMemeMatch,
 		nbAnalysables,
 		nbTotal,
 		laPlusSerree: laPlusSerree
 			? {
 					matchLabel: laPlusSerree.matchLabel || laPlusSerree.texteBrut,
+					libelleFr: laPlusSerree.libelleFr,
 					pct: pct1(laPlusSerree.probabilite as number)
 				}
 			: null

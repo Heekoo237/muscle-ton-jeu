@@ -45,6 +45,11 @@ export interface WritingInput {
 	/** Sélections retirées à expliquer (badge rouge ou mention neutre). */
 	retraits: RetraitEnrichi[];
 	rienARetirer: boolean;
+	/**
+	 * Rien retiré ALORS qu'une sélection est fragile : le plancher bloque le retrait.
+	 * La synthèse ne doit PAS dire « tient debout » dans ce cas.
+	 */
+	retraitBloqueParPlancher?: boolean;
 }
 
 /** Sortie deux niveaux : une synthèse, puis une explication par sélection retirée. */

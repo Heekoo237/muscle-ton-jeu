@@ -29,7 +29,7 @@ from ..strength import fit_league
 from .db import connect
 from .nightly import _fetch_history
 
-DEFAULT_TARGETS = ["marseille", "strasbourg", "everton", "alverca", "raal", "amed", "louviere"]
+DEFAULT_TARGETS = ["lens", "paris", "marseille", "strasbourg", "alverca", "raal", "amed"]
 
 _SQL_NOW_NIGHTLY = """
     select now(),

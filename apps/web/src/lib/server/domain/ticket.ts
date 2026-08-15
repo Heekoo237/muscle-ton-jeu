@@ -89,6 +89,12 @@ export interface ReinforcedResult {
 	probaRenforcee: number;
 	/** Vrai si rien n'a été retiré → « Rien à retirer. Ton ticket tient debout. » */
 	rienARetirer: boolean;
+	/**
+	 * Vrai si rien n'a été retiré ALORS QU'une sélection est fragile : le plancher
+	 * de 4 empêche le retrait (trop peu de matchs analysés). Cas distinct du « tout
+	 * solide » — il ne faut JAMAIS dire « ton ticket tient debout » ici.
+	 */
+	retraitBloqueParPlancher: boolean;
 	/** Vrai si le produit est faussé par deux sélections sur le même match. */
 	conflitMemeMatch: boolean;
 }
@@ -128,6 +134,9 @@ export function buildReinforced(input: Selection[], floor = REINFORCED_FLOOR): R
 		probaTotale,
 		probaRenforcee,
 		rienARetirer: aRetirer.size === 0,
+		// Rien retiré MAIS des candidats fragiles existent → c'est le plancher qui a
+		// bloqué (removable = 0 : trop peu de matchs analysés), pas un ticket sain.
+		retraitBloqueParPlancher: aRetirer.size === 0 && fragilesTries.length > 0,
 		conflitMemeMatch: hasSameFixtureConflict(analysables)
 	};
 }

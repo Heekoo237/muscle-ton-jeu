@@ -95,24 +95,35 @@
 		{/if}
 	</div>
 
-	<!-- Ligne de verdict -->
+	<!-- Ligne de verdict — TROIS cas distincts, jamais « tient debout » à tort. -->
 	<div class="verdict" aria-live="polite">
-		{#if vm.rienARetirer}
-			<div class="t-body-lg">Rien à retirer. Ton ticket tient debout.</div>
-			<!-- Info NEUTRE, calculée en code : la ligne analysable la plus serrée
-			     (probabilité la plus basse). Un fait, pas un conseil — aucun badge,
-			     aucune couleur, aucun verbe d'action. Absente si < 2 lignes analysables. -->
-			{#if vm.laPlusSerree}
-				<div class="serree t-body">
-					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel} ({pctBig(vm.laPlusSerree.pct)})
-				</div>
-			{/if}
-		{:else}
+		{#if !vm.rienARetirer}
+			<!-- (a) Retrait effectué : la comparaison des chances. -->
 			<div class="t-body-lg">
 				{vm.nbRetirees} match{vm.nbRetirees > 1 ? 's' : ''} retiré{vm.nbRetirees > 1 ? 's' : ''}.
 				Tes chances passent de <span class="v">{pctBig(vm.probaTotalePct)}</span> à
 				<span class="v">{pctBig(vm.probaRenforceePct)}</span>.
 			</div>
+		{:else if vm.retraitBloqueParPlancher}
+			<!-- (c) Fragile MAIS retrait bloqué par le plancher : on le DIT, jamais
+			     « tient debout ». La ligne la plus serrée est le pari fragile lui-même. -->
+			<div class="t-body-lg">
+				On ne peut pas alléger ce ticket : il ne reste pas assez de matchs analysés.
+			</div>
+			{#if vm.laPlusSerree}
+				<div class="serree t-body">
+					Ta sélection la plus serrée : {vm.laPlusSerree.libelleFr} ({pctBig(vm.laPlusSerree.pct)})
+				</div>
+			{/if}
+		{:else}
+			<!-- (b) Rien de fragile : le ticket tient vraiment. Info NEUTRE (la plus
+			     serrée) seulement avec ≥ 2 lignes analysables — sinon elle n'a pas de sens. -->
+			<div class="t-body-lg">Rien à retirer. Ton ticket tient debout.</div>
+			{#if vm.laPlusSerree && vm.nbAnalysables >= 2}
+				<div class="serree t-body">
+					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel} ({pctBig(vm.laPlusSerree.pct)})
+				</div>
+			{/if}
 		{/if}
 		<LegalNote />
 	</div>

@@ -61,6 +61,29 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4
 		const r = buildReinforced(s);
 		expect(r.rienARetirer).toBe(true);
 		expect(r.retirees).toEqual([]);
+		// Cas (b) : rien de fragile → le plancher n'est PAS en cause.
+		expect(r.retraitBloqueParPlancher).toBe(false);
+	});
+
+	it('(c) fragile MAIS retrait bloqué par le plancher : rienARetirer sans « tient debout »', () => {
+		// Une seule ligne analysable, fragile (0,11 < seuil) : le plancher de 4 interdit
+		// tout retrait. On ne doit PAS conclure « ticket solide » — le drapeau le dit.
+		const r = buildReinforced([sel(1, 0.11)]);
+		expect(r.rienARetirer).toBe(true);
+		expect(r.retirees).toEqual([]);
+		expect(r.retraitBloqueParPlancher).toBe(true);
+	});
+
+	it('(c) tient aussi avec 2-3 analysables fragiles sous le plancher', () => {
+		const r = buildReinforced([sel(1, 0.11), sel(2, 0.2), sel(3, 0.25)]);
+		expect(r.rienARetirer).toBe(true);
+		expect(r.retraitBloqueParPlancher).toBe(true);
+	});
+
+	it('(a) un vrai retrait n’est jamais marqué « bloqué par plancher »', () => {
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.72), sel(5, 0.3)]);
+		expect(r.rienARetirer).toBe(false);
+		expect(r.retraitBloqueParPlancher).toBe(false);
 	});
 
 	it('ne retire jamais sous le plancher même avec beaucoup de fragiles', () => {
