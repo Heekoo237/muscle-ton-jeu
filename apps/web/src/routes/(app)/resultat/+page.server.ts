@@ -1,6 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getTicket, updateTicket, saveAnalysisText } from '$lib/server/fixtures/ticketStore';
+import {
+	getTicket,
+	updateTicket,
+	saveAnalysisText,
+	getAnalysisText
+} from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
@@ -12,9 +17,21 @@ import { computeCharge } from '$lib/server/domain/billing';
 import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
 import type { WritingInput, AnalyseTexte, RetraitEnrichi } from '$lib/server/services/writing';
-import { chanceSur, chanceSurMot, faitsDescriptifs } from '$lib/server/services/writing/enrich';
-import { serialiseAnalyse } from '$lib/server/services/writing/serialize';
+import {
+	chanceSur,
+	chanceSurMot,
+	faitsDescriptifs,
+	syntheseDeterministe
+} from '$lib/server/services/writing/enrich';
+import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
 import type { ExplicationVM, LineVM, ResultVM, Selection } from '$lib/types';
+
+// Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
+// (writeSafely, ≤ 20 s d'AbortController) ; sans ce réglage, la valeur par défaut
+// de la plateforme (≈10 s) couperait la fonction avant notre garde-fou → 504 puis
+// résultat au rafraîchissement. Les re-vues ne rappellent plus l'IA (texte figé),
+// donc 60 s n'est jamais approché en régime normal — c'est une borne, pas un budget.
+export const config = { maxDuration: 60 };
 
 /** Arrondi au dixième de pour-cent, cohérent avec l'affichage et les garde-fous. */
 function pct1(prob: number): number {
@@ -143,48 +160,61 @@ export const load: PageServerLoad = async (event) => {
 				)
 			: null;
 
-	// 3. Rédaction sous garde-fous. On explique CHAQUE sélection retirée (badge
-	//    rouge ou mention neutre), enrichie de faits DESCRIPTIFS lus en base
-	//    (forme, buts domicile/extérieur, confrontations) — jamais recalculés ici.
-	const retirees = r.selections.filter((s) => s.retireeDuRenforce);
-	// On ne lit des FAITS que pour les sélections en régime MESURE (championnat
-	// backtesté, historique football-data présent). En régime COTE, aucun historique :
-	// on n'interroge même pas le service de stats, pour qu'il ne puisse renvoyer
-	// aucune donnée partielle (CLAUDE.md, § deux régimes). Le rédacteur tombe alors
-	// sur l'aveu honnête « d'après les cotes ».
-	const fixtureIds = [
-		...new Set(
-			retirees
-				.filter((s) => regimeOf(s.source) === 'mesure')
-				.map((s) => s.fixtureId)
-				.filter((x): x is number => x !== null)
-		)
-	];
-	const faitsParMatch = await stats.forFixtures(fixtureIds);
-	const retraits: RetraitEnrichi[] = retirees.map((s) => ({
-		ordre: s.ordre,
-		libelleFr: `${s.matchLabel} — ${s.libelleFr}`,
-		avecBadge: s.fragile,
-		chanceSur: chanceSur(s.probabilite ?? null),
-		chanceSurMot: chanceSurMot(s.probabilite ?? null),
-		// Faits ORIENTÉS : seulement ceux qui jouent contre la sélection jouée, et
-		// SEULEMENT en régime mesure. En régime cote, faits vides → aveu honnête.
-		faits:
-			regimeOf(s.source) === 'mesure' && s.fixtureId !== null
-				? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche)
-				: []
-	}));
-	const writingInput: WritingInput = {
-		probaTotalePct: pct1(r.probaTotale),
-		probaRenforceePct: pct1(r.probaRenforcee),
-		nbRetirees: r.retirees.length,
-		nbMatchs: nbAnalysables,
-		nbFragiles: r.selections.filter((s) => s.fragile).length,
-		retraits,
-		rienARetirer: r.rienARetirer,
-		retraitBloqueParPlancher: r.retraitBloqueParPlancher
-	};
-	const analyse = await writeSafely(writingInput, ticketNames(r.selections));
+	// Compteurs/pourcentages DÉTERMINISTES (sans IA) : synthèse, VM, figeage.
+	const probaTotalePct = pct1(r.probaTotale);
+	const probaRenforceePct = pct1(r.probaRenforcee);
+	const nbRetirees = r.retirees.length;
+	const nbFragiles = r.selections.filter((s) => s.fragile).length;
+
+	// 3. Texte deux niveaux. RÈGLE de stabilité : on ne rappelle JAMAIS l'IA pour un
+	//    ticket DÉJÀ analysé. Le texte est FIGÉ à la première analyse et relu à
+	//    l'identique — ce qui (a) rend le résultat immuable au rafraîchissement, et
+	//    (b) retire l'appel IA du chemin de re-vue, une cause directe de 504/latence.
+	//    Seule la PREMIÈRE analyse enrichit (faits, lecture stats) et rédige.
+	let analyse: AnalyseTexte;
+	if (ticket.billing) {
+		const fige = parseAnalyse(await getAnalysisText(ticket.id));
+		analyse = fige ?? {
+			// Texte figé introuvable (vieux ticket) : synthèse déterministe, sans IA.
+			synthese: syntheseDeterministe({
+				probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
+				nbFragiles, retraits: [], rienARetirer: r.rienARetirer,
+				retraitBloqueParPlancher: r.retraitBloqueParPlancher
+			}),
+			parSelection: []
+		};
+	} else {
+		// On explique CHAQUE sélection retirée, enrichie de faits DESCRIPTIFS lus en
+		// base — SEULEMENT en régime MESURE (en cote, aucun historique : faits vides,
+		// aveu honnête « d'après les cotes »). Faits jamais recalculés ici.
+		const retirees = r.selections.filter((s) => s.retireeDuRenforce);
+		const fixtureIds = [
+			...new Set(
+				retirees
+					.filter((s) => regimeOf(s.source) === 'mesure')
+					.map((s) => s.fixtureId)
+					.filter((x): x is number => x !== null)
+			)
+		];
+		const faitsParMatch = await stats.forFixtures(fixtureIds);
+		const retraits: RetraitEnrichi[] = retirees.map((s) => ({
+			ordre: s.ordre,
+			libelleFr: `${s.matchLabel} — ${s.libelleFr}`,
+			avecBadge: s.fragile,
+			chanceSur: chanceSur(s.probabilite ?? null),
+			chanceSurMot: chanceSurMot(s.probabilite ?? null),
+			faits:
+				regimeOf(s.source) === 'mesure' && s.fixtureId !== null
+					? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche)
+					: []
+		}));
+		const writingInput: WritingInput = {
+			probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
+			nbFragiles, retraits, rienARetirer: r.rienARetirer,
+			retraitBloqueParPlancher: r.retraitBloqueParPlancher
+		};
+		analyse = await writeSafely(writingInput, ticketNames(r.selections));
+	}
 
 	// 4. Facturation (règle : débit à l'affichage réussi, jamais avant, une fois).
 	//    Idempotent : une fois `billing` posé, on ne recalcule ni ne redébite.
@@ -232,12 +262,7 @@ export const load: PageServerLoad = async (event) => {
 			// l'historique et l'image de partage relisent CES drapeaux. Sans ça, le
 			// ticket renforcé s'affichait sans aucune ligne barrée (rien de persisté).
 			selections: r.selections,
-			result: {
-				probaTotalePct: writingInput.probaTotalePct,
-				probaRenforceePct: writingInput.probaRenforceePct,
-				nbRetirees: writingInput.nbRetirees,
-				nbFragiles: r.selections.filter((s) => s.fragile).length
-			}
+			result: { probaTotalePct, probaRenforceePct, nbRetirees, nbFragiles }
 		});
 	}
 
@@ -278,9 +303,9 @@ export const load: PageServerLoad = async (event) => {
 
 	const vm: ResultVM = {
 		lignes,
-		probaTotalePct: writingInput.probaTotalePct,
-		probaRenforceePct: writingInput.probaRenforceePct,
-		nbRetirees: writingInput.nbRetirees,
+		probaTotalePct,
+		probaRenforceePct,
+		nbRetirees,
 		synthese: analyse.synthese,
 		explications,
 		rienARetirer: r.rienARetirer,

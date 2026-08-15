@@ -13,6 +13,13 @@ import { formatCostLine } from './cost';
 const API = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-haiku-4-5-20251001'; // rapide + bon marché, vision solide
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+// Garde-fou : une lecture qui traîne ne doit JAMAIS pendre jusqu'au 504 de la
+// passerelle. Passé ce délai, on avorte → `readTicket` retombe sur son échec
+// « illisible » (jamais de facturation) plutôt que de laisser la fonction expirer.
+// La vision traite 1 à 3 images ; 25 s ne coupe jamais une lecture valide, il borne
+// une panne. L'action /analyser peut relancer la lecture UNE fois (lecture
+// incomplète) : 2 × 25 s = 50 s reste sous le `maxDuration` de 60 s de la route.
+const TIMEOUT_MS = 25_000;
 
 const SYSTEM = `Tu transcris une capture d'écran de ticket de paris sportifs. Tu ne fais QUE lire.
 Règles strictes :
@@ -48,6 +55,8 @@ export class AnthropicVision implements VisionService {
 		}));
 		content.push({ type: 'text', text: 'Transcris ce ticket en JSON selon le schéma.' });
 
+		const ctrl = new AbortController();
+		const minuteur = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
 		let res: Response;
 		try {
 			res = await fetch(API, {
@@ -62,10 +71,13 @@ export class AnthropicVision implements VisionService {
 					max_tokens: 1024,
 					system: SYSTEM,
 					messages: [{ role: 'user', content }]
-				})
+				}),
+				signal: ctrl.signal
 			});
 		} catch {
-			return { lignes: [], echec: 'illisible' }; // réseau/API KO : jamais de facturation
+			return { lignes: [], echec: 'illisible' }; // réseau/API KO ou délai dépassé : jamais de facturation
+		} finally {
+			clearTimeout(minuteur);
 		}
 
 		if (!res.ok) return { lignes: [], echec: 'illisible' };

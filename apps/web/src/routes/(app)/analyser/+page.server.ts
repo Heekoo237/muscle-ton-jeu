@@ -13,6 +13,13 @@ import {
 } from '$lib/server/fixtures/captureStore';
 import { getAppSession } from '$lib/server/session';
 
+// Fenêtre d'exécution de la fonction Vercel. SANS ce réglage, la valeur par
+// défaut de la plateforme (≈10 s) coupe la fonction AVANT nos propres garde-fous
+// d'appel IA (AbortController) — l'utilisateur voit un 504 puis un résultat au
+// rafraîchissement. La lecture vision peut être RELANCÉE une fois (2 × 25 s), d'où
+// 60 s : borne haute compatible Hobby comme Pro, jamais atteinte par un appel sain.
+export const config = { maxDuration: 60 };
+
 const SLOTS = ['capture_0', 'capture_1', 'capture_2'];
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 

@@ -20,6 +20,11 @@ import { env } from '$env/dynamic/private';
 
 const API = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-haiku-4-5-20251001'; // rapide + bon marché
+// Garde-fou : un appel IA qui traîne ne doit JAMAIS pendre jusqu'au 504 de la
+// passerelle. Passé ce délai, on avorte → le rédacteur retombe sur le template
+// (writeSafely) plutôt que de laisser la fonction expirer. Haiku répond en quelques
+// secondes ; 20 s ne coupe jamais un appel valide, il borne une panne.
+const TIMEOUT_MS = 20_000;
 
 /** Clé du rédacteur : dédiée si présente, sinon la clé Anthropic générique. */
 export function writerKey(): string | undefined {
@@ -157,20 +162,28 @@ export class AnthropicWriting implements WritingService {
 		if (input.rienARetirer) {
 			return { synthese: syntheseDeterministe(input), parSelection: [] };
 		}
-		const res = await fetch(API, {
-			method: 'POST',
-			headers: {
-				'x-api-key': this.key,
-				'anthropic-version': '2023-06-01',
-				'content-type': 'application/json'
-			},
-			body: JSON.stringify({
-				model: MODEL,
-				max_tokens: 1024,
-				system: SYSTEM,
-				messages: [{ role: 'user', content: userPayload(input) }]
-			})
-		});
+		const ctrl = new AbortController();
+		const minuteur = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+		let res: Response;
+		try {
+			res = await fetch(API, {
+				method: 'POST',
+				headers: {
+					'x-api-key': this.key,
+					'anthropic-version': '2023-06-01',
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({
+					model: MODEL,
+					max_tokens: 1024,
+					system: SYSTEM,
+					messages: [{ role: 'user', content: userPayload(input) }]
+				}),
+				signal: ctrl.signal
+			});
+		} finally {
+			clearTimeout(minuteur);
+		}
 		if (!res.ok) throw new Error(`API rédaction ${res.status}`);
 		const data = (await res.json().catch(() => null)) as {
 			content?: Array<{ text?: string }>;
