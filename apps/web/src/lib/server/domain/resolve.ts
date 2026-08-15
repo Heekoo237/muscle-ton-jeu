@@ -258,7 +258,7 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 	const clubByName = new Map<string, number>();
 	for (const t of teams) clubByName.set(normalize(t.nom), clubOf(t));
 
-	return raw.lignes.map((ligne, i): Selection => {
+	const selections = raw.lignes.map((ligne, i): Selection => {
 		const ordre = i + 1;
 		const { matchText, marketText, odds } = lineParts(ligne);
 		const diag = diagnoseMatch(matchText, fixtures, teams, clubByName);
@@ -360,4 +360,24 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 			libelleFr: ''
 		};
 	});
+
+	// MESURE DE VARIABILITÉ VISION — symptôme exact du bug « issue manquante » : un
+	// marché de type 1X2 / double chance RECONNU mais dont l'issue pariée est VIDE.
+	// La vision n'est pas déterministe ; ce compteur rend le taux visible sans
+	// attendre une plainte. Marqueur stable `[résolution] LECTURE INCOMPLÈTE` :
+	// l'agrégat par jour se lit en comptant ces lignes dans les logs.
+	let incompletes = 0;
+	for (let i = 0; i < selections.length; i++) {
+		const s = selections[i];
+		if (s.etatResolution === 'certain' || s.fixtureId == null) continue;
+		const sp = splitResultMarket(lineParts(raw.lignes[i]).marketText);
+		if (sp && (sp.kind === '1x2' || sp.kind === 'dc') && normalize(sp.choice) === '') incompletes++;
+	}
+	if (incompletes > 0) {
+		console.warn(
+			`[résolution] LECTURE INCOMPLÈTE : ${incompletes}/${selections.length} ligne(s) — ` +
+				`marché reconnu, issue vide (variabilité vision, à relire).`
+		);
+	}
+	return selections;
 }

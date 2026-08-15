@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { resolveTicket } from './resolve';
 import type { Fixture, Team } from '$lib/types';
 import type { RawTicketRead } from '$lib/server/services/vision';
@@ -94,6 +94,18 @@ describe('resolveTicket — le CHOIX est collé au type (Betclic)', () => {
 		const [s] = resolveTicket(struct('Lens - Paris SG', 'Marseille Résultat du match'), fixturesFr, teamsFr);
 		expect(s.etatResolution).toBe('inconnu');
 		expect(s.marche).toBeNull();
+	});
+
+	it('marché 1X2 reconnu mais issue VIDE → ligne non lue ET compteur de variabilité', () => {
+		// Le bug du matin : la vision a rendu « Résultat du match » sans l'issue. Le
+		// match est résolu (fixtureId présent) mais le pari est inanalysable, et on
+		// journalise le symptôme (marqueur stable, agrégeable par jour).
+		const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const [s] = resolveTicket(struct('Lens - Paris SG', 'Résultat du match (t. rég)'), fixturesFr, teamsFr);
+		expect(s.etatResolution).toBe('inconnu');
+		expect(s.fixtureId).not.toBeNull();
+		expect(spy.mock.calls.flat().join(' ')).toContain('LECTURE INCOMPLÈTE');
+		spy.mockRestore();
 	});
 
 	it('championnat NON couvert (équipes absentes) → hors_couverture, gardé, jamais « à corriger »', () => {
