@@ -196,6 +196,36 @@ book sert le 2,5 et sa marge, par ligue, journalisé chaque nuit). *Une décisio
 reportée sans critère est une décision jamais prise* : ce seuil EST la décision.
 Chiffres provisoires, à rejuger ici à la recalibration.
 
+## Cotes indévigeables : la cause était l'ÉCHANGE, pas le réassemblage
+
+Un nocturne a planté sur `brentq` (`f(a) et f(b) de même signe`) : un groupe 1X2
+dont Σ des probabilités implicites était **< 1** (marge négative), impossible à
+déviger. La cause, vue par la donnée (`[cote invalide]` journalise book par book) :
+
+```
+soccer_england_efl_cup fixture=43253  WIN_HOME=1.09 DRAW=1.02 WIN_AWAY=1.04
+books: betfair_ex_eu, betfair_ex_eu, betfair_ex_eu   → 1/1.09+1/1.02+1/1.04 ≈ 2.9
+```
+
+**Le même book (Betfair) sur les trois issues.** Ce sont des cotes d'un **échange
+de paris** : un carnet d'ordres quasi vide donne des « cotes » à ~1,05 qui ne sont
+pas un prix. Le dévigage est calibré sur des **bookmakers classiques** (marge
+positive), pas sur des exchanges au carnet déséquilibré.
+
+**Hypothèse ÉCARTÉE (notée pour le jour où un vrai cas apparaîtra).** On avait
+d'abord soupçonné `fetch_latest_odds` de réassembler un groupe en mêlant des books
+ou des instants différents (le « dernier par marché » indépendamment). La donnée l'a
+réfutée : ici, un seul book, un seul instant. **Ne pas corriger le réassemblage tant
+qu'un `[cote invalide]` ne montre pas des books réellement différents sur un même
+groupe.** Le garde-fou (rejet + journal de la marge négative) tient dans les deux cas.
+
+**Décision ouverte : exclure les exchanges de la sélection des cotes ?**
+`provider._pick_bookmaker` / `_pick_totals_book` peuvent retenir un exchange
+(`betfair_ex_*`, `matchbook`, `smarkets`, `betdaq`) quand c'est le seul book EU d'un
+match (coupes, marchés minces). À trancher sur volume : sonde `diag-books` (part des
+prédictions issues d'un exchange). Si non négligeable → exclure les exchanges du
+choix de book dans `provider.py`, jamais les déviger.
+
 ## Pistes d'amélioration (à évaluer à la recalibration)
 
 **À traiter EN MÊME TEMPS que la recalibration et les trois écarts connus

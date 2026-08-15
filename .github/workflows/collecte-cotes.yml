@@ -31,6 +31,7 @@ on:
           - diag-ecart            # matchs à venir COTÉS mais SANS probabilité, par régime (lecture seule)
           - diag-nocturne         # POURQUOI le modèle saute des matchs : nom diverge vs sans historique (lecture)
           - diag-trace            # remonte la chaîne du nocturne pour des matchs précis : fenêtre/index/expected_goals (lecture)
+          - diag-books            # part des prédictions issues d'un exchange (Betfair…) vs bookmaker classique (lecture)
           - reconcilier-dryrun    # RAPPORT réconciliation club_id : intra-modèle + groupes + collisions (lecture)
           - reconcilier           # APPLIQUE club_id (écrit) : groupes − collisions, puis re-teste sur l'état final
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
@@ -132,6 +133,10 @@ jobs:
       - name: Trace nocturne — remonte la chaîne pour des matchs précis (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-trace'
         run: python -m mtj_model.pipeline.diag_trace
+
+      - name: Diagnostic books — part des prédictions issues d'un exchange (lecture)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'diag-books'
+        run: python -m mtj_model.pipeline.diag_books
 
       - name: Rapport réconciliation club_id — dry-run, aucune écriture (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier-dryrun'
