@@ -1,4 +1,4 @@
-import type { SportsDataService } from './index';
+import type { SportsDataService, CoverageEntry } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { FAKE_TEAMS, fakeFixtures } from '$lib/server/fixtures/sports';
 import {
@@ -33,5 +33,19 @@ export class FakeSportsData implements SportsDataService {
 
 	async resultsSince(): Promise<Fixture[]> {
 		return []; // aucun résultat terminé dans le jeu factice
+	}
+
+	async coveredCompetitions(): Promise<CoverageEntry[]> {
+		// Jeu factice représentatif : quelques ligues mesurées + une coupe active et
+		// une inactive, pour exercer la page /couverture en local.
+		return [
+			{ nom: 'Premier League', pays: 'Angleterre', regime: 'modele', actif: true },
+			{ nom: 'Ligue 1', pays: 'France', regime: 'modele', actif: true },
+			{ nom: 'La Liga', pays: 'Espagne', regime: 'modele', actif: true },
+			{ nom: 'Serie A', pays: 'Italie', regime: 'modele', actif: false },
+			{ nom: 'Coupe de la Ligue anglaise', pays: 'Angleterre', regime: 'cote_seule', actif: true },
+			{ nom: 'Copa Libertadores', pays: 'Amérique du Sud', regime: 'cote_seule', actif: true },
+			{ nom: 'Coupe du Roi', pays: 'Espagne', regime: 'cote_seule', actif: false }
+		];
 	}
 }

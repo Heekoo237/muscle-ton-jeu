@@ -7,7 +7,7 @@
  * sync.upsert_team) : les alias portent la clé normalisée, donc ici on lit
  * simplement noms + alias, sans re-normaliser à la volée.
  */
-import type { SportsDataService } from './index';
+import type { SportsDataService, CoverageEntry } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
 import {
@@ -123,5 +123,32 @@ export class SupabaseSportsData implements SportsDataService {
 			scoreHome: r.score_home,
 			scoreAway: r.score_away
 		}));
+	}
+
+	async coveredCompetitions(): Promise<CoverageEntry[]> {
+		// Deux lectures, jointes en mémoire (pas de relation FK déclarée côté Supabase) :
+		// le catalogue (nom, pays, régime) et l'état actif (leagues.actif, alimenté par
+		// catalogue_sync). Join sur fd_code = provider_ref (invariant du pipeline).
+		const admin = supabaseAdmin();
+		const [cat, lg] = await Promise.all([
+			admin.from('league_catalog').select('nom, pays, regime, fd_code'),
+			admin.from('leagues').select('provider_ref, actif')
+		]);
+		if (cat.error) throw cat.error;
+		if (lg.error) throw lg.error;
+		const actifByRef = new Map(
+			((lg.data ?? []) as { provider_ref: string; actif: boolean }[]).map((r) => [
+				r.provider_ref,
+				!!r.actif
+			])
+		);
+		return ((cat.data ?? []) as { nom: string; pays: string | null; regime: string; fd_code: string }[]).map(
+			(c) => ({
+				nom: c.nom,
+				pays: c.pays ?? '',
+				regime: c.regime === 'modele' ? 'modele' : 'cote_seule',
+				actif: actifByRef.get(c.fd_code) ?? false
+			})
+		);
 	}
 }

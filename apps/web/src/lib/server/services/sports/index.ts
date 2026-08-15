@@ -5,6 +5,16 @@
  */
 import type { Fixture, Team } from '$lib/types';
 
+/** Une compétition du catalogue, pour la page publique « Quelles compétitions ? ». */
+export interface CoverageEntry {
+	nom: string;
+	pays: string;
+	/** 'modele' = backtestée (analysée finement) ; sinon analysée d'après les cotes. */
+	regime: 'modele' | 'cote_seule';
+	/** Active chez le fournisseur en ce moment (les coupes vont et viennent). */
+	actif: boolean;
+}
+
 export interface SportsDataService {
 	/** Calendrier des `days` prochains jours (strictement À VENIR) — dashboard, etc. */
 	upcomingFixtures(days?: number): Promise<Fixture[]>;
@@ -19,6 +29,8 @@ export interface SportsDataService {
 	teams(): Promise<Team[]>;
 	/** Résultats terminés depuis une date, pour le règlement des tickets. */
 	resultsSince(sinceIso: string): Promise<Fixture[]>;
+	/** Compétitions du catalogue (page publique /couverture). Lu, jamais en dur. */
+	coveredCompetitions(): Promise<CoverageEntry[]>;
 }
 
 import { FakeSportsData } from './fake';

@@ -62,11 +62,9 @@
 			     en base). On informe, on ne fait pas semblant de pouvoir analyser. -->
 			<div class="nc-banner">
 				{#if horsCouverture}
-					<p class="nc-titre">Ce match n'est pas dans un championnat qu'on couvre.</p>
-					<p class="nc-sous">
-						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas. Tu
-						n'as rien à corriger.
-					</p>
+					<p class="nc-titre">Ce match n'est pas au catalogue des compétitions qu'on analyse.</p>
+					<p class="nc-sous">Gardé dans ton ticket, non analysé, non facturé.</p>
+					<a class="nc-lien" href="/couverture" target="_blank" rel="noopener">Quelles compétitions ?</a>
 				{:else if commence}
 					<p class="nc-titre">Ce match a déjà commencé.</p>
 					<p class="nc-sous">
@@ -240,6 +238,15 @@
 		margin: 0;
 		font-size: 14px;
 		color: var(--c-ink-2);
+	}
+	.nc-lien {
+		display: inline-block;
+		margin-top: var(--s-2);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--c-ink);
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.actions-bas {
 		margin-top: var(--s-3);
