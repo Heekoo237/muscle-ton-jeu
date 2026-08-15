@@ -207,6 +207,7 @@ def league_predictions(
     book_by_fixture: dict[int, dict[str, str]] | None = None,
     margin_override: bool = False,
     invalides: list | None = None,
+    repli_promu: list | None = None,
 ) -> list[PredictionRow]:
     """Prédictions d'un championnat pour ses matchs à venir.
 
@@ -214,8 +215,12 @@ def league_predictions(
     - `upcoming` : matchs à venir (colonnes fixture_id, home, away).
     - `odds_by_fixture` : {fixture_id: {marché: cote décimale}} relevées.
 
-    Une équipe inconnue du fit (ex. promue sans historique) → aucune ligne pour
-    ce match : ses marchés restent INCONNUS (règle d'archi n°3), jamais devinés.
+    Une équipe inconnue du fit (ex. promu sans historique) ne peut pas être modélisée.
+    Repli PAR MATCH : si une cote VALIDE existe, on écrit une prédiction COTE SEULE
+    pour ce seul match (source `cote_seule`, confiance basse) — même en régime modèle.
+    On n'a pas modélisé ce match, on ne prétend pas l'avoir fait. Sans cote non plus,
+    le match reste INCONNU (règle d'archi n°3), jamais deviné. `repli_promu` reçoit
+    les fixture_id passés par ce repli (pour les compter par ligue).
     """
     odds_by_fixture = odds_by_fixture or {}
     book_by_fixture = book_by_fixture or {}
@@ -227,7 +232,19 @@ def league_predictions(
     for m in upcoming.itertuples(index=False):
         eg = fit.expected_goals(m.home, m.away)
         if eg is None:
-            continue  # équipe inconnue → marchés inconnus, on n'écrit rien
+            # Équipe hors fit (promu) : repli COTE SEULE pour CE match. On réutilise la
+            # MÊME fonction que le régime cote seule (source cote_seule/cote_derivee,
+            # confiance faible, seuil fixe) — aucune divergence, aucune prétention de
+            # modèle. Rien produit si la cote est absente ou invalide.
+            secours = league_predictions_cote_seule(
+                pd.DataFrame([{"fixture_id": int(m.fixture_id)}]),
+                league_code, odds_by_fixture, book_by_fixture, invalides=invalides,
+            )
+            if secours:
+                rows.extend(secours)
+                if repli_promu is not None:
+                    repli_promu.append(int(m.fixture_id))
+            continue
         model_probs = market_probabilities(score_matrix(eg[0], eg[1], fit.rho, size=GRID))
         books = book_by_fixture.get(int(m.fixture_id), {})  # {marché: book} — le 1X2 et
         # le plus/moins 2,5 peuvent venir de books différents (voir provider.parse_odds).

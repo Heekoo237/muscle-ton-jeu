@@ -24,6 +24,18 @@ BOOKMAKER = "pinnacle"              # sharp, cohérent avec le backtest
 MARKETS = "h2h,totals"             # 1X2 + plus/moins
 TOTALS_POINT = 2.5                  # la SEULE ligne plus/moins qu'on price (marché du ticket)
 
+# Échanges de paris : un carnet d'ordres, pas une marge de book. Un carnet mince
+# donne des « cotes » aberrantes (EFL Cup à 290 %, cf. README) — et notre dévigage
+# est calibré sur des books CLASSIQUES. On ne retient JAMAIS un exchange comme
+# source : mieux vaut pas de cote (repli modèle) qu'une cote d'exchange. Détection
+# par sous-chaîne, couvre les variantes régionales (_eu/_uk/_au).
+EXCHANGE_MARKERS = ("betfair_ex", "matchbook", "smarkets", "betdaq")
+
+
+def _is_exchange(key: str | None) -> bool:
+    k = (key or "").lower()
+    return any(m in k for m in EXCHANGE_MARKERS)
+
 
 @dataclass(frozen=True)
 class ProviderFixture:
@@ -149,13 +161,21 @@ def _map_outcome(market_key: str, outcome: dict, home: str, away: str) -> str | 
 
 
 def _pick_bookmaker(bookmakers: list[dict]) -> dict | None:
-    """Notre bookmaker de référence si présent, sinon le premier disponible."""
+    """Notre bookmaker de référence si présent, sinon le premier book CLASSIQUE.
+
+    Jamais un exchange : sur un marché mince où il ne reste qu'un exchange, on
+    préfère RENDRE None (pas de cote → repli modèle / non analysé) plutôt qu'un prix
+    de carnet vide.
+    """
     if not bookmakers:
         return None
     for b in bookmakers:
         if b.get("key") == BOOKMAKER:
             return b
-    return bookmakers[0]
+    for b in bookmakers:
+        if not _is_exchange(b.get("key")):
+            return b
+    return None
 
 
 def _totals_pair(bookmaker: dict, point: float = TOTALS_POINT) -> tuple[float, float] | None:
@@ -187,6 +207,8 @@ def _pick_totals_book(bookmakers: list[dict], point: float = TOTALS_POINT) -> di
     best: dict | None = None
     best_margin: float | None = None
     for b in bookmakers:
+        if _is_exchange(b.get("key")):
+            continue  # jamais un exchange (carnet d'ordres, pas une marge)
         pair = _totals_pair(b, point)
         if pair is None:
             continue

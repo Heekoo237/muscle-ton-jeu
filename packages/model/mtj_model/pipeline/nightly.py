@@ -222,9 +222,12 @@ def _sync_via_provider(con, days: int) -> None:
     provider = get_provider()
     if isinstance(provider, NullProvider):
         print("Fournisseur non branché : synchro des résultats ignorée (base lue telle quelle).")
-        return
+        return None
     from .sync import refresh_scores  # import tardif : la synchro réelle vit à part
     refresh_scores(con, provider, days_from=3)
+    # Coût MESURÉ (en-têtes fournisseur), pas supposé : c'est le SEUL poste payant du
+    # nocturne (le calcul, lui, ne lit que la base). De quoi chiffrer une planification.
+    return getattr(provider, "credits_used", None)
 
 
 # Au-delà de ce taux de matchs sautés (toutes ligues EN FENÊTRE confondues), le run
@@ -252,13 +255,14 @@ def coverage_report(model_codes, groups) -> tuple[dict, bool, dict]:
     """
     couverture: dict = {}
     vus: set = set()
-    tot_fen = tot_tr = tot_inv = 0
+    tot_fen = tot_tr = tot_inv = tot_repli = 0
     abandons: list = []
     for g in groups:
         fd = g["fd"]
         vus.add(fd)
         fenetre, traites = g["fenetre"], g["traites"]
         invalides = g.get("cotes_invalides", 0)
+        repli = g.get("repli_promu", 0)
         sautes = max(0, fenetre - traites)
         if sautes == 0:
             raison = None
@@ -271,22 +275,24 @@ def coverage_report(model_codes, groups) -> tuple[dict, bool, dict]:
         else:
             raison = "equipe_inconnue"
         couverture[fd] = {"regime": g["regime"], "fenetre": fenetre, "traites": traites,
-                          "sautes": sautes, "cotes_invalides": invalides, "raison": raison}
+                          "sautes": sautes, "cotes_invalides": invalides,
+                          "repli_promu": repli, "raison": raison}
         tot_fen += fenetre
         tot_tr += traites
         tot_inv += invalides
+        tot_repli += repli
         if g["regime"] == "modele" and fenetre > 0 and traites == 0:
             abandons.append(fd)
     # Ligues modèle attendues SANS aucun match en fenêtre : bénin (pré-saison), mais
     # tracé — pour que « pas de ligne » ne se confonde jamais avec « abandon ».
     for fd in sorted(set(model_codes) - vus):
-        couverture[fd] = {"regime": "modele", "fenetre": 0, "traites": 0,
-                          "sautes": 0, "cotes_invalides": 0, "raison": "aucun_match_fenetre"}
+        couverture[fd] = {"regime": "modele", "fenetre": 0, "traites": 0, "sautes": 0,
+                          "cotes_invalides": 0, "repli_promu": 0, "raison": "aucun_match_fenetre"}
     tot_sautes = tot_fen - tot_tr
     taux = round(tot_sautes / tot_fen, 3) if tot_fen else 0.0
     degrade = bool(abandons) or taux > NIGHTLY_SKIP_ALERT
-    resume = {"fenetre": tot_fen, "traites": tot_tr, "sautes": tot_sautes,
-              "taux_saut": taux, "cotes_invalides": tot_inv, "abandons": abandons}
+    resume = {"fenetre": tot_fen, "traites": tot_tr, "sautes": tot_sautes, "taux_saut": taux,
+              "cotes_invalides": tot_inv, "repli_promu": tot_repli, "abandons": abandons}
     return couverture, degrade, resume
 
 
@@ -295,7 +301,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     with connect() as con:
         run_id = _open_run(con, jour)
         try:
-            _sync_via_provider(con, days)
+            credits_sync = _sync_via_provider(con, days)
             upcoming = _fetch_upcoming(con, days)
             history = _fetch_history(con)
             fixture_ids = [int(x) for x in upcoming["fixture_id"].tolist()] if not upcoming.empty else []
@@ -322,6 +328,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                 cote_seule = regimes.get(fd) == "cote_seule"
                 hist_thin = False
                 inv_ligue: list[dict] = []
+                repli_ligue: list[int] = []  # promus repliés en cote seule (ligue modèle)
                 try:
                     if cote_seule:
                         # Non backtesté : cote dé-vigée seule + double chance dérivée.
@@ -332,7 +339,8 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                         # trop mince → aucune ligne pour TOUTE la ligue. On le NOMME.
                         hist_thin = hist.empty or hist["home"].nunique() < 4
                         rows = league_predictions(hist, up, fd, ref_date, odds, books,
-                                                  margin_override=fd in model_leagues, invalides=inv_ligue)
+                                                  margin_override=fd in model_leagues,
+                                                  invalides=inv_ligue, repli_promu=repli_ligue)
                 except Exception as exc:  # noqa: BLE001 — une ligue ne fait JAMAIS tomber le run
                     print(f"  ⚠ ligue {fd} IGNORÉE (erreur non rattrapée) : {type(exc).__name__}: {exc}")
                     rows = []
@@ -344,12 +352,17 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
                         if r.source == "repli":
                             repli[fd][r.marche][0] += 1
                 all_rows.extend(rows)
+                nb_repli = len(set(repli_ligue))
+                if nb_repli:
+                    # Un championnat modèle avec beaucoup de repli promu doit se voir.
+                    print(f"  repli cote seule (promus) {fd} : {nb_repli} match(s) sur {len(up)}")
                 groups.append({
                     "fd": fd, "regime": "cote_seule" if cote_seule else "modele",
                     "fenetre": int(len(up)), "traites": len({r.fixture_id for r in rows}),
                     "hist_thin": hist_thin,
                     # Matchs distincts dont AU MOINS un groupe de cotes a été rejeté.
                     "cotes_invalides": len({i["fixture_id"] for i in inv_ligue}),
+                    "repli_promu": nb_repli,
                 })
 
             write_predictions(con, all_rows, jour)
@@ -362,6 +375,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             journal: dict = dict(detail)
             journal["couverture"] = couverture
             journal["couverture_resume"] = resume_cv
+            journal["credits_sync"] = credits_sync  # coût mesuré du run (traçable dans le temps)
             repli_rates = _repli_rates(repli)
             if repli_rates:
                 journal["repli_marches"] = repli_rates
@@ -387,9 +401,15 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     r = resume_cv
     print(f"  couverture : {r['traites']}/{r['fenetre']} matchs traités "
           f"(sautés {r['sautes']}, {r['taux_saut']:.0%}).")
+    if credits_sync is not None:
+        print(f"  crédits fournisseur ce run : {credits_sync} (rafraîchissement des "
+              f"résultats — SEUL poste payant ; le calcul lit la base).")
     if r.get("cotes_invalides"):
         print(f"  ⚠ {r['cotes_invalides']} match(s) à cote INVALIDE rejetés "
               f"(détail « [cote invalide] » ci-dessus).")
+    if r.get("repli_promu"):
+        print(f"  {r['repli_promu']} match(s) en repli COTE SEULE (promus hors modèle) — "
+              f"source cote_seule, confiance basse.")
     if r["abandons"]:
         print(f"  ⚠ LIGUES ABANDONNÉES (matchs en fenêtre, AUCUNE ligne) : {', '.join(r['abandons'])}")
     for fd in sorted(couverture):
