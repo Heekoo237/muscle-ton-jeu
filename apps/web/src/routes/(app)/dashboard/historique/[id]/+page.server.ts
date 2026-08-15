@@ -37,7 +37,10 @@ export const load: PageServerLoad = async (event) => {
 		// Règle unique : analysable = résolu ET pourvu d'une probabilité (figée au moment
 		// de l'analyse). Un match résolu sans proba reste « non analysé », jamais compté.
 		analysable: isAnalysable(s),
-		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null
+		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null,
+		// Même honnêteté qu'au résultat : la VRAIE raison de non-analyse, pas « non couvert »
+		// par défaut. Absente si la ligne est analysée.
+		raisonNonAnalyse: isAnalysable(s) ? undefined : (s.raison ?? 'sans_donnee')
 	}));
 
 	// Texte figé, relu tel quel (deux niveaux ; ancien texte plat toléré).

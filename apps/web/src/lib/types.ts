@@ -2,6 +2,7 @@
  * types.ts — Types du domaine, partagés serveur/client (affichage).
  * La logique déterministe vit dans lib/server/domain ; ici, seulement les formes.
  */
+import type { RaisonNonAnalyse } from './lineStatus';
 
 /** Marchés COUVERTS uniquement (CLAUDE.md « Marchés couverts »). */
 export type Market =
@@ -166,6 +167,8 @@ export interface LineVM {
 	analysable: boolean;
 	/** Probabilité de la sélection (table predictions), en % ; null si non analysée. */
 	probabilitePct: number | null;
+	/** Raison PRÉCISE de non-analyse (déjà commencé, hors catalogue…) ; absente si analysée. */
+	raisonNonAnalyse?: RaisonNonAnalyse;
 }
 
 /** Explication d'une sélection retirée (texte deux niveaux, second niveau). */

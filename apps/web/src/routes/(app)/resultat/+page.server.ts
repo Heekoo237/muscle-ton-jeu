@@ -25,6 +25,7 @@ import {
 } from '$lib/server/services/writing/enrich';
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
 import type { ExplicationVM, LineVM, ResultVM, Selection } from '$lib/types';
+import type { RaisonNonAnalyse } from '$lib/lineStatus';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
 // (writeSafely, ≤ 20 s d'AbortController) ; sans ce réglage, la valeur par défaut
@@ -36,6 +37,17 @@ export const config = { maxDuration: 60 };
 /** Arrondi au dixième de pour-cent, cohérent avec l'affichage et les garde-fous. */
 function pct1(prob: number): number {
 	return Math.round(prob * 100 * 10) / 10;
+}
+
+/**
+ * Raison PRÉCISE de non-analyse d'une ligne, pour l'affichage honnête (jamais une
+ * raison approximative quand on connaît la vraie). Résolue mais sans probabilité en
+ * base → `sans_donnee` ; sinon on reprend la raison de résolution. `undefined` si
+ * la ligne EST analysée.
+ */
+function raisonNonAnalyseDe(s: Selection): RaisonNonAnalyse | undefined {
+	if (isAnalysable(s)) return undefined;
+	return s.raison ?? 'sans_donnee';
 }
 
 // Compteurs de bascule vers le template (par instance). Journalisés à chaque
@@ -280,7 +292,10 @@ export const load: PageServerLoad = async (event) => {
 		analysable: isAnalysable(s),
 		// Probabilité par ligne : lue en table (jamais calculée ici), affichée dans
 		// la lecture détaillée. null quand la sélection n'est pas analysable.
-		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null
+		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null,
+		// Raison EXACTE de non-analyse (déjà commencé, hors catalogue…) pour ne jamais
+		// afficher une cause approximative. Absente quand la ligne est analysée.
+		raisonNonAnalyse: raisonNonAnalyseDe(s)
 	}));
 
 	// Explications par sélection retirée, rattachées à leur ligne (ordre, libellés,

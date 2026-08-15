@@ -8,10 +8,21 @@
 	import HistoryMarquee from '$lib/components/HistoryMarquee.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 	import ShareSheet from '$lib/components/ShareSheet.svelte';
-	import { ligneNote } from '$lib/lineStatus';
+	import { ligneNote, resumeNonAnalyse, type RaisonNonAnalyse } from '$lib/lineStatus';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const vm = $derived(data.vm);
+
+	// Résumé HONNÊTE des lignes non analysées : la vraie raison, jamais « non couvert »
+	// par défaut. Une cause → message précis ; plusieurs → compte neutre.
+	const resumeAutres = $derived(
+		resumeNonAnalyse(
+			vm.lignes
+				.filter((l) => !l.analysable)
+				.map((l) => l.raisonNonAnalyse)
+				.filter((r): r is RaisonNonAnalyse => r != null)
+		)
+	);
 
 	let shareOpen = $state(false);
 
@@ -111,8 +122,8 @@
 				<span class="cv-pct">{pctBig(vm.probaRenforceePct)}</span> — sur les {vm.nbAnalysables} match{vm.nbAnalysables
 					> 1
 					? 's'
-					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}. Les autres ne sont pas couverts, ton
-				ticket entier a moins de chances.
+					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}.{#if resumeAutres}
+					{resumeAutres}.{/if} Ton ticket entier a moins de chances.
 			</p>
 		{/if}
 	</div>
@@ -134,7 +145,9 @@
 			</div>
 			{#if vm.laPlusSerree}
 				<div class="serree t-body">
-					Ta sélection la plus serrée : {vm.laPlusSerree.libelleFr} ({pctBig(vm.laPlusSerree.pct)})
+					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel}, {vm.laPlusSerree.libelleFr} ({pctBig(
+						vm.laPlusSerree.pct
+					)})
 				</div>
 			{/if}
 		{:else}
@@ -143,7 +156,9 @@
 			<div class="t-body-lg">Rien à retirer. Ton ticket tient debout.</div>
 			{#if vm.laPlusSerree && vm.nbAnalysables >= 2}
 				<div class="serree t-body">
-					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel} ({pctBig(vm.laPlusSerree.pct)})
+					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel}, {vm.laPlusSerree.libelleFr} ({pctBig(
+						vm.laPlusSerree.pct
+					)})
 				</div>
 			{/if}
 		{/if}
