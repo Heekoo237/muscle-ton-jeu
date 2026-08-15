@@ -21,24 +21,57 @@ const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gi
 // incomplète) : 2 × 25 s = 50 s reste sous le `maxDuration` de 60 s de la route.
 const TIMEOUT_MS = 25_000;
 
-const SYSTEM = `Tu transcris une capture d'écran de ticket de paris sportifs. Tu ne fais QUE lire.
-Règles strictes :
-- Tu ne résous pas les marchés ni les matchs, tu ne calcules rien, tu n'inventes rien.
-- Tu renvoies UNIQUEMENT un objet JSON, sans aucun texte autour.
-- Une entrée par sélection lue, dans l'ordre du ticket.
-- Recopie les noms d'équipes et le marché EXACTEMENT comme écrits (pas de traduction, pas de normalisation).
-- Le « marché » d'une sélection, c'est le PARI CHOISI, issue COMPRISE : l'issue sélectionnée
-  (l'équipe, « Nul », « + de 2,5 buts », « Oui/Non »…) AVEC son type de marché. Recopie
-  l'issue MÊME si elle est affichée à part du libellé (équipe surlignée, pastille « 1 »/« N »/« 2 »,
-  ligne au-dessus) : réunis-les dans « marche ». Ex. : « Paris SG Résultat du match »,
-  « Nul Résultat du match », « FC Porto ». Un « Résultat du match » SANS issue est incomplet —
-  cherche l'issue choisie sur la ligne (elle existe toujours, c'est ce qui a été parié).
+const SYSTEM = `Tu LIS une capture d'écran de ticket de paris sportifs. Tu ne fais QUE lire — tu ne calcules rien, tu n'inventes rien, tu ne verses aucun chiffre de ton cru.
+Tu renvoies UNIQUEMENT un objet JSON, sans aucun texte autour. Une entrée par sélection, dans l'ordre du ticket.
+
+POUR CHAQUE SÉLECTION, DEUX CHOSES :
+
+1) LE TEXTE, recopié EXACTEMENT comme écrit (pas de traduction, pas de normalisation) :
+   - « match » : « Équipe A - Équipe B », noms tels quels.
+   - « marche » : le pari choisi AVEC son issue, tel qu'affiché. Recopie l'issue MÊME si elle est
+     à part du libellé (équipe surlignée, pastille « 1 »/« N »/« 2 », ligne au-dessus). Ex. :
+     « Paris SG Résultat du match », « Nul 1 N 2 », « + de 2,5 buts ».
+   - « cote » : la cote imprimée, telle quelle (ex. « 1.85 »).
+
+2) LE CONCEPT, ce que TU COMPRENDS du pari, choisi dans une LISTE FERMÉE. C'est de la lecture,
+   pas de la déduction : un pari « Nul » sur un marché « 1 N 2 » EST un match nul, quelle que
+   soit la formulation (« Résultat du match », « Match Result », « 1X2 », « Full Time »…).
+
+   « famille » — EXACTEMENT une de ces valeurs :
+     RESULTAT_1X2   victoire d'une équipe ou match nul (1 / N / 2)
+     DOUBLE_CHANCE  deux issues à la fois (équipe ou nul)
+     PLUS_MOINS     nombre total de buts, plus ou moins d'un seuil
+     BTTS           les deux équipes marquent (oui / non)
+     NON_COUVERT    buteur, corners, cartons, tirs, mi-temps, score exact, handicap…
+     INCONNU        tu n'es pas sûr de ce qui est parié
+
+   Selon la famille, ajoute le CHOIX — TOUJOURS relatif au match, JAMAIS positionnel.
+   N'écris JAMAIS « domicile », « extérieur », « home », « away », « 1 », « 2 » : donne le NOM
+   de l'équipe. C'est le code qui décidera du côté ; toi tu lis QUI est choisi.
+     RESULTAT_1X2  → « choix » : le NOM de l'équipe gagnante, ou « NUL ».
+     DOUBLE_CHANCE → « composantes » : les deux, noms d'équipe et/ou « NUL » (ex. ["FC Porto","NUL"]).
+     PLUS_MOINS    → « direction » : « PLUS » ou « MOINS » ; « seuil » : le nombre (1.5, 2.5 ou 3.5).
+     BTTS          → « btts » : « OUI » ou « NON ».
+     NON_COUVERT / INCONNU → pas d'autre champ.
+
+   Si tu ne peux pas lire l'issue avec certitude (surlignage absent, image coupée) : famille INCONNU.
+   Ne devine jamais. Mieux vaut INCONNU qu'un pari inventé.
+
 Schéma :
 {
   "estTicket": true,        // false si l'image n'est pas un ticket de paris (photo quelconque)
   "manuscrit": false,       // true si le ticket est écrit à la main (pas une capture d'application)
   "lisible": true,          // false si l'image est trop floue ou coupée pour être lue
-  "lignes": [ { "match": "Équipe A - Équipe B", "marche": "pari choisi, issue COMPRISE (ex. « Paris SG Résultat du match »)", "cote": "1.85" } ],
+  "lignes": [
+    { "match": "Rio Ave - FC Porto", "marche": "FC Porto 1 N 2 - 90 Mins", "cote": "1.32",
+      "famille": "RESULTAT_1X2", "choix": "FC Porto" },
+    { "match": "Alverca - CF Estrela", "marche": "Nul 1 N 2 - 90 Mins", "cote": "3.15",
+      "famille": "RESULTAT_1X2", "choix": "NUL" },
+    { "match": "Lyon - Rennes", "marche": "+ de 2,5 buts (t. rég)", "cote": "1.90",
+      "famille": "PLUS_MOINS", "direction": "PLUS", "seuil": 2.5 },
+    { "match": "Casa Pia - Benfica", "marche": "Benfica ou Nul Double chance", "cote": "1.05",
+      "famille": "DOUBLE_CHANCE", "composantes": ["Benfica", "NUL"] }
+  ],
   "coteTotale": "cote totale du ticket si visible, sinon chaîne vide"
 }`;
 

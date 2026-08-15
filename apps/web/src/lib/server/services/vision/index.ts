@@ -6,6 +6,42 @@
  * l'utilisateur a joué), affichée pour qu'il vérifie qu'on a bien lu — jamais
  * une probabilité calculée (CLAUDE.md, règle d'or n°1).
  */
+/**
+ * FAMILLE de marché — liste FERMÉE lue par le modèle vision (son droit n°1 : lire
+ * un concept, pas une chaîne). Le CODE vérifie ensuite qu'elle est dans cette
+ * liste et redresse le CÔTÉ depuis la donnée (jamais depuis l'ordre d'affichage).
+ * `NON_COUVERT` : buteur, corners, cartons, mi-temps… `INCONNU` : le modèle n'est
+ * pas sûr. Ni l'un ni l'autre n'est jamais deviné (règle d'archi n°3).
+ */
+export type MarketFamily =
+	| 'RESULTAT_1X2'
+	| 'DOUBLE_CHANCE'
+	| 'PLUS_MOINS'
+	| 'BTTS'
+	| 'NON_COUVERT'
+	| 'INCONNU';
+
+/**
+ * Le CONCEPT lu par la vision — jamais positionnel. Le choix est le nom d'équipe
+ * ou « NUL », JAMAIS « domicile/extérieur » : c'est le code, avec le fixture
+ * résolu, qui décide du côté (règle d'or n°1 : un côté déduit de l'ordre du
+ * bookmaker serait un chiffre faux, plausible, invisible). AUCUN nombre du modèle
+ * n'est une proba ; le seuil lu est recoupé contre le texte, jamais utilisé seul.
+ */
+export interface MarketConcept {
+	famille: MarketFamily;
+	/** RESULTAT_1X2 : nom d'équipe lu tel quel, ou « NUL ». */
+	choix?: string;
+	/** DOUBLE_CHANCE : les deux composantes (noms d'équipe et/ou « NUL »). */
+	composantes?: string[];
+	/** PLUS_MOINS : sens du pari. */
+	direction?: 'PLUS' | 'MOINS';
+	/** PLUS_MOINS : seuil lu (attendu 1.5 / 2.5 / 3.5, contraint et recoupé côté code). */
+	seuil?: number;
+	/** BTTS : les deux équipes marquent, oui ou non. */
+	btts?: 'OUI' | 'NON';
+}
+
 export interface RawLine {
 	/** Ligne telle quelle (repli d'affichage et de découpe). */
 	texteBrut: string;
@@ -13,6 +49,12 @@ export interface RawLine {
 	matchText?: string;
 	marketText?: string;
 	coteText?: string;
+	/**
+	 * Concept lu dans la liste fermée. Quand il est présent ET résout avec
+	 * certitude, il PRIME sur l'analyse de chaîne. Sinon (absent, ou INCONNU), le
+	 * code retombe sur la table/heuristiques de `marketText` — jamais deviné.
+	 */
+	concept?: MarketConcept;
 }
 
 /** Raison d'un échec de lecture — jamais silencieux, jamais facturé. */

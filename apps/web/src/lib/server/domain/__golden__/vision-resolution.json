@@ -1,0 +1,144 @@
+{
+  "_note": "GOLDEN SET — couche A (déterministe, sans réseau). Chaque cas rejoue une sortie vision (concept + texte brut) à travers resolveTicket et vérifie la RÉSOLUTION du code. On teste des CAS PIÈGES autant que des réussites : le test exige qu'ils tombent en INCONNU / non_couvert OU soient correctement redressés — jamais devinés. Pour ajouter un bookmaker : copier sa sortie vision réelle en un cas ici. Un cas peut surcharger `teams`/`fixtures` ; sinon il hérite de `base`.",
+  "base": {
+    "teams": [
+      { "id": 1, "nom": "Alverca", "aliases": ["alverca fc"], "leagueId": 1 },
+      { "id": 2, "nom": "CF Estrela", "aliases": ["estrela", "estrela amadora"], "leagueId": 1 },
+      { "id": 3, "nom": "Rio Ave", "aliases": ["rio ave fc"], "leagueId": 1 },
+      { "id": 4, "nom": "FC Porto", "aliases": ["porto"], "leagueId": 1 },
+      { "id": 5, "nom": "Casa Pia", "aliases": ["casa pia ac"], "leagueId": 1 },
+      { "id": 6, "nom": "Benfica", "aliases": ["sl benfica"], "leagueId": 1 }
+    ],
+    "fixtures": [
+      { "id": 101, "dateUtc": "", "teamHome": "Alverca", "teamAway": "CF Estrela", "leagueId": 1, "statut": "scheduled", "scoreHome": null, "scoreAway": null },
+      { "id": 102, "dateUtc": "", "teamHome": "Rio Ave", "teamAway": "FC Porto", "leagueId": 1, "statut": "scheduled", "scoreHome": null, "scoreAway": null },
+      { "id": 103, "dateUtc": "", "teamHome": "Casa Pia", "teamAway": "Benfica", "leagueId": 1, "statut": "scheduled", "scoreHome": null, "scoreAway": null }
+    ]
+  },
+  "cas": [
+    {
+      "nom": "1X2 nul — famille + choix NUL, notation « 1 N 2 » que la table ne connaît pas",
+      "note": "Le cas exact du terrain : « Nul 1 N 2 - 90 Mins » tombait en NON RECONNUE. Le concept résout, la table n'a plus à connaître « 1 N 2 ».",
+      "lignes": [
+        { "matchText": "Alverca - CF Estrela", "marketText": "Nul 1 N 2 - 90 Mins", "coteText": "3,15", "concept": { "famille": "RESULTAT_1X2", "choix": "NUL" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "DRAW", "fixtureId": 101, "coteSaisie": 3.15 }]
+    },
+    {
+      "nom": "1X2 victoire extérieur — côté déduit du fixture (Porto = away chez nous)",
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "FC Porto 1 N 2 - 90 Mins", "coteText": "1,32", "concept": { "famille": "RESULTAT_1X2", "choix": "FC Porto" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_AWAY", "fixtureId": 102 }]
+    },
+    {
+      "nom": "1X2 victoire domicile — Casa Pia = home chez nous",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Casa Pia 1 N 2 - 90 Mins", "coteText": "4,50", "concept": { "famille": "RESULTAT_1X2", "choix": "Casa Pia" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_HOME", "fixtureId": 103 }]
+    },
+    {
+      "nom": "1X2 victoire extérieur — Benfica joue À L'EXTÉRIEUR chez Casa Pia",
+      "note": "Rappel : dans « Casa Pia - Benfica », Benfica est l'équipe à l'extérieur. Le côté vient de NOTRE base, pas de la place du nom.",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Benfica 1 N 2 - 90 Mins", "coteText": "1,17", "concept": { "famille": "RESULTAT_1X2", "choix": "Benfica" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_AWAY", "fixtureId": 103 }]
+    },
+    {
+      "nom": "Double chance — « Casa Pia ou Nul » (domicile + nul)",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Casa Pia ou Nul Double chance", "coteText": "1,45", "concept": { "famille": "DOUBLE_CHANCE", "composantes": ["Casa Pia", "NUL"] } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "DC_HOME_DRAW", "fixtureId": 103 }]
+    },
+    {
+      "nom": "Double chance — « Benfica ou Nul » (extérieur + nul), côté redressé depuis la base",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Benfica ou Nul Double chance", "coteText": "1,05", "concept": { "famille": "DOUBLE_CHANCE", "composantes": ["Benfica", "NUL"] } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "DC_DRAW_AWAY", "fixtureId": 103 }]
+    },
+    {
+      "nom": "Plus de buts — seuil 2,5 recoupé contre le texte",
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "+ de 2,5 buts (t. rég)", "coteText": "1,90", "concept": { "famille": "PLUS_MOINS", "direction": "PLUS", "seuil": 2.5 } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "OVER_2_5", "fixtureId": 102 }]
+    },
+    {
+      "nom": "BTTS — « Both Teams To Score » ne doit PAS être pris pour un marché buteur",
+      "note": "Piège de chevauchement : « to score » figure dans la liste des non-couverts (buteur). Le second filet retire d'abord les libellés BTTS ; le marché reste COUVERT.",
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "Both Teams To Score", "coteText": "1,72", "concept": { "famille": "BTTS", "btts": "OUI" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "BTTS_YES", "fixtureId": 102 }]
+    },
+
+    {
+      "nom": "PIÈGE — ordre domicile/extérieur inversé par rapport à notre base",
+      "note": "Le bookmaker affiche « FC Porto - Rio Ave » (extérieur à gauche). Notre base a Rio Ave à domicile. Le match doit être RETROUVÉ (redressé) et le côté lu sur NOTRE fixture : Porto reste WIN_AWAY. Un côté déduit de l'ordre du ticket aurait donné WIN_HOME — un chiffre faux, invisible.",
+      "lignes": [
+        { "matchText": "FC Porto - Rio Ave", "marketText": "FC Porto 1 N 2", "coteText": "1,32", "concept": { "famille": "RESULTAT_1X2", "choix": "FC Porto" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "WIN_AWAY", "fixtureId": 102 }]
+    },
+    {
+      "nom": "PIÈGE — seuil ambigu : « Plus de buts » sans seuil visible",
+      "note": "La vision ne donne pas de seuil ; le texte n'en contient pas. On ne devine pas : secours texte → AMBIGU, on propose les trois seuils.",
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "Plus de buts", "coteText": "1,50", "concept": { "famille": "PLUS_MOINS", "direction": "PLUS" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "ambigu", "candidates": ["OVER_1_5", "OVER_2_5", "OVER_3_5"], "fixtureId": 102 }]
+    },
+    {
+      "nom": "PIÈGE — seuil mal lu : la vision dit 3,5 mais le texte dit 2,5",
+      "note": "Recoupement du seuil : 3,5 est absent du texte → concept rejeté → secours texte, qui relit le VRAI seuil 2,5. On redresse vers la donnée, jamais vers le nombre mal lu.",
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "+ de 2,5 buts", "coteText": "1,90", "concept": { "famille": "PLUS_MOINS", "direction": "PLUS", "seuil": 3.5 } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "OVER_2_5", "fixtureId": 102 }]
+    },
+    {
+      "nom": "PIÈGE — marché non couvert avec libellé exotique, mal étiqueté par la vision",
+      "note": "La vision annonce à tort RESULTAT_1X2, mais le texte dit « Anytime Goalscorer ». Le second filet (terme non-couvert dans le texte) l'emporte : non_couvert, jamais analysé.",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Rafa Silva - Anytime Goalscorer", "coteText": "2,10", "concept": { "famille": "RESULTAT_1X2", "choix": "Benfica" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "raison": "non_couvert", "fixtureId": 103 }]
+    },
+    {
+      "nom": "Non couvert — la vision le reconnaît elle-même (famille NON_COUVERT)",
+      "lignes": [
+        { "matchText": "Casa Pia - Benfica", "marketText": "Nombre de corners +9,5", "coteText": "1,80", "concept": { "famille": "NON_COUVERT" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "raison": "non_couvert", "fixtureId": 103 }]
+    },
+    {
+      "nom": "PIÈGE — issue vide : famille 1X2 annoncée, choix manquant (variabilité vision)",
+      "note": "Le bug du terrain : « Résultat du match » sans l'issue. Le match est résolu mais le pari inanalysable → INCONNU + LECTURE INCOMPLÈTE (déclenche le retry).",
+      "attendLectureIncomplete": true,
+      "lignes": [
+        { "matchText": "Rio Ave - FC Porto", "marketText": "Résultat du match (t. rég)", "coteText": "1,90", "concept": { "famille": "RESULTAT_1X2", "choix": "" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "fixtureId": 102 }]
+    },
+    {
+      "nom": "PIÈGE — capture partielle : un côté du match coupé",
+      "note": "Le nom d'équipe droite manque (image rognée). Match illisible → INCONNU, jamais deviné. fixtureId null.",
+      "lignes": [
+        { "matchText": "Alverca -", "marketText": "Nul 1 N 2", "coteText": "3,15", "concept": { "famille": "RESULTAT_1X2", "choix": "NUL" } }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "inconnu", "fixtureId": null }]
+    },
+    {
+      "nom": "SECOURS — aucune famille (vieux flux vision) : la table de secours résout depuis le texte",
+      "note": "Rétrocompatibilité : sans concept, le comportement historique tient. La table reste, en second chemin.",
+      "lignes": [
+        { "matchText": "Alverca - CF Estrela", "marketText": "1X", "coteText": "1,40" }
+      ],
+      "attendu": [{ "ordre": 1, "etatResolution": "certain", "marche": "DC_HOME_DRAW", "fixtureId": 101 }]
+    }
+  ]
+}

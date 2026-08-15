@@ -164,6 +164,24 @@ export function splitResultMarket(notation: string): ResultSplit | null {
 }
 
 /**
+ * Le libellé lu désigne-t-il un marché NON couvert (buteur, corners, cartons,
+ * mi-temps…) ? Sert de SECOND FILET : quand la vision annonce une famille couverte
+ * mais que le texte contient un terme non-couvert, on refuse plutôt que d'analyser
+ * le mauvais marché (« on préfère refuser d'analyser que d'analyser le mauvais »).
+ *
+ * Piège traité : « both teams to score » contient « to score » (terme de buteur)
+ * sans être un marché de buteur — c'est le marché COUVERT « les deux marquent ». On
+ * retire d'abord les libellés de TYPE couverts (1X2 / double chance / BTTS) : sans
+ * ça, un vrai BTTS serait pris pour un non-couvert. Après retrait, il ne reste que
+ * les vrais termes non-couverts.
+ */
+export function matchesUncovered(notation: string): boolean {
+	let n = normalize(notation);
+	for (const p of [...TYPE_1X2, ...TYPE_DC, ...TYPE_BTTS]) n = n.split(p).join(' ');
+	return UNCOVERED.some((re) => re.test(n));
+}
+
+/**
  * Notations « plus/moins de buts » COMPLÈTES des bookmakers : le seuil ET la
  * direction sont dans la phrase, pas dans une clé propre. Ex. Betclic :
  *   « + de 1,5 - Nombre total de buts (t. rég) »  ·  « - de 2,5 buts »
@@ -196,6 +214,21 @@ export function resolveMarket(notation: string): MarketResolution {
 	}
 	if (AMBIGUOUS_UNDER.has(n)) {
 		return { state: 'ambigu', market: null, raison: 'ambigu', candidates: UNDER_CANDIDATES };
+	}
+	// Marché de BUTS avec une DIRECTION mais SANS seuil (« Plus de buts », « Over
+	// goals ») → ambigu : on sait le sens, pas la ligne. On propose les trois seuils,
+	// jamais un seuil deviné (règle d'archi n°3). Le cas AVEC seuil est déjà traité
+	// par parseTotals plus haut ; ici il n'y a pas de seuil à lire.
+	const contexteButs = /\bbuts?\b/.test(n) || /nombre total/.test(n) || /\bgoals?\b/.test(n);
+	if (contexteButs) {
+		const over = /\bplus\b/.test(n) || /(^|\s)\+\s*de\b/.test(n) || /\bover\b/.test(n);
+		const under = /\bmoins\b/.test(n) || /(^|\s)-\s*de\b/.test(n) || /\bunder\b/.test(n);
+		if (over && !under) {
+			return { state: 'ambigu', market: null, raison: 'ambigu', candidates: OVER_CANDIDATES };
+		}
+		if (under && !over) {
+			return { state: 'ambigu', market: null, raison: 'ambigu', candidates: UNDER_CANDIDATES };
+		}
 	}
 	if (UNCOVERED.some((re) => re.test(n))) {
 		return { state: 'inconnu', market: null, raison: 'non_couvert' };

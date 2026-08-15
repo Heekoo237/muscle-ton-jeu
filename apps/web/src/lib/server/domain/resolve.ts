@@ -9,9 +9,15 @@
  *
  * Aucune probabilité n'est calculée ni lue ici.
  */
-import type { Fixture, Selection, Team } from '$lib/types';
-import type { RawLine, RawTicketRead } from '$lib/server/services/vision';
-import { resolveMarket, marketLabelFr, splitResultMarket, type MarketResolution } from './market-map';
+import type { Fixture, Market, Selection, Team } from '$lib/types';
+import type { MarketConcept, RawLine, RawTicketRead } from '$lib/server/services/vision';
+import {
+	resolveMarket,
+	marketLabelFr,
+	splitResultMarket,
+	matchesUncovered,
+	type MarketResolution
+} from './market-map';
 import { aliasFor } from './team-aliases';
 import { ANALYSIS_WINDOW_DAYS } from './window';
 
@@ -135,11 +141,28 @@ function diagnoseMatch(
 		// d'avant (on ne casse rien tant que club_id n'est pas rempli).
 		const homeClub = clubOf(homeTeam);
 		const awayClub = clubOf(awayTeam);
-		const fixture = fixtures.find(
-			(f) =>
-				clubByName.get(normalize(f.teamHome)) === homeClub &&
-				clubByName.get(normalize(f.teamAway)) === awayClub
-		);
+		const fxHomeClub = (f: Fixture) => clubByName.get(normalize(f.teamHome));
+		const fxAwayClub = (f: Fixture) => clubByName.get(normalize(f.teamAway));
+		let fixture = fixtures.find((f) => fxHomeClub(f) === homeClub && fxAwayClub(f) === awayClub);
+		// ORDRE INVERSÉ — certains bookmakers affichent l'extérieur à gauche. On tente
+		// l'orientation inverse, mais SEULEMENT si elle désigne UN SEUL match (sinon on
+		// ne devine pas). Le côté (domicile/extérieur) sera ensuite lu sur le fixture
+		// RÉSOLU, jamais sur l'ordre du ticket : c'est là tout l'intérêt du redressement.
+		if (!fixture) {
+			const inverses = fixtures.filter((f) => fxHomeClub(f) === awayClub && fxAwayClub(f) === homeClub);
+			if (inverses.length === 1) fixture = inverses[0];
+			else if (inverses.length > 1) {
+				console.warn(
+					`[résolution] ORDRE INVERSÉ AMBIGU « ${matchText} » — plusieurs matchs entre ces équipes, on ne devine pas`
+				);
+				return { kind: 'non_resolu' };
+			}
+		}
+		// Le CÔTÉ vient de la donnée : on rattache home/away aux équipes du fixture
+		// résolu, pas à l'ordre du ticket. En orientation inverse, la gauche du ticket
+		// est l'extérieur réel — sans ce redressement, whichSide se tromperait de camp.
+		const trueHome = fixture && fxHomeClub(fixture) === homeClub ? homeTeam : awayTeam;
+		const trueAway = trueHome === homeTeam ? awayTeam : homeTeam;
 		// « Hors fenêtre » N'EST vrai que si un match existe RÉELLEMENT entre ces deux
 		// équipes, à une date au-delà de la période analysée. Sinon (aucun match entre
 		// elles), c'est « on n'a pas retrouvé ce match » — pas « hors fenêtre ». Ce
@@ -153,16 +176,16 @@ function diagnoseMatch(
 				console.warn(
 					`[résolution] DÉJÀ COMMENCÉ « ${matchText} » — coup d'envoi ${fixture.dateUtc}, passé`
 				);
-				return { kind: 'commence', homeTeam, awayTeam };
+				return { kind: 'commence', homeTeam: trueHome, awayTeam: trueAway };
 			}
 			// Trouvé mais au-delà de la période analysée.
 			if (!Number.isNaN(t) && t > now + ANALYSIS_WINDOW_DAYS * 86_400_000) {
 				console.warn(
 					`[résolution] HORS FENÊTRE « ${matchText} » — match trouvé le ${fixture.dateUtc}, au-delà de la période analysée (${ANALYSIS_WINDOW_DAYS} j)`
 				);
-				return { kind: 'hors_fenetre', homeTeam, awayTeam };
+				return { kind: 'hors_fenetre', homeTeam: trueHome, awayTeam: trueAway };
 			}
-			return { kind: 'ok', fixture, homeTeam, awayTeam };
+			return { kind: 'ok', fixture, homeTeam: trueHome, awayTeam: trueAway };
 		}
 		console.warn(
 			`[résolution] NON RETROUVÉ « ${matchText} » — équipes reconnues, mais aucun match entre elles en base`
@@ -238,6 +261,101 @@ function resolveMarketForFixture(
 	return resolveMarket(marketText);
 }
 
+const INCONNU: MarketResolution = { state: 'inconnu', market: null, raison: 'inconnu' };
+const SEUILS_COUVERTS = new Set([1.5, 2.5, 3.5]);
+
+/**
+ * Résout le marché depuis le CONCEPT lu par la vision (famille + choix relatif).
+ * Le code fait tout le jugement : il vérifie que la famille est couverte, redresse
+ * le CÔTÉ depuis le fixture (jamais depuis l'ordre du ticket), contraint le seuil à
+ * {1,5 · 2,5 · 3,5} ET le recoupe contre le texte lu. Tout ce qui ne colle pas →
+ * INCONNU (jamais deviné) : l'appelant retombera alors sur la table de secours.
+ *
+ * `rawMarketText` sert au RECOUPEMENT du seuil : un seuil annoncé par la vision mais
+ * ABSENT du texte est un seuil possiblement mal lu — on refuse (il sélectionnerait
+ * une autre probabilité sans qu'on le voie). Règle d'or n°1, jusque dans le seuil.
+ */
+function resolveConcept(
+	concept: MarketConcept,
+	rawMarketText: string,
+	home: Team,
+	away: Team
+): MarketResolution {
+	switch (concept.famille) {
+		case 'NON_COUVERT':
+			return { state: 'inconnu', market: null, raison: 'non_couvert' };
+		case 'INCONNU':
+			return INCONNU;
+		case 'RESULTAT_1X2': {
+			const c = normalize(concept.choix ?? '');
+			if (!c) return INCONNU; // issue vide : lecture incomplète, jamais devinée
+			if (DRAW_WORDS.has(c)) return { state: 'certain', market: 'DRAW' };
+			const side = whichSide(concept.choix ?? '', home, away);
+			if (side === 'home') return { state: 'certain', market: 'WIN_HOME' };
+			if (side === 'away') return { state: 'certain', market: 'WIN_AWAY' };
+			return INCONNU; // choix ne correspond à aucune équipe ni « Nul »
+		}
+		case 'DOUBLE_CHANCE': {
+			const parts = concept.composantes ?? [];
+			const sides = new Set<string>();
+			for (const p of parts) {
+				if (DRAW_WORDS.has(normalize(p))) sides.add('draw');
+				else {
+					const s = whichSide(p, home, away);
+					if (s) sides.add(s);
+				}
+			}
+			if (sides.has('home') && sides.has('draw')) return { state: 'certain', market: 'DC_HOME_DRAW' };
+			if (sides.has('away') && sides.has('draw')) return { state: 'certain', market: 'DC_DRAW_AWAY' };
+			if (sides.has('home') && sides.has('away')) return { state: 'certain', market: 'DC_HOME_AWAY' };
+			return INCONNU;
+		}
+		case 'PLUS_MOINS': {
+			const seuil = concept.seuil;
+			// Contrainte : hors des seuils couverts → INCONNU (jamais un seuil inventé).
+			if (typeof seuil !== 'number' || !SEUILS_COUVERTS.has(seuil)) return INCONNU;
+			// RECOUPEMENT : le seuil annoncé DOIT figurer dans le texte lu. Un seuil mal
+			// lu (2,5 lu 3,5) échoue ici → secours texte, qui relira le VRAI seuil.
+			const present = new RegExp(`${String(seuil)[0]}[.,]5`).test(rawMarketText);
+			if (!present) return INCONNU;
+			if (concept.direction !== 'PLUS' && concept.direction !== 'MOINS') return INCONNU;
+			const tag = seuil === 1.5 ? '1_5' : seuil === 2.5 ? '2_5' : '3_5';
+			return { state: 'certain', market: `${concept.direction === 'PLUS' ? 'OVER' : 'UNDER'}_${tag}` as Market };
+		}
+		case 'BTTS':
+			if (concept.btts === 'NON') return { state: 'certain', market: 'BTTS_NO' };
+			if (concept.btts === 'OUI') return { state: 'certain', market: 'BTTS_YES' };
+			return INCONNU;
+	}
+}
+
+/**
+ * Résolution du marché AVEC le concept de la vision quand il existe, table de
+ * secours sinon. L'ordre encode les priorités validées :
+ *  1. SECOND FILET non-couvert : un terme non-couvert dans le TEXTE l'emporte, même
+ *     sur une famille couverte annoncée — « on préfère refuser que d'analyser le
+ *     mauvais marché » (le piège « both teams to score » est traité dans `matchesUncovered`) ;
+ *  2. CONCEPT : s'il résout avec certitude (ou dit explicitement non-couvert), il prime ;
+ *  3. SECOURS TEXTE : famille absente ou INCONNU → table + heuristiques (comportement
+ *     historique), qui gère aussi l'AMBIGU (« Over » sans seuil → trois choix).
+ */
+function resolveMarketWithConcept(
+	marketText: string,
+	concept: MarketConcept | undefined,
+	home: Team,
+	away: Team
+): MarketResolution {
+	if (concept) {
+		if (matchesUncovered(marketText)) {
+			return { state: 'inconnu', market: null, raison: 'non_couvert' };
+		}
+		const byConcept = resolveConcept(concept, marketText, home, away);
+		if (byConcept.state === 'certain' || byConcept.raison === 'non_couvert') return byConcept;
+		// INCONNU du concept → on tente la table de secours sur le texte.
+	}
+	return resolveMarketForFixture(marketText, home, away);
+}
+
 /** Champs d'une ligne : structurés si le modèle vision les a isolés, sinon découpés. */
 function lineParts(ligne: RawLine): { matchText: string; marketText: string; odds: number | null } {
 	if (ligne.matchText || ligne.marketText || ligne.coteText) {
@@ -295,7 +413,8 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 		}
 
 		const fx = { fixture: diag.fixture, home: diag.homeTeam.nom, away: diag.awayTeam.nom };
-		const market = resolveMarketForFixture(marketText, diag.homeTeam, diag.awayTeam);
+		// Concept vision d'abord (côté redressé sur le fixture), table de secours ensuite.
+		const market = resolveMarketWithConcept(marketText, ligne.concept, diag.homeTeam, diag.awayTeam);
 
 		const matchLabel = `${fx.home} – ${fx.away}`;
 
@@ -388,6 +507,19 @@ export function incompleteReads(selections: Selection[], raw: RawTicketRead): nu
 	for (let i = 0; i < selections.length; i++) {
 		const s = selections[i];
 		if (s.etatResolution === 'certain' || s.fixtureId == null) continue;
+		// Deux symptômes de la même panne (issue omise), selon le chemin de lecture :
+		//  - CONCEPT : famille de résultat annoncée mais choix/composantes vides ;
+		//  - TEXTE  : type 1X2 / double chance reconnu mais issue vide (secours).
+		const concept = raw.lignes[i].concept;
+		if (concept) {
+			const choixVide =
+				(concept.famille === 'RESULTAT_1X2' && !normalize(concept.choix ?? '')) ||
+				(concept.famille === 'DOUBLE_CHANCE' && (concept.composantes?.length ?? 0) < 2);
+			if (choixVide) {
+				n++;
+				continue;
+			}
+		}
 		const sp = splitResultMarket(lineParts(raw.lignes[i]).marketText);
 		if (sp && (sp.kind === '1x2' || sp.kind === 'dc') && normalize(sp.choice) === '') n++;
 	}
