@@ -353,7 +353,8 @@
 					<div style="font-size:14px;line-height:1.4;color:rgba(248,241,228,0.72);max-width:40ch">Muscle Ton Jeu n’accepte aucune mise et ne verse aucun gain.</div>
 				</div>
 				<div style="flex:1 1 240px;min-width:0;display:flex;flex-direction:column">
-					<a href="/jeu-responsable" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Jeu responsable</a>
+					<a href="/couverture" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Voir toutes les compétitions qu’on analyse</a>
+						<a href="/jeu-responsable" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Jeu responsable</a>
 					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Mentions légales</a>
 					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">CGU</a>
 					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Confidentialité</a>

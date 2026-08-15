@@ -25,10 +25,13 @@
 		return href === '/dashboard' ? p === '/dashboard' : p.startsWith(href);
 	}
 
+	// `sidebarOnly` : lien de réassurance présent dans la barre latérale, PAS dans la
+	// navigation basse mobile (réservée aux 3 cibles principales + Quitter).
 	const NAV = [
-		{ href: '/dashboard', label: 'Accueil', short: 'Accueil', icon: 'home' },
-		{ href: '/dashboard/historique', label: 'Mon historique', short: 'Historique', icon: 'list' },
-		{ href: '/historique', label: 'Historique public', short: 'Public', icon: 'globe' }
+		{ href: '/dashboard', label: 'Accueil', short: 'Accueil', icon: 'home', sidebarOnly: false },
+		{ href: '/dashboard/historique', label: 'Mon historique', short: 'Historique', icon: 'list', sidebarOnly: false },
+		{ href: '/historique', label: 'Historique public', short: 'Public', icon: 'globe', sidebarOnly: false },
+		{ href: '/couverture', label: 'Compétitions couvertes', short: 'Compétitions', icon: 'trophy', sidebarOnly: true }
 	];
 </script>
 
@@ -39,6 +42,8 @@
 		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>
 	{:else if name === 'globe'}
 		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8" /><path d="M4 12h16M12 4c2.5 2.5 2.5 13 0 16M12 4c-2.5 2.5-2.5 13 0 16" /></svg>
+	{:else if name === 'trophy'}
+		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /><path d="M10 14v3M14 14v3M8 20h8" /></svg>
 	{:else if name === 'logout'}
 		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4v16h-4" /><path d="M10 8l-4 4 4 4M6 12h9" /></svg>
 	{/if}
@@ -121,7 +126,7 @@
 
 	<!-- NAVIGATION BASSE (mobile) -->
 	<nav class="bottomnav" aria-label="Navigation">
-		{#each NAV as item (item.href)}
+		{#each NAV.filter((i) => !i.sidebarOnly) as item (item.href)}
 			<a class="tab" href={item.href} class:active={active(item.href)} aria-current={active(item.href) ? 'page' : undefined}>
 				{@render icon(item.icon)}
 				<span>{item.short}</span>

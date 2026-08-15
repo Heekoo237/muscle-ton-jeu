@@ -9,6 +9,7 @@
 		<p class="wordmark">MTJ</p>
 		<nav class="links t-body" aria-label="Liens de bas de page">
 			<a href="/historique">Historique public</a>
+			<a href="/couverture">Compétitions couvertes</a>
 			<a href="/jeu-responsable">Jeu responsable</a>
 			<a href="/aide">Aide</a>
 		</nav>
