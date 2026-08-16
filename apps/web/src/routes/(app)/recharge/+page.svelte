@@ -1,29 +1,61 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
+	import { enhance } from '$app/forms';
 	import { formatFranc } from '$lib/format';
-	let { data }: { data: PageData } = $props();
+	import TestBanner from '$lib/components/TestBanner.svelte';
+	import { PAYS, paysDe, validerNumero } from '$lib/payments/operators';
 
-	function creditsLabel(c: number | 'illimite'): string {
-		return c === 'illimite' ? 'Illimité 72 h' : `${c} crédits`;
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let etape = $state<1 | 2>(1);
+	// Graine initiale depuis le pays mémorisé ; ensuite l'utilisateur en est maître.
+	// svelte-ignore state_referenced_locally
+	let paysCode = $state(data.paysDefaut);
+	let numero = $state('');
+	let operateurId = $state('');
+	let packId = $state('');
+
+	const pays = $derived(paysDe(paysCode) ?? PAYS[0]);
+	const validation = $derived(validerNumero(numero, pays));
+	const pack = $derived(data.packs.find((p) => p.id === packId));
+
+	// Changer de pays remet l'opérateur à zéro (les listes diffèrent).
+	function choisirPays(code: string) {
+		paysCode = code as typeof paysCode;
+		operateurId = '';
+	}
+
+	// « X crédits, soit environ Y analyses ». Un ticket courant coûte 1 crédit
+	// (2-6 sélections) → 1 pour 1 en ordre de grandeur ; « environ » absorbe le reste.
+	function analyses(credits: number | 'illimite'): string {
+		return credits === 'illimite'
+			? 'analyses illimitées 72 h'
+			: `environ ${credits} analyse${credits > 1 ? 's' : ''}`;
+	}
+
+	const peutContinuer = $derived(validation.ok && operateurId !== '' && packId !== '');
+	const operateur = $derived(pays.operateurs.find((o) => o.id === operateurId));
+
+	function continuer() {
+		if (peutContinuer) etape = 2;
 	}
 </script>
 
 <svelte:head><title>Recharger — Muscle Ton Jeu</title></svelte:head>
 
 <main class="container">
-	{#if data.besoin > 0}
-		<!-- Écran de blocage (PRD §5.4) : bloque l'affichage, jamais l'entrée. -->
+	{#if data.modeTest}
+		<TestBanner />
+	{/if}
+
+	{#if data.besoin > 0 && etape === 1}
 		<h1 class="t-h1">Ton ticket est prêt.</h1>
 		<p class="t-body-lg sous">
-			{data.besoin} crédit{data.besoin > 1 ? 's' : ''} nécessaire{data.besoin > 1 ? 's' : ''}.
+			{data.besoin} crédit{data.besoin > 1 ? 's' : ''} nécessaire{data.besoin > 1 ? 's' : ''}. Il te
+			reste {data.credits}.
 		</p>
-		<div class="solde-box">
-			<span class="t-body">Il te reste</span>
-			<span class="t-chiffre-md">{data.credits}</span>
-			<span class="t-body">crédit{data.credits > 1 ? 's' : ''}.</span>
-		</div>
 		<p class="t-body garde">Ton ticket est gardé. Tu le retrouveras ici.</p>
-	{:else}
+	{:else if etape === 1}
 		<h1 class="t-h1">Recharger</h1>
 	{/if}
 
@@ -31,140 +63,173 @@
 		<p class="t-body message" role="note">{data.message}</p>
 	{/if}
 
-	<form method="POST" action="?/payer" class="packs">
-		<input type="hidden" name="retour" value={data.retour} />
-		<label class="field-label t-small" for="msisdn">Ton numéro Mobile Money</label>
-		<input class="field" id="msisdn" name="msisdn" inputmode="tel" placeholder="6XX XXX XXX" />
+	{#if data.enCours}
+		<div class="encours" role="note">
+			<p class="t-body">Une recharge est déjà en cours.</p>
+			<a class="btn-outline" href={`/recharge/attente?ref=${data.enCours.reference}`}>Reprendre</a>
+		</div>
+	{/if}
 
-		{#each data.packs as pack (pack.id)}
-			<button
-				class="pack-card"
-				class:featured={pack.id === data.featured}
-				name="pack"
-				value={pack.id}
-			>
-				{#if pack.id === data.featured && data.besoin > 0}
-					<span class="badge-accent">Couvre ton ticket</span>
-				{/if}
-				<span class="nom t-h3">{pack.nom}</span>
-				<span class="prix t-chiffre-md">{formatFranc(pack.prix)}</span>
-				<span class="contenu t-body">{creditsLabel(pack.credits)}</span>
-				<span class="mention t-small">{pack.mention}</span>
-			</button>
-		{/each}
-	</form>
+	{#if form?.message}
+		<p class="t-body message" role="alert">{form.message}</p>
+	{/if}
 
-	<a class="t-small support" href="/aide">J'ai payé, je n'ai rien reçu</a>
+	{#if etape === 1}
+		<!-- ÉTAPE 1 — saisie -->
+		<section class="bloc">
+			<span class="lab t-small">Pays</span>
+			<div class="pays-liste">
+				{#each PAYS as p (p.code)}
+					<button
+						type="button"
+						class="pays-item"
+						class:sel={p.code === paysCode}
+						onclick={() => choisirPays(p.code)}
+					>
+						<span class="drapeau">{p.drapeau}</span>
+						<span class="pnom">{p.nom}</span>
+						<span class="pind t-small">{p.indicatif}</span>
+					</button>
+				{/each}
+			</div>
+		</section>
+
+		<section class="bloc">
+			<label class="lab t-small" for="numero">Ton numéro Mobile Money</label>
+			<div class="tel">
+				<span class="ind">{pays.indicatif}</span>
+				<input
+					id="numero"
+					class="field"
+					inputmode="numeric"
+					autocomplete="tel"
+					bind:value={numero}
+					placeholder={'0'.repeat(pays.longueur)}
+				/>
+			</div>
+			{#if validation.message}
+				<p class="aide t-small" role="status">{validation.message}</p>
+			{/if}
+		</section>
+
+		<section class="bloc">
+			<span class="lab t-small">Ton opérateur</span>
+			<!-- On ne DÉDUIT jamais : Wave marche sur tout numéro, le Bénin est interopérable.
+			     L'utilisateur choisit, explicitement — un geste de plus, zéro erreur. -->
+			<div class="ops">
+				{#each pays.operateurs as op (op.id)}
+					<button
+						type="button"
+						class="op"
+						class:sel={op.id === operateurId}
+						style="--op:{op.couleur}; --op-txt:{op.texte === 'clair' ? '#fff' : '#111'}"
+						onclick={() => (operateurId = op.id)}
+					>
+						{op.nom}
+					</button>
+				{/each}
+			</div>
+		</section>
+
+		<section class="bloc">
+			<span class="lab t-small">Montant</span>
+			<div class="packs">
+				{#each data.packs as p (p.id)}
+					<button
+						type="button"
+						class="pack"
+						class:sel={p.id === packId}
+						class:featured={data.besoin > 0 && p.id === 'ticket'}
+						onclick={() => (packId = p.id)}
+					>
+						<span class="pnom2 t-h3">{p.nom}</span>
+						<span class="prix t-chiffre-md">{formatFranc(p.prix)}</span>
+						<span class="contenu t-body">
+							{p.credits === 'illimite' ? 'Illimité 72 h' : `${p.credits} crédits`}
+						</span>
+						<span class="analyses t-small">{analyses(p.credits)}</span>
+					</button>
+				{/each}
+			</div>
+		</section>
+
+		<button class="btn-primary continuer" disabled={!peutContinuer} onclick={continuer}>
+			Continuer
+		</button>
+	{:else}
+		<!-- ÉTAPE 2 — récapitulatif -->
+		<h1 class="t-h1">Vérifie avant de payer</h1>
+		{#if data.modeTest}<p class="t-small sous">Aucun paiement réel ne sera effectué.</p>{/if}
+
+		<div class="recap">
+			<div class="ligne"><span class="k t-body">Montant</span><span class="v t-chiffre-md">{formatFranc(pack?.prix ?? 0)}</span></div>
+			<div class="ligne"><span class="k t-body">Numéro</span><span class="v t-body">{pays.indicatif} {validation.valeur}</span></div>
+			<div class="ligne">
+				<span class="k t-body">Opérateur</span>
+				<span class="v op-tag" style="--op:{operateur?.couleur}; --op-txt:{operateur?.texte === 'clair' ? '#fff' : '#111'}">{operateur?.nom}</span>
+			</div>
+			<div class="ligne recu">
+				<span class="k t-body">Tu reçois</span>
+				<span class="v t-body">
+					{pack?.credits === 'illimite' ? 'Crédits illimités' : `${pack?.credits} crédits`}, soit {analyses(pack?.credits ?? 0)}
+				</span>
+			</div>
+		</div>
+
+		<form method="POST" action="?/payer" use:enhance>
+			<input type="hidden" name="pays" value={pays.code} />
+			<input type="hidden" name="numero" value={validation.valeur} />
+			<input type="hidden" name="operateur" value={operateurId} />
+			<input type="hidden" name="pack" value={packId} />
+			<input type="hidden" name="retour" value={data.retour} />
+			<button class="btn-primary" type="submit">Payer {formatFranc(pack?.prix ?? 0)}</button>
+		</form>
+		<button class="btn-dark modifier" type="button" onclick={() => (etape = 1)}>Modifier</button>
+	{/if}
+
+	<div class="liens-bas">
+		<a class="t-small" href="/dashboard/recharges">Mes recharges</a>
+		<a class="t-small support" href="/aide">J'ai payé mais je n'ai pas reçu mes crédits</a>
+	</div>
 </main>
 
 <style>
-	main {
-		padding-top: var(--s-6);
-		padding-bottom: var(--s-12);
-	}
-	.sous {
-		color: var(--c-ink-2);
-		margin: var(--s-2) 0 var(--s-4);
-	}
-	.solde-box {
-		display: flex;
-		align-items: baseline;
-		gap: var(--s-2);
-		background: var(--c-canvas-sunk);
-		border-radius: var(--r-md);
-		padding: var(--s-4);
-	}
-	.garde {
-		color: var(--c-ink-2);
-		margin: var(--s-3) 0 var(--s-8);
-	}
-	.message {
-		background: var(--c-ocre-wash);
-		border: 1px solid var(--c-ocre-line);
-		border-radius: var(--r-md);
-		padding: var(--s-3) var(--s-4);
-		color: var(--c-ink);
-		margin: 0 0 var(--s-6);
-	}
-	.field-label {
-		display: block;
-		color: var(--c-ink-2);
-		margin-bottom: var(--s-1);
-	}
-	.field {
-		width: 100%;
-		height: 52px;
-		padding: 0 var(--s-5);
-		border-radius: var(--r-pill);
-		border: 1px solid var(--c-line);
-		background: var(--c-surface);
-		font-family: var(--font-body);
-		font-size: 16px;
-		margin-bottom: var(--s-6);
-	}
-	.field:focus {
-		outline: none;
-		border-color: var(--c-line-strong);
-		box-shadow: 0 0 0 3px var(--c-line-strong);
-	}
-	.packs {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-	}
-	.pack-card {
-		position: relative;
-		display: grid;
-		grid-template-columns: 1fr auto;
-		grid-template-areas: 'nom prix' 'contenu prix' 'mention mention';
-		gap: var(--s-1) var(--s-3);
-		text-align: left;
-		background: var(--c-surface);
-		border: 1px solid var(--c-line);
-		border-radius: var(--r-lg);
-		padding: var(--s-5);
-		min-height: 112px;
-		cursor: pointer;
-	}
-	.pack-card:active {
-		transform: scale(0.99);
-	}
-	.pack-card.featured {
-		border: 1px solid var(--c-line-strong);
-		border-top: 3px solid var(--c-accent-line);
-	}
-	.nom {
-		grid-area: nom;
-	}
-	.prix {
-		grid-area: prix;
-		align-self: center;
-	}
-	.contenu {
-		grid-area: contenu;
-		color: var(--c-ink-2);
-	}
-	.mention {
-		grid-area: mention;
-		color: var(--c-ink-3);
-	}
-	.badge-accent {
-		position: absolute;
-		top: calc(-1 * var(--s-3));
-		left: var(--s-5);
-		background: var(--c-accent);
-		color: var(--c-ink-inverse);
-		border-radius: var(--r-pill);
-		height: 28px;
-		display: inline-flex;
-		align-items: center;
-		padding: 0 var(--s-3);
-		font-size: 14px;
-		font-weight: 600;
-	}
-	.support {
-		display: inline-block;
-		margin-top: var(--s-8);
-		color: var(--c-ink-2);
-	}
+	main { padding-top: var(--s-6); padding-bottom: var(--s-12); display: flex; flex-direction: column; gap: var(--s-5); }
+	.sous { color: var(--c-ink-2); margin: 0; }
+	.garde { color: var(--c-ink-2); margin: 0; }
+	.message { background: var(--c-ocre-wash); border: 1px solid var(--c-ocre-line); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); color: var(--c-ink); margin: 0; }
+	.encours { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); background: var(--c-canvas-sunk); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
+	.bloc { display: flex; flex-direction: column; gap: var(--s-2); }
+	.lab { color: var(--c-ink-2); font-weight: 600; }
+	.pays-liste { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+	.pays-item { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-md); background: var(--c-surface); text-align: left; }
+	.pays-item.sel { border-color: var(--c-ink); border-width: 2px; }
+	.drapeau { font-size: 20px; }
+	.pnom { flex: 1; }
+	.pind { color: var(--c-ink-3); }
+	.tel { display: flex; align-items: center; gap: var(--s-2); }
+	.ind { padding: 0 var(--s-3); height: 52px; display: flex; align-items: center; border: 1px solid var(--c-line); border-radius: var(--r-pill); background: var(--c-canvas-sunk); color: var(--c-ink-2); font-weight: 600; }
+	.field { flex: 1; height: 52px; padding: 0 var(--s-5); border-radius: var(--r-pill); border: 1px solid var(--c-line); background: var(--c-surface); font-family: var(--font-body); font-size: 16px; }
+	.field:focus { outline: none; border-color: var(--c-line-strong); box-shadow: 0 0 0 3px var(--c-line-strong); }
+	.aide { color: var(--c-ocre); }
+	.ops { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+	.op { padding: var(--s-3) var(--s-4); border-radius: var(--r-pill); border: 2px solid transparent; background: var(--op); color: var(--op-txt); font-weight: 700; opacity: 0.55; }
+	.op.sel { opacity: 1; border-color: var(--c-ink); }
+	.packs { display: flex; flex-direction: column; gap: var(--s-3); }
+	.pack { position: relative; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'nom prix' 'contenu prix' 'analyses analyses'; gap: var(--s-1) var(--s-3); text-align: left; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--r-lg); padding: var(--s-5); }
+	.pack.sel { border-color: var(--c-ink); border-width: 2px; }
+	.pack.featured { border-top: 3px solid var(--c-accent-line); }
+	.pnom2 { grid-area: nom; }
+	.prix { grid-area: prix; align-self: center; }
+	.contenu { grid-area: contenu; color: var(--c-ink-2); }
+	.analyses { grid-area: analyses; color: var(--c-ink-3); }
+	.continuer:disabled { opacity: 0.5; }
+	.recap { display: flex; flex-direction: column; gap: var(--s-3); background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--r-lg); padding: var(--s-5); }
+	.ligne { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+	.ligne .k { color: var(--c-ink-2); }
+	.recu { border-top: 1px solid var(--c-line); padding-top: var(--s-3); }
+	.op-tag { padding: var(--s-1) var(--s-3); border-radius: var(--r-pill); background: var(--op); color: var(--op-txt); font-weight: 700; }
+	.modifier { margin-top: var(--s-2); }
+	.liens-bas { display: flex; justify-content: space-between; gap: var(--s-4); margin-top: var(--s-6); }
+	.liens-bas a { color: var(--c-ink-2); }
 </style>
