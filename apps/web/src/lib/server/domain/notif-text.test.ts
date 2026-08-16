@@ -60,9 +60,14 @@ describe('règle d’or n°2 — AUCUN vocabulaire de gain dans une notification
 		});
 	}
 
-	it('le rendez-vous du matin ne contient aucun mot interdit', () => {
-		const n = buildMorningNotification('/analyser');
-		expect(n.corps).toBe("L'analyse offerte du jour t'attend.");
-		expect(checkVocabulary(`${n.titre} ${n.corps}`).ok).toBe(true);
+	it('le rendez-vous du matin (deux variantes) ne contient aucun mot interdit', () => {
+		const offerte = buildMorningNotification(true, '/analyser');
+		const habitue = buildMorningNotification(false, '/analyser');
+		expect(offerte.corps).toBe("Ta première analyse est offerte. Les matchs du jour t'attendent.");
+		expect(habitue.corps).toBe('Les matchs du jour sont analysés. Vérifie ton ticket avant de le valider.');
+		// Un habitué ne s'entend JAMAIS promettre une gratuité.
+		expect(habitue.corps).not.toContain('offerte');
+		expect(checkVocabulary(`${offerte.titre} ${offerte.corps}`).ok).toBe(true);
+		expect(checkVocabulary(`${habitue.titre} ${habitue.corps}`).ok).toBe(true);
 	});
 });

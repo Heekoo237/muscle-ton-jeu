@@ -5,7 +5,9 @@ import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
 import { isAnalysable } from '$lib/server/domain/ticket';
-import type { ExplicationVM, LineVM } from '$lib/types';
+import { settleTicket, type FinalScore } from '$lib/server/domain/settle';
+import { sports } from '$lib/server/services';
+import type { ExplicationVM, LineVM, TicketResult } from '$lib/types';
 
 /**
  * Consultation d'une analyse passée, telle qu'elle a été rendue. Lecture seule,
@@ -61,6 +63,26 @@ export const load: PageServerLoad = async (event) => {
 		.filter((x): x is ExplicationVM => x !== null)
 		.sort((a, b) => a.ordre - b.ordre);
 
+	// RÈGLEMENT pour l'affichage : c'est ici qu'atterrit le clic sur la notification
+	// « ton ticket est tombé ». On montre le VERDICT et, si c'est le cas, que le
+	// renforcé serait passé — notre meilleur argument. Déterministe (settle.ts),
+	// jamais un LLM. Scores bornés à la période du ticket (fetch léger).
+	const depuis = new Date(ticket.creeLeMs - 2 * 86_400_000).toISOString();
+	const finished = await sports.resultsSince(depuis);
+	const scores = new Map<number, FinalScore>();
+	for (const f of finished) {
+		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
+	}
+	const v = settleTicket(ticket.selections, scores);
+	const verdict: 'attente' | TicketResult = v.originale;
+	const tombeSur =
+		v.originale === 'tombe' && v.premierPerduOrdre != null
+			? (ticket.selections.find((s) => s.ordre === v.premierPerduOrdre)?.matchLabel ?? null)
+			: null;
+	// Issue par ligne (ordre → passé / tombé / en attente), pour marquer le détail.
+	const issues: Record<number, 'passe' | 'tombe' | 'attente'> = {};
+	for (const [ordre, o] of v.parSelection) issues[ordre] = o === null ? 'attente' : o ? 'passe' : 'tombe';
+
 	return {
 		dateMs: ticket.creeLeMs,
 		nbMatchs: lignes.filter((l) => l.analysable).length,
@@ -69,6 +91,12 @@ export const load: PageServerLoad = async (event) => {
 		probaRenforceePct: ticket.result?.probaRenforceePct ?? 0,
 		nbRetirees: ticket.result?.nbRetirees ?? 0,
 		synthese: analyse?.synthese ?? null,
-		explications
+		explications,
+		// Verdict du règlement (null d'affichage = « en attente »).
+		verdict,
+		tombeSur,
+		// L'original tombe mais le renforcé aurait tenu : l'argument du produit.
+		verdictRenforce: v.originale === 'tombe' && v.renforce === 'passe',
+		issues
 	};
 };

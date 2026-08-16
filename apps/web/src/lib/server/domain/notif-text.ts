@@ -74,14 +74,19 @@ export function buildSettleNotification(
 }
 
 /**
- * Notification RENDEZ-VOUS DU MATIN. Texte fixe. L'appelant NE l'émet QUE si une
- * analyse offerte est réellement disponible pour l'utilisateur (sinon promesse
- * fausse) — cette fonction ne décide pas de l'éligibilité, elle rédige.
+ * Notification RENDEZ-VOUS DU MATIN. Deux variantes, AUCUNE promesse fausse :
+ *  - `premiereOffreDisponible` (premier ticket non utilisé) → on peut nommer la
+ *    gratuité, elle est réelle pour cet utilisateur ;
+ *  - sinon → message utile sans promesse de gratuité (l'analyse d'un ticket peut
+ *    coûter des crédits selon le ticket, on ne le laisse pas croire gratuit).
+ * L'appelant décide de l'éligibilité (matchs à venir, utilisateur actif) ; ici on rédige.
  */
-export function buildMorningNotification(url?: string): NotificationPayload {
-	return {
-		titre: 'Muscle Ton Jeu',
-		corps: "L'analyse offerte du jour t'attend.",
-		url
-	};
+export function buildMorningNotification(
+	premiereOffreDisponible: boolean,
+	url?: string
+): NotificationPayload {
+	const corps = premiereOffreDisponible
+		? "Ta première analyse est offerte. Les matchs du jour t'attendent."
+		: 'Les matchs du jour sont analysés. Vérifie ton ticket avant de le valider.';
+	return { titre: 'Muscle Ton Jeu', corps, url };
 }

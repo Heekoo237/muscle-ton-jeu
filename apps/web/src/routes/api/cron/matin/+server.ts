@@ -14,7 +14,7 @@ export const POST: RequestHandler = async (event) => {
 	if (!cronAutorise(event)) error(401, 'Non autorisé.');
 	const stats = await runMorningJob(event.url.origin, Date.now());
 	console.log(
-		`[cron matin] matchs=${stats.matchsAujourdhui} éligibles=${stats.eligibles} notifiés=${stats.notifies}`
+		`[cron matin] matchs24h=${stats.matchs24h} éligibles=${stats.eligibles} notifiés=${stats.notifies}`
 	);
 	return json({ ok: true, ...stats });
 };

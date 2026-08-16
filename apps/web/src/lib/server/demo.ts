@@ -113,6 +113,10 @@ export interface DemoDetail {
 	nbRetirees: number;
 	synthese: string | null;
 	explications: ExplicationVM[];
+	verdict: 'attente' | 'passe' | 'tombe';
+	tombeSur: string | null;
+	verdictRenforce: boolean;
+	issues: Record<number, 'passe' | 'tombe' | 'attente'>;
 }
 
 function line(
@@ -175,7 +179,15 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 				texte:
 					'Milan gagne, c’est ton match le plus risqué. Milan a perdu deux fois à domicile ce mois-ci. Une chance sur trois, pas plus.'
 			}
-		]
+		],
+		// Démo réglée pour montrer le verdict (les deux fragiles retirés tombent → le
+		// renforcé serait passé) ; les autres restent en attente.
+		verdict: known ? 'tombe' : 'attente',
+		tombeSur: known ? 'LENS – NICE' : null,
+		verdictRenforce: known,
+		issues: known
+			? { 1: 'passe', 2: 'tombe', 3: 'passe', 4: 'tombe', 5: 'passe', 6: 'passe', 7: 'passe' }
+			: { 1: 'attente', 2: 'attente', 3: 'attente', 4: 'attente', 5: 'attente', 6: 'attente', 7: 'attente' }
 	};
 }
 

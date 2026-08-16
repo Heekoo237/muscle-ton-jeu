@@ -17,6 +17,22 @@
 	const nbFragiles = $derived(data.lignes.filter((l) => l.fragile).length);
 	// « la plus fragile » n'a de sens que s'il n'y a QU'UN retrait (cf. lineStatus).
 	const retraitUnique = $derived(data.lignes.filter((l) => l.retiree).length === 1);
+
+	// Verdict du règlement : c'est ce que l'utilisateur vient voir en cliquant la
+	// notification. Le cas « tombé mais le renforcé serait passé » est notre argument.
+	const regle = $derived(data.verdict === 'passe' || data.verdict === 'tombe');
+	const verdictPhrase = $derived(
+		data.verdict === 'passe'
+			? 'Ton ticket est passé. Bien joué.'
+			: data.verdict === 'tombe'
+				? data.verdictRenforce
+					? `Ton ticket est tombé${data.tombeSur ? ` sur ${data.tombeSur}` : ''}. Le renforcé serait passé.`
+					: `Ton ticket est tombé${data.tombeSur ? ` sur ${data.tombeSur}` : ''}.`
+				: ''
+	);
+	function issueDe(ordre: number): 'passe' | 'tombe' | 'attente' | undefined {
+		return data.issues?.[ordre];
+	}
 	// Toutes les lignes, non analysées comprises : neutres, jamais retirées.
 	// « analysable » côté papier = réellement analysée (résolue ET avec proba).
 	const paperLines = $derived(
@@ -40,6 +56,20 @@
 		<h1 class="t-h1">Ton ticket, lu</h1>
 		<p class="t-small sous">{dateLabel} · {data.nbMatchs} match{data.nbMatchs > 1 ? 's' : ''} · consultable à vie</p>
 	</div>
+
+	{#if regle}
+		<!-- Verdict du ticket réglé : la première chose vue en arrivant depuis la
+		     notification. « Le renforcé serait passé » est mis en avant. -->
+		<div
+			class="bilan"
+			class:passe={data.verdict === 'passe'}
+			class:tombe={data.verdict === 'tombe'}
+			class:sauve={data.verdictRenforce}
+			role="status"
+		>
+			<p class="bilan-txt">{verdictPhrase}</p>
+		</div>
+	{/if}
 
 	{#if data.synthese}
 		<p class="t-body-lg analyse">{data.synthese}</p>
@@ -95,7 +125,11 @@
 					<span class="mpm-match">
 						{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}
 					</span>
-					{#if l.analysable && l.probabilitePct != null}
+					{#if issueDe(l.ordre) === 'passe'}
+						<span class="issue passe">passé</span>
+					{:else if issueDe(l.ordre) === 'tombe'}
+						<span class="issue tombe">tombé</span>
+					{:else if l.analysable && l.probabilitePct != null}
 						<span class="mpm-pct">{pctBig(l.probabilitePct)}</span>
 					{:else}
 						<span class="mpm-na">non analysé</span>
@@ -118,6 +152,43 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-6);
+	}
+	/* Bandeau de verdict du ticket réglé — la première chose vue depuis la notif. */
+	.bilan {
+		padding: var(--s-4) var(--s-5);
+		border-radius: var(--r-md);
+		border: 1px solid var(--c-line);
+	}
+	.bilan.passe {
+		background: var(--c-vert-wash);
+		border-color: var(--c-vert);
+	}
+	.bilan.tombe {
+		background: var(--c-rouge-wash);
+		border-color: var(--c-rouge);
+	}
+	/* Tombé MAIS le renforcé aurait tenu : on sort du rouge, c'est notre argument. */
+	.bilan.tombe.sauve {
+		background: var(--c-ocre-wash);
+		border-color: var(--c-ocre);
+	}
+	.bilan-txt {
+		margin: 0;
+		font-family: var(--font-title);
+		font-size: 18px;
+		color: var(--c-ink);
+	}
+	.issue {
+		font-weight: 700;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 0.4px;
+	}
+	.issue.passe {
+		color: var(--c-vert);
+	}
+	.issue.tombe {
+		color: var(--c-rouge);
 	}
 	.tete {
 		display: flex;

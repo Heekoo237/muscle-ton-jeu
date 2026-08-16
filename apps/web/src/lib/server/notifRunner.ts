@@ -126,53 +126,73 @@ export async function runSettleJob(origin: string, nowMs: number): Promise<Settl
 }
 
 export interface MorningStats {
-	matchsAujourdhui: number;
+	matchs24h: number;
 	eligibles: number;
 	notifies: number;
 }
 
+/** Jours d'inactivité au-delà desquels on ne réveille plus un compte (il a décroché). */
+const MATIN_ACTIF_JOURS = 30;
+
 /**
- * Rendez-vous du matin. N'envoie QU'aux utilisateurs pour qui une analyse offerte
- * est RÉELLEMENT disponible (premier ticket non utilisé) — sinon promesse fausse.
- * Et seulement les jours où il y a des matchs. Idempotent par (user, jour local).
+ * Rendez-vous du matin. Conditions d'envoi :
+ *  1. il y a des matchs dans les PROCHAINES 24 h ;
+ *  2. l'utilisateur est ACTIF (a analysé ≥ 1 ticket dans les 30 derniers jours) —
+ *     on ne réveille pas quelqu'un qui a décroché ;
+ *  3. il est abonné aux notifications.
+ * Le TEXTE dépend de la gratuité RÉELLE : première analyse offerte (premier ticket
+ * non utilisé) → variante « offerte » ; sinon message utile sans promesse.
+ * Idempotent par (utilisateur, jour local).
  */
 export async function runMorningJob(origin: string, nowMs: number): Promise<MorningStats> {
 	const db = supabaseAdmin();
-	// Jour LOCAL (UTC+1) pour la fenêtre « matchs du jour » et la clé d'idempotence.
-	const localMidnight = new Date(nowMs + 3600_000);
-	const jour = localMidnight.toISOString().slice(0, 10);
-	const debut = `${jour}T00:00:00Z`;
-	const fin = `${jour}T23:59:59Z`;
+	const nowIso = new Date(nowMs).toISOString();
+	const dans24h = new Date(nowMs + 24 * 3600_000).toISOString();
+	const jour = new Date(nowMs + 3600_000).toISOString().slice(0, 10); // jour LOCAL (UTC+1)
 
+	// 1) Des matchs dans les prochaines 24 h ?
 	const { count: matchs } = await db
 		.from('fixtures')
 		.select('id', { count: 'exact', head: true })
 		.eq('statut', 'scheduled')
-		.gte('date_utc', debut)
-		.lte('date_utc', fin);
-	const matchsAujourdhui = matchs ?? 0;
-	if (matchsAujourdhui === 0) return { matchsAujourdhui: 0, eligibles: 0, notifies: 0 };
-	if (enHeuresCalmes(nowMs)) return { matchsAujourdhui, eligibles: 0, notifies: 0 }; // garde-fou
+		.gte('date_utc', nowIso)
+		.lte('date_utc', dans24h);
+	const matchs24h = matchs ?? 0;
+	if (matchs24h === 0) return { matchs24h: 0, eligibles: 0, notifies: 0 };
+	if (enHeuresCalmes(nowMs)) return { matchs24h, eligibles: 0, notifies: 0 }; // garde-fou
 
-	// Éligibles : analyse offerte DISPONIBLE (premier ticket non utilisé) ET abonnés.
-	const { data: abonnes } = await db.from('push_subscriptions').select('user_id');
-	const userIds = [...new Set(((abonnes ?? []) as { user_id: number }[]).map((a) => a.user_id))];
-	if (userIds.length === 0) return { matchsAujourdhui, eligibles: 0, notifies: 0 };
+	// 2) Utilisateurs ACTIFS : au moins un ticket analysé dans les 30 derniers jours.
+	const cutoff = new Date(nowMs - MATIN_ACTIF_JOURS * 86_400_000).toISOString();
+	const { data: recents } = await db
+		.from('tickets')
+		.select('user_id')
+		.eq('statut', 'analyse')
+		.not('user_id', 'is', null)
+		.gte('cree_le', cutoff);
+	const actifs = new Set(((recents ?? []) as { user_id: number }[]).map((t) => t.user_id));
+	if (actifs.size === 0) return { matchs24h, eligibles: 0, notifies: 0 };
 
-	const { data: users } = await db
-		.from('users')
-		.select('id')
-		.eq('premier_ticket_utilise', false)
-		.in('id', userIds);
-	const eligibles = ((users ?? []) as { id: number }[]).map((u) => u.id);
+	// 3) …ET abonnés.
+	const { data: abonnes } = await db.from('push_subscriptions').select('user_id').in('user_id', [...actifs]);
+	const eligibles = [...new Set(((abonnes ?? []) as { user_id: number }[]).map((a) => a.user_id))];
+	if (eligibles.length === 0) return { matchs24h, eligibles: 0, notifies: 0 };
 
-	const payload = buildMorningNotification(`${origin}/analyser`);
+	// Variante de texte selon la gratuité RÉELLE (premier ticket encore disponible ?).
+	const { data: users } = await db.from('users').select('id, premier_ticket_utilise').in('id', eligibles);
+	const offreDispo = new Map(
+		((users ?? []) as { id: number; premier_ticket_utilise: boolean }[]).map((u) => [
+			u.id,
+			u.premier_ticket_utilise === false
+		])
+	);
+
+	const url = `${origin}/analyser`;
 	let notifies = 0;
 	for (const uid of eligibles) {
 		const pris = await reserver(`matin:${uid}:${jour}`, uid, 'matin');
 		if (!pris) continue;
-		await notifications.notify(uid, payload);
+		await notifications.notify(uid, buildMorningNotification(offreDispo.get(uid) ?? false, url));
 		notifies++;
 	}
-	return { matchsAujourdhui, eligibles: eligibles.length, notifies };
+	return { matchs24h, eligibles: eligibles.length, notifies };
 }
