@@ -215,6 +215,8 @@ export const load: PageServerLoad = async (event) => {
 			avecBadge: s.fragile,
 			chanceSur: chanceSur(s.probabilite ?? null),
 			chanceSurMot: chanceSurMot(s.probabilite ?? null),
+			// Cote lue sur la capture (jamais calculée) — pour la traduction pédagogique.
+			cote: s.coteSaisie,
 			faits:
 				regimeOf(s.source) === 'mesure' && s.fixtureId !== null
 					? faitsDescriptifs(faitsParMatch.get(s.fixtureId), s.marche)

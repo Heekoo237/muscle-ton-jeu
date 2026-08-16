@@ -15,6 +15,7 @@ function r(o: Partial<RetraitEnrichi> & Pick<RetraitEnrichi, 'ordre' | 'libelleF
 		avecBadge: true,
 		chanceSur: 2,
 		chanceSurMot: 'une chance sur deux',
+		cote: null,
 		faits: [],
 		...o
 	};

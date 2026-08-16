@@ -53,6 +53,15 @@ export function chanceSurMot(proba: number | null): string | null {
 	return x === null ? null : `une chance sur ${enMots(x)}`;
 }
 
+/**
+ * Cote transcrite → forme d'affichage française (« 7,90 »). Deux décimales, virgule.
+ * PURE mise en forme d'un nombre LU sur la capture : jamais un calcul (règle d'or
+ * n°1). Utilisée par la phrase de traduction pédagogique de la cote.
+ */
+export function formatCote(cote: number): string {
+	return cote.toFixed(2).replace('.', ',');
+}
+
 /* ------------------------------------------------------------------------ */
 /*  Synthèse déterministe (niveau 1)                                         */
 /* ------------------------------------------------------------------------ */

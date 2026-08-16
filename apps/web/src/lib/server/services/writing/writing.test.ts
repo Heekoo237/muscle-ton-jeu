@@ -13,6 +13,7 @@ function retrait(over: Partial<RetraitEnrichi> = {}): RetraitEnrichi {
 		avecBadge: true,
 		chanceSur: 2,
 		chanceSurMot: 'une chance sur deux',
+		cote: null,
 		faits: ['Napoli a perdu deux fois à domicile.'],
 		...over
 	};

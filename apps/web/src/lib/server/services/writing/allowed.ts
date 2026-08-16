@@ -31,6 +31,12 @@ export function allowedNumbersFor(input: WritingInput): number[] {
 	const chances = input.retraits
 		.map((r) => r.chanceSur)
 		.filter((x): x is number => typeof x === 'number');
+	// La COTE transcrite (exception documentée règle d'or n°1) est autorisée dans le
+	// texte : c'est le seul nombre lu, jamais calculé. Sans ça, la phrase de traduction
+	// « une cote à 7,90 » serait rejetée par le garde-fou.
+	const cotes = input.retraits
+		.map((r) => r.cote)
+		.filter((x): x is number => typeof x === 'number');
 	const seuils = input.retraits
 		.flatMap((r) => extractNumbers(r.libelleFr))
 		.filter((n) => SEUILS_MARCHES.has(n));
@@ -40,5 +46,5 @@ export function allowedNumbersFor(input: WritingInput): number[] {
 	const faits = input.retraits.flatMap((r) =>
 		r.faits.flatMap((f) => [...extractNumbers(f), ...extractNumberWords(f)])
 	);
-	return [...base, ...chances, ...seuils, ...faits];
+	return [...base, ...chances, ...cotes, ...seuils, ...faits];
 }

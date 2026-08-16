@@ -14,7 +14,7 @@
  */
 import type { AnalyseTexte, WritingInput, WritingService } from './index';
 import { allowedNumbersFor } from './allowed';
-import { syntheseDeterministe } from './enrich';
+import { syntheseDeterministe, formatCote } from './enrich';
 import { formatWritingCost } from './cost';
 import { env } from '$env/dynamic/private';
 
@@ -76,20 +76,30 @@ FRAGILE OU MOINS SOLIDE
 - Sélection « avecBadge = true » : tu peux dire « c'est risqué », « ton match le plus risqué », « fragile ».
 - Sélection « avecBadge = false » : dis seulement « la moins solide de ton ticket ». JAMAIS « fragile » ni « risqué » : la lecture est moins sûre, on ne crie pas au loup.
 
-LES FAITS — SOIT DES FAITS, SOIT L'AVEU, JAMAIS LES DEUX
-On te donne des faits déjà écrits (« encaisse peu à l'extérieur »). Ils jouent TOUS contre la sélection : ils expliquent pourquoi elle est faible. Utilise-en un ou deux par sélection, reformulés à ta façon. N'en invente AUCUN, n'en ajoute AUCUN.
-Quand tu as des faits, tu ne parles PAS de la cote : tu cites les faits, un point c'est tout.
-Quand on ne te donne AUCUN fait : ne meuble pas, ne reste pas sur le pourcentage. Dis franchement qu'il n'y a rien de marquant à signaler, et que c'est la cote qui rend la sélection fragile (ou la place en dernier, sans badge). Exemple : « Benfica gagne, c'est ton match le plus risqué. On n'a rien de marquant à signaler ici. C'est la cote qui le rend fragile. »
-Le mot « cote » n'apparaît donc QUE dans une explication SANS aucun fait. Jamais les deux ensemble.
+LES FAITS
+On te donne des faits déjà écrits (« encaisse peu à l'extérieur »). Ils jouent TOUS contre la sélection. Utilise-en un ou deux, reformulés à ta façon. N'en invente AUCUN, n'en ajoute AUCUN.
+Ne dis JAMAIS « c'est LA cote qui le rend fragile » : c'est un aveu creux. Quand tu n'as aucun fait, c'est la phrase de TRADUCTION de la cote (ci-dessous) qui porte l'explication — bien mieux que « on n'a rien à signaler ».
+
+TRADUIRE LA COTE — sur la sélection la plus risquée seulement
+Quand on te donne « cote » ET « foisSur », ajoute UNE phrase qui traduit la grosse cote en langage courant : l'utilisateur connaît la cote, tu lui dis à quelle fréquence ça passe.
+- Emploie EXACTEMENT les deux valeurs données : la « cote » telle quelle, et « une fois sur {foisSur} ». Tu ne CALCULES rien, tu ne déduis aucun nombre. Les exemples ci-dessous montrent le REGISTRE, pas les chiffres — prends toujours les chiffres du JSON.
+- Mots BASIQUES. JAMAIS « probabilité implicite », « cote dévigée », « marge ».
+- Tu dis ce que le bookmaker PENSE, point. Jamais « le bookmaker se trompe », jamais « il a raison ».
+- VARIE la tournure (sinon ça sonne template) :
+  · « Une cote à 7,90, ça veut dire que le bookmaker le voit passer une fois sur huit. »
+  · « Le bookmaker le paye 7,90 : pour lui, ça arrive une fois sur huit. »
+  · « À 7,90, ton bookmaker dit une chose : une fois sur huit. »
+- Cette phrase S'AJOUTE aux faits, elle ne les remplace pas. S'il y a des faits, garde-les ET ajoute la traduction.
+- UNE seule sélection porte cette traduction (la plus risquée). Pas sur chaque ligne.
 
 LES CHANCES
-On te donne « une chance sur deux » tout prêt. Reprends cette formule telle quelle. N'invente aucun autre nombre, aucun pourcentage.
+La formule « une chance sur deux » t'est parfois donnée toute prête ; reprends-la telle quelle. N'invente aucun autre nombre, aucun pourcentage.
 
 INTERDITS ABSOLUS
 - Aucune promesse de gain. Mots bannis : garanti, sûr, gagnant, imbattable, secret, méthode, gains, fixed, infaillible.
 - Ne recommande JAMAIS de jouer ou de ne pas jouer. Tu éclaires, tu ne conseilles pas la mise.
 - N'écris jamais le mot « IA ».
-- Aucun chiffre en dehors de ce qu'on te donne. Pas de pourcentage inventé, pas de cote, pas de statistique décorative.`;
+- Aucun chiffre en dehors de ce qu'on te donne. Pas de pourcentage inventé, pas de statistique décorative. La SEULE cote autorisée est celle qu'on te donne dans « cote » — jamais une autre.`;
 
 interface Retrait {
 	ordre: number;
@@ -97,16 +107,35 @@ interface Retrait {
 	avecBadge: boolean;
 	chanceSurMot: string | null;
 	faits: string[];
+	/** Cote transcrite, en forme d'affichage (« 7,90 ») ; absente si non lue. */
+	cote?: string;
+	/** « une fois sur X » : l'entier X, tiré de NOTRE probabilité (jamais de la cote). */
+	foisSur?: number;
 }
 
 function userPayload(input: WritingInput): string {
-	const retraits: Retrait[] = input.retraits.map((r) => ({
-		ordre: r.ordre,
-		libelleFr: r.libelleFr,
-		avecBadge: r.avecBadge,
-		chanceSurMot: r.chanceSurMot,
-		faits: r.faits
-	}));
+	// Une seule sélection porte la traduction de la cote : la plus risquée (proba la
+	// plus basse ⇒ « une fois sur X » le plus grand). On la choisit en code pour éviter
+	// que le modèle la mette partout (répétition). Doit avoir une cote ET un foisSur.
+	const laPlusRisquee = input.retraits
+		.filter((r) => r.cote != null && r.chanceSur != null)
+		.sort((a, b) => (b.chanceSur ?? 0) - (a.chanceSur ?? 0))[0];
+
+	const retraits: Retrait[] = input.retraits.map((r) => {
+		const base: Retrait = {
+			ordre: r.ordre,
+			libelleFr: r.libelleFr,
+			avecBadge: r.avecBadge,
+			chanceSurMot: r.chanceSurMot,
+			faits: r.faits
+		};
+		// La cote + « une fois sur X » ne partent QUE sur la sélection la plus risquée.
+		if (laPlusRisquee && r.ordre === laPlusRisquee.ordre && r.cote != null && r.chanceSur != null) {
+			base.cote = formatCote(r.cote);
+			base.foisSur = r.chanceSur;
+		}
+		return base;
+	});
 	// On ne passe PAS les compteurs du ticket : la synthèse (et ses nombres) est
 	// écrite par le code, pas par le modèle. Le modèle ne voit que les retraits.
 	return JSON.stringify({ retraits });
@@ -126,7 +155,8 @@ function toAnalyse(raw: unknown, input: WritingInput): AnalyseTexte {
 	// peuvent donc pas être fabriqués (règle d'or n°1).
 	const synthese = syntheseDeterministe(input);
 	const valides = new Set(input.retraits.map((r) => r.ordre));
-	// Un retrait a-t-il des faits ? Si oui, l'aveu « c'est la cote » est interdit.
+	// Un retrait a-t-il des faits ? Si oui, l'AVEU creux « c'est LA cote » est interdit
+	// (mais la TRADUCTION « une cote à 7,90 » reste permise — voir plus bas).
 	const aDesFaits = new Map(input.retraits.map((r) => [r.ordre, r.faits.length > 0]));
 	const parSelection: { ordre: number; texte: string }[] = [];
 	if (Array.isArray(o.parSelection)) {
@@ -140,11 +170,13 @@ function toAnalyse(raw: unknown, input: WritingInput): AnalyseTexte {
 	}
 	// Chaque retrait doit être expliqué : sinon la sortie est incomplète, on régénère.
 	if (parSelection.length !== input.retraits.length) throw new Error('explications incomplètes');
-	// Exclusivité faits / aveu : le mot « cote » ne doit pas apparaître quand des
-	// faits existent (sinon on régénère). L'aveu est réservé au cas sans fait.
+	// L'AVEU creux (« c'est LA cote qui le rend fragile ») reste interdit quand des
+	// faits existent : les faits expliquent, on ne se rabat pas sur la cote. Mais la
+	// TRADUCTION pédagogique (« UNE cote à 7,90… ») est permise — elle emploie « une
+	// cote », jamais « la cote ». C'est cette nuance qui distingue les deux.
 	for (const p of parSelection) {
-		if (aDesFaits.get(p.ordre) && /\bcotes?\b/i.test(p.texte)) {
-			throw new Error('aveu « cote » alors que des faits existent');
+		if (aDesFaits.get(p.ordre) && /\bla\s+cotes?\b/i.test(p.texte)) {
+			throw new Error('aveu « la cote » alors que des faits existent');
 		}
 	}
 	return { synthese, parSelection };

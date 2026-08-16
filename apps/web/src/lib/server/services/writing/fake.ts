@@ -1,6 +1,6 @@
 import type { WritingService, WritingInput, AnalyseTexte, RetraitEnrichi } from './index';
 import { allowedNumbersFor } from './allowed';
-import { syntheseDeterministe } from './enrich';
+import { syntheseDeterministe, enMots, formatCote } from './enrich';
 
 /**
  * Rédaction factice DÉTERMINISTE : un texte au ton du produit qui n'emploie que
@@ -16,21 +16,41 @@ export class FakeWriting implements WritingService {
 	async writeAnalysis(input: WritingInput): Promise<AnalyseTexte> {
 		const synthese = syntheseDeterministe(input);
 		if (input.rienARetirer) return { synthese, parSelection: [] };
-		const parSelection = input.retraits.map((r) => ({ ordre: r.ordre, texte: this.pourRetrait(r) }));
+		// La traduction de la cote ne va que sur la sélection la plus risquée (proba la
+		// plus basse ⇒ chanceSur le plus grand), comme le vrai rédacteur.
+		const cible = input.retraits
+			.filter((r) => r.cote != null && r.chanceSur != null)
+			.sort((a, b) => (b.chanceSur ?? 0) - (a.chanceSur ?? 0))[0];
+		const parSelection = input.retraits.map((r) => ({
+			ordre: r.ordre,
+			texte: this.pourRetrait(r, cible?.ordre === r.ordre)
+		}));
 		return { synthese, parSelection };
 	}
 
-	private pourRetrait(r: RetraitEnrichi): string {
+	private pourRetrait(r: RetraitEnrichi, traduitLaCote: boolean): string {
 		const nom = nomSelection(r.libelleFr);
 		const tete = r.avecBadge ? `${nom}, c'est risqué.` : `${nom}, la moins solide de ton ticket.`;
-		// Aucun fait distinctif → on le dit franchement, on ne meuble pas (brief).
-		const corps = r.faits.length
-			? ` ${r.faits.join(' ')}`
-			: r.avecBadge
-				? " On n'a rien de marquant à signaler. C'est la cote qui le rend fragile."
-				: " On n'a rien de marquant à signaler. C'est la cote qui le place en dernier.";
+		// Traduction pédagogique de la cote (nombres FOURNIS : cote lue + « une fois sur X »
+		// tiré de notre proba, jamais un calcul sur la cote). Uniquement sur la cible.
+		const traduction =
+			traduitLaCote && r.cote != null && r.chanceSur != null
+				? ` Une cote à ${formatCote(r.cote)}, ça veut dire que le bookmaker le voit passer une fois sur ${enMots(r.chanceSur)}.`
+				: '';
+		if (r.faits.length) {
+			// Faits d'abord ; la traduction S'AJOUTE (elle ne remplace pas les faits).
+			return `${tete} ${r.faits.join(' ')}${traduction}`.trim();
+		}
+		if (traduction) {
+			// Sans fait, la traduction PORTE l'explication (bien mieux que l'aveu creux).
+			return `${tete}${traduction}`.trim();
+		}
+		// Ni fait ni cote : aveu honnête, sans meubler.
+		const aveu = r.avecBadge
+			? " On n'a rien de marquant à signaler. C'est la cote qui le rend fragile."
+			: " On n'a rien de marquant à signaler. C'est la cote qui le place en dernier.";
 		const chance = r.chanceSurMot ? ` ${cap(r.chanceSurMot)}, pas plus.` : '';
-		return `${tete}${corps}${chance}`.trim();
+		return `${tete}${aveu}${chance}`.trim();
 	}
 
 	allowedNumbers(input: WritingInput): number[] {

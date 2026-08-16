@@ -74,6 +74,7 @@ describe('rédacteur en régime cote — aveu honnête, aucun fait inventé (pr�
 					avecBadge: true,
 					chanceSur: 3,
 					chanceSurMot: 'une chance sur trois',
+					cote: null,
 					faits: []
 				}
 			]

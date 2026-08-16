@@ -26,6 +26,14 @@ export interface RetraitEnrichi {
 	/** Entier correspondant (2 pour « sur deux ») — autorisé au garde-fou des nombres. */
 	chanceSur: number | null;
 	/**
+	 * Cote TRANSCRITE depuis la capture de l'utilisateur (exception documentée de la
+	 * règle d'or n°1 : affichée, JAMAIS calculée). Sert uniquement à la phrase de
+	 * traduction pédagogique (« une cote à 7,90… »). Le « une fois sur X » de cette
+	 * phrase vient de `chanceSur` (notre probabilité), pas d'un calcul sur la cote.
+	 * null si la cote n'a pas été lue → pas de phrase de traduction.
+	 */
+	cote: number | null;
+	/**
 	 * Faits descriptifs DÉJÀ rédigés (forme, buts, confrontations), en toutes
 	 * lettres. Le rédacteur en choisit un ou deux et les reformule ; il n'en
 	 * invente aucun (règle d'or n°1). Vide si rien de distinctif.
