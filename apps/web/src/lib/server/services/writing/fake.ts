@@ -35,7 +35,7 @@ export class FakeWriting implements WritingService {
 		// tiré de notre proba, jamais un calcul sur la cote). Uniquement sur la cible.
 		const traduction =
 			traduitLaCote && r.cote != null && r.chanceSur != null
-				? ` Une cote à ${formatCote(r.cote)}, ça veut dire que le bookmaker le voit passer une fois sur ${enMots(r.chanceSur)}.`
+				? ` Une cote à ${formatCote(r.cote)}, c'est rare : ça passe environ une fois sur ${enMots(r.chanceSur)}.`
 				: '';
 		if (r.faits.length) {
 			// Faits d'abord ; la traduction S'AJOUTE (elle ne remplace pas les faits).

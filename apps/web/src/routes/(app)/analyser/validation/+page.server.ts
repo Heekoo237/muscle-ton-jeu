@@ -80,6 +80,11 @@ export const actions: Actions = {
 				etatResolution: 'certain' as const,
 				raison: undefined,
 				candidates: undefined,
+				// La cote transcrite valait pour le pari LU. L'utilisateur vient de changer
+				// le pari : cette cote ne correspond plus au nouveau marché. On la retire —
+				// afficher une cote qui ne colle plus au pari serait un mensonge (et couperait
+				// la phrase de traduction pédagogique, qui n'a plus de cote fiable).
+				coteSaisie: null,
 				libelleFr: marketLabelFr(marche, home, away)
 			};
 		});

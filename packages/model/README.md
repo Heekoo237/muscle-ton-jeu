@@ -139,6 +139,32 @@ Le détail machine est dans `constants.py` (`PROBABILITY_SOURCE`).
 > (`CONFIDENCE_ON_FALLBACK`). On ne présente jamais un repli modèle comme une
 > lecture de marché.
 
+## Traduction de la cote dans le texte : « une fois sur X » vient de la PROBA, pas de 1/cote
+
+Le rédacteur (app) ajoute une phrase pédagogique sur la sélection la plus risquée :
+« Une cote à 7,90, c'est rare : ça passe **environ** une fois sur neuf. »
+
+**Le « une fois sur X » vient de NOTRE probabilité dévigée (`chanceSur`, déjà en base),
+JAMAIS de 1/cote.** Pour une cote de 7,90, `1/7,90 ≈ 8`, mais notre probabilité dévigée
+donne `≈ 9`. **L'écart est NORMAL, c'est la marge du bookmaker** : `1/cote` inclut la
+marge (le prix de vente), le dévigage la retire (l'estimation honnête). Notre chiffre
+est le bon.
+
+Deux conséquences à NE PAS « corriger » :
+- On ne calcule **jamais** `1/cote` : ce serait faire entrer `coteSaisie` dans un calcul,
+  interdit par la règle d'or n°1 (test `no-cote-in-calc`). La cote est **affichée**, pas
+  calculée.
+- Le mot **« environ »** est **obligatoire** dans la phrase (contrainte du prompt) :
+  il dit que notre chiffre est une estimation, pas la division de la cote, et supprime
+  le doute quand l'utilisateur compare « 7,90 » à « une fois sur neuf ». Ne pas chercher
+  à faire coïncider les deux nombres — c'est la formulation qui s'ajuste, pas le chiffre.
+
+La cote affichée est celle **transcrite de la capture de l'utilisateur** (son ticket).
+Si la vision ne l'a pas lue, ou si l'utilisateur a **corrigé** son pari (le marché change,
+la cote lue ne correspond plus), la cote est absente → **pas de phrase** (`resolve`/
+`corriger` mettent `coteSaisie` à null). Une cote qui ne colle plus au pari serait un
+mensonge.
+
 ## Bascule cote ↔ modèle sur marge excessive
 
 Le dévigage a été calibré sur Pinnacle. Sur les ligues où Pinnacle est absent
