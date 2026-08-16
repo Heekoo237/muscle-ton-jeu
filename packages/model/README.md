@@ -304,6 +304,39 @@ très concrète à l'utilisateur (« Marseille joue son troisième match en huit
 jours ») — plus parlante qu'un chiffre de probabilité. À ne considérer que si le
 gain de prédiction est réel : on n'affiche pas une raison qui n'a pas d'effet mesuré.
 
+### Débloquer BTTS (et plus/moins 1,5 · 3,5) par la COTE
+
+BTTS est aujourd'hui **suspendu** — mais la suspension vise le **modèle**, pas la
+**cote**. Voir « BTTS — pourquoi c'est suspendu » : le biais du modèle sur « les deux
+équipes marquent » est de ~3 pt **et il n'est PAS constant** (−1,6 pt en Bundesliga,
++7,4 pt en La Liga). Un biais qui varie par ligue ne se corrige pas par une règle
+unique.
+
+**Cause identifiée.** Dixon-Coles calcule les buts de chaque équipe **séparément** et
+les suppose **indépendants**. Or une équipe qui mène défend, une équipe menée pousse :
+la dépendance est réelle. Sur le **1X2** et le **total de buts**, l'approximation passe ;
+sur **BTTS**, elle mord (c'est exactement une info de co-occurrence de buts).
+
+**La piste.** Une **cote dévigée n'a pas ce biais** — elle vient du marché, pas d'un
+modèle qui suppose l'indépendance. **La suspension ne s'applique donc pas au régime
+cote** : on peut rouvrir BTTS *uniquement en régime cote*, en gardant la voie modèle
+fermée jusqu'à la recalibration par ligue.
+
+**Le blocage est le COÛT, pas la justesse.** BTTS n'est pas dans l'appel groupé
+(`/odds` par ligue) : il faut l'endpoint **par événement**, ~**3 crédits par match**.
+C'est précisément le cas d'usage de l'**activation à la demande** déjà décrite (voir
+« Marchés additionnels À LA DEMANDE ») : ne payer que pour les matchs **réellement
+présents dans un ticket utilisateur**, avec déduplication. À ~1 000 tickets/mois, l'ordre
+de grandeur est de **quelques centaines de crédits**, pas un abonnement supérieur.
+
+**Même remarque pour plus/moins 1,5 et 3,5**, aujourd'hui calculés par le **modèle seul**
+faute de cote groupée : la cote par événement les débloquerait de la même façon, au même
+coût marginal.
+
+**Quand.** Après le lancement, dans **le même lot que l'activation à la demande** — jamais
+avant que le produit tourne de bout en bout. La confiance reste **basse** (régime cote,
+barre de fragilité conservatrice) et le rédacteur ne prétend aucune précision mesurée.
+
 ## Seuil de fragilité (étape 4.5)
 
 Une sélection est **fragile** si sa probabilité passe sous le seuil de **son
