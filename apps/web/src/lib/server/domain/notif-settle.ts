@@ -32,8 +32,14 @@ export interface SettlePorts {
 	reserver(cle: string, userId: number, type: 'settle' | 'matin'): Promise<boolean>;
 	/** Envoi effectif à tous les appareils de l'utilisateur. */
 	notify(userId: number, payload: NotificationPayload): Promise<void>;
-	/** Pose le résultat du ticket (idempotent côté base : ne réécrit pas si déjà réglé). */
-	poserResultat(ticketId: number, resultat: TicketResult): Promise<void>;
+	/**
+	 * Pose le résultat du ticket (idempotent côté base : ne réécrit pas si déjà réglé).
+	 * On persiste LES DEUX verdicts : `renforce` (la proposition du produit, historique)
+	 * ET `originale` (le ticket tel que l'utilisateur l'avait joué). L'original était
+	 * jusqu'ici calculé puis jeté — or c'est la preuve « ton ticket serait tombé, le
+	 * renforcé serait passé », irrécupérable pour le passé une fois perdue.
+	 */
+	poserResultat(ticketId: number, renforce: TicketResult, originale: TicketResult): Promise<void>;
 	/** Lien ouvert au tap (détail du ticket). */
 	urlTicket(ticketId: number): string;
 }
@@ -81,8 +87,9 @@ export async function runSettlement(
 		// Pas encore tous les matchs analysés terminés → on laisse en attente.
 		if (verdict.originale === 'en_attente') continue;
 
-		// Le résultat porté à l'historique est celui du RENFORCÉ (proposition du produit).
-		await ports.poserResultat(t.id, verdict.renforce);
+		// Le résultat porté à l'historique est celui du RENFORCÉ (proposition du produit) ;
+		// on persiste aussi l'ORIGINAL, pour mesurer plus tard la valeur réelle du retrait.
+		await ports.poserResultat(t.id, verdict.renforce, verdict.originale);
 		stats.regles++;
 
 		// Heures calmes : résultat posé, mais AUCUN envoi. La clé n'est pas réservée,

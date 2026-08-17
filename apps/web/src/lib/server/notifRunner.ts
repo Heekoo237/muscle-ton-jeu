@@ -112,9 +112,14 @@ function supabaseSettlePorts(origin: string): SettlePorts {
 		},
 		reserver,
 		notify: (userId, payload) => notifications.notify(userId, payload),
-		async poserResultat(ticketId, resultat: TicketResult) {
-			// Idempotent : on ne réécrit pas un ticket déjà réglé.
-			await db.from('tickets').update({ resultat }).eq('id', ticketId).is('resultat', null);
+		async poserResultat(ticketId, renforce: TicketResult, originale: TicketResult) {
+			// Idempotent : on ne réécrit pas un ticket déjà réglé. Les deux verdicts sont
+			// posés ensemble, dans le même UPDATE gardé par `resultat IS NULL`.
+			await db
+				.from('tickets')
+				.update({ resultat: renforce, resultat_originale: originale })
+				.eq('id', ticketId)
+				.is('resultat', null);
 		},
 		urlTicket: (id) => `${origin}/dashboard/historique/${id}`
 	};

@@ -26,7 +26,7 @@ function sel(ordre: number, fixtureId: number, marche: Selection['marche'], extr
 function fakePorts(scores: Map<number, FinalScore>) {
 	const reserved = new Set<string>();
 	const sent: { userId: number; payload: NotificationPayload }[] = [];
-	const results: { ticketId: number; resultat: string }[] = [];
+	const results: { ticketId: number; resultat: string; originale: string }[] = [];
 	const ports: SettlePorts = {
 		async scoresFor(ids) {
 			return new Map(ids.map((id) => [id, scores.get(id) ?? null]));
@@ -39,8 +39,8 @@ function fakePorts(scores: Map<number, FinalScore>) {
 		async notify(userId, payload) {
 			sent.push({ userId, payload });
 		},
-		async poserResultat(ticketId, resultat) {
-			results.push({ ticketId, resultat });
+		async poserResultat(ticketId, resultat, originale) {
+			results.push({ ticketId, resultat, originale });
 		},
 		urlTicket: (id) => `/dashboard/historique/${id}`
 	};
@@ -64,10 +64,33 @@ describe('runSettlement — règlement + notification', () => {
 		]);
 		const { ports, sent, results } = fakePorts(scores);
 		const stats = await runSettlement([ticket], ports, MIDI_UTC);
-		expect(results).toEqual([{ ticketId: 7, resultat: 'passe' }]);
+		// Les deux verdicts sont posés : ici les deux sélections gardées passent →
+		// original ET renforcé « passe » (le ticket n'a rien retiré).
+		expect(results).toEqual([{ ticketId: 7, resultat: 'passe', originale: 'passe' }]);
 		expect(sent).toHaveLength(1);
 		expect(sent[0].payload.corps).toContain('passé');
 		expect(stats).toMatchObject({ regles: 1, notifies: 1 });
+	});
+
+	it('verdicts DIVERGENTS persistés : original tombe, renforcé passe', async () => {
+		// La sélection RETIRÉE tombe, la GARDÉE passe → c'est exactement la preuve
+		// « ton ticket serait tombé, le renforcé serait passé ». On vérifie que les
+		// DEUX verdicts sont posés (l'original n'est plus jeté).
+		const ticketRetrait: TicketARegler = {
+			id: 9,
+			userId: 3,
+			selections: [
+				sel(1, 200, 'WIN_HOME', { retireeDuRenforce: true }), // retirée
+				sel(2, 201, 'WIN_HOME') // gardée
+			]
+		};
+		const scores = new Map<number, FinalScore>([
+			[200, { home: 0, away: 1 }], // la retirée tombe
+			[201, { home: 1, away: 0 }] // la gardée passe
+		]);
+		const { ports, results } = fakePorts(scores);
+		await runSettlement([ticketRetrait], ports, MIDI_UTC);
+		expect(results).toEqual([{ ticketId: 9, resultat: 'passe', originale: 'tombe' }]);
 	});
 
 	it('IDEMPOTENCE : deux passages → une seule notification', async () => {
