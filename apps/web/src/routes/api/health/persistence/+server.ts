@@ -1,8 +1,9 @@
-import { json } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 import { ensureAppUser, record } from '$lib/server/fixtures/userStore';
 import { createTicket, getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
+import { cronAutorise } from '$lib/server/cronAuth';
 import type { Selection } from '$lib/types';
 
 /**
@@ -28,7 +29,11 @@ function testSelection(ordre: number, marche: Selection['marche']): Selection {
 	};
 }
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async (event) => {
+	// Diagnostic qui ÉCRIT en base (crée user + ticket + ligne de grand livre) : jamais
+	// public. Réservé au porteur du secret cron (même garde que les tâches planifiées),
+	// sinon un tiers pourrait faire écrire la base à volonté (surface d'abus C1/8b).
+	if (!cronAutorise(event)) error(403, 'Accès refusé.');
 	if (!isSupabaseConfigured()) return json({ configured: false });
 
 	const steps: Record<string, unknown> = {};

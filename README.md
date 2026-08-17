@@ -59,8 +59,10 @@ template) : on **mesure**, on ne se fie pas à la vigilance.
 - **Limitation de débit** (`src/lib/server/ratelimit.ts` + migration `0015`). Fenêtre
   fixe atomique en base (`hit_rate_limit`), donc partagée entre instances serverless.
   Appliquée à l'appel vision de `/analyser` (coûteux, non authentifié) — par IP et par
-  compte (`RATE_LIMITS`). **Fail-open** : une panne du limiteur laisse passer (on ne
-  bloque jamais un utilisateur légitime), l'incident est journalisé.
+  compte — **et au rendu de l'image de partage** (`/p/[code]/image`, rasterisation
+  resvg lourde, non authentifiée : par IP, le CDN absorbant le trafic légitime).
+  Réglages nommés dans `RATE_LIMITS`. **Fail-open** : une panne du limiteur laisse
+  passer (on ne bloque jamais un utilisateur légitime), l'incident est journalisé.
 - **Session mise en cache par requête** (`getAppSession` via `event.locals`) : les
   trois `load` d'une page (layout app, layout dashboard, page) ne résolvent la
   session qu'**une** fois — plus de triple `auth.getUser` + triple lecture `users`.
@@ -70,6 +72,30 @@ template) : on **mesure**, on ne se fie pas à la vigilance.
   frontière : l'auth ne passe pas par `section()` (une session absente redirige) ;
   tout le reste, oui. Le `handleError` global reste le dernier filet (message
   lisible + lien support, jamais la stack à l'écran).
+
+## Durcissement sécurité (audit)
+
+Corrections issues de l'audit, dans l'ordre appliqué.
+
+- **Débit de crédits ATOMIQUE** (`debiter_credits`, migration `0017`). Une seule
+  requête décide ET applique le débit, le solde enforçé au niveau base
+  (`credits >= cost`), la ligne de grand livre posée dans la MÊME transaction. Fin du
+  read-then-write de `record()` sur le chemin de facturation et de la garde sur un
+  solde de **session périmé** : deux affichages concurrents ne peuvent plus payer deux
+  analyses avec le même solde de départ. `false` → solde insuffisant, l'affichage
+  (jamais l'entrée) redirige vers la recharge.
+- **En-têtes de sécurité** (`apps/web/vercel.json`, `headers` sur `/(.*)`). Posés
+  côté Vercel pour couvrir aussi la landing **prérendue** (les en-têtes de réponse
+  fixés au prerender ne survivent pas). CSP (`default-src 'self'` ; `script-src`/
+  `style-src` avec `'unsafe-inline'` — l'app pose du style/script inline, aucun CDN
+  externe ; `connect-src` borné à `*.supabase.co` ; `img-src` `self`/`data:`/`blob:`/
+  `*.googleusercontent.com` pour les avatars Google ; `frame-ancestors 'none'`),
+  HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
+  `Permissions-Policy`.
+- **Endpoints de diagnostic fermés** (`/api/health/persistence`, `/api/health/supabase`).
+  Le premier **écrivait** en base (user + ticket + grand livre) sans authentification ;
+  les deux passent désormais par `cronAutorise` (secret cron partagé) → `403` sinon.
+  `whoami` reste ouvert : il ne renvoie que la session de l'appelant, rien d'autrui.
 
 ## Dette de bêta (à revoir à la fin de la bêta)
 

@@ -8,7 +8,7 @@ import {
 } from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
-import { hasRecharged, consommerAnalyseOfferte, record } from '$lib/server/fixtures/userStore';
+import { hasRecharged, consommerAnalyseOfferte, debiterCredits } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, stats } from '$lib/server/services';
 import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
@@ -254,11 +254,15 @@ export const load: PageServerLoad = async (event) => {
 				charge = { gratuit: true, raison: 'offerte', credits: 0, bloque: false };
 			} else {
 				const cost = charge.credits ?? 0;
-				// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
-				if (session.credits < cost) {
+				// Débit ATOMIQUE : une seule requête décide ET applique, en enforçant le
+				// solde AU NIVEAU BASE (`credits >= cost`). On ne se fie plus au solde de
+				// SESSION (périmé) : deux affichages concurrents ne peuvent plus payer deux
+				// analyses avec le même solde de départ. false → solde insuffisant, on
+				// bloque l'affichage (jamais l'entrée) en redirigeant vers la recharge.
+				const debite = await debiterCredits(session.userId, cost, ticket.id);
+				if (!debite) {
 					redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
 				}
-				await record(session.userId, -cost, 'debit_analyse', ticket.id); // débit à l'affichage
 			}
 		}
 

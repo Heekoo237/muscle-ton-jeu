@@ -14,7 +14,14 @@ import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 export const RATE_LIMITS = {
 	/** Appel vision de /analyser : ~$ par appel, non authentifié. */
 	analyserIp: { fenetreS: 600, max: 15 }, // 15 soumissions / 10 min / IP
-	analyserCompte: { fenetreS: 3600, max: 20 } // 20 / heure / compte
+	analyserCompte: { fenetreS: 3600, max: 20 }, // 20 / heure / compte
+	/**
+	 * Image de partage publique : la rasterisation resvg est LOURDE en CPU et
+	 * l'endpoint est non authentifié (og:image). Le cache CDN absorbe le trafic
+	 * légitime (immutable, 24 h) ; cette borne coupe le martèlement d'un tiers qui
+	 * ferait rendre en boucle des codes variés depuis une même IP.
+	 */
+	imagePartageIp: { fenetreS: 60, max: 30 } // 30 rendus / min / IP
 } as const;
 
 /** True = requête AUTORISÉE. En local/factice (sans Supabase), pas de limite. */

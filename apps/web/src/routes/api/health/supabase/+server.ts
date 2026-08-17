@@ -1,6 +1,7 @@
-import { json } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { cronAutorise } from '$lib/server/cronAuth';
 
 /**
  * Diagnostic de branchement Supabase. À ouvrir sur l'URL Vercel après avoir
@@ -10,7 +11,10 @@ import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
  * Ne renvoie aucune donnée sensible — seulement l'état de la connexion et le
  * fait que les tables existent (compte de `leagues`, vide mais présent).
  */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async (event) => {
+	// Sonde de branchement : lecture seule, mais elle révèle le schéma et consomme la
+	// base. Réservée au porteur du secret cron — pas d'endpoint de diagnostic public.
+	if (!cronAutorise(event)) error(403, 'Accès refusé.');
 	if (!isSupabaseConfigured()) {
 		return json({
 			configured: false,

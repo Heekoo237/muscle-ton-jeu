@@ -131,6 +131,34 @@ export async function consommerAnalyseOfferte(userId: number): Promise<boolean> 
 	return data === true;
 }
 
+/**
+ * Débite ATOMIQUEMENT `p_cost` crédits et pose la ligne de grand livre dans la
+ * MÊME transaction. Le solde est enforçé AU NIVEAU BASE (`credits >= p_cost`) :
+ * deux affichages concurrents partant du même solde ne peuvent plus payer deux
+ * analyses. Renvoie true si débité, false si solde insuffisant (l'appelant
+ * redirige alors vers la recharge). Fin du read-then-write de `record()` sur le
+ * chemin de facturation et de la garde sur un solde de SESSION périmé.
+ */
+export async function debiterCredits(
+	userId: number,
+	cost: number,
+	ticketId?: string
+): Promise<boolean> {
+	if (!isSupabaseConfigured()) {
+		if (memUser.credits < cost) return false;
+		memUser.credits -= cost;
+		memLedger.push({ motif: 'debit_analyse' });
+		return true;
+	}
+	const { data, error } = await supabaseAdmin().rpc('debiter_credits', {
+		p_user: userId,
+		p_cost: cost,
+		p_ticket: ticketId ? Number(ticketId) : null
+	});
+	if (error) throw error;
+	return data === true;
+}
+
 export async function hasRecharged(userId: number): Promise<boolean> {
 	if (!isSupabaseConfigured()) {
 		return memLedger.some((e) => e.motif === 'recharge');
