@@ -19,8 +19,8 @@
 	<section class="bloc">
 		<h2 class="t-h3">Conditions d'utilisation</h2>
 		<p class="t-body">
-			Service réservé aux personnes majeures (18+). Une probabilité n'est pas une
-			garantie de résultat. Le contenu à venir sera précisé ici avant le lancement.
+			Service réservé aux personnes majeures (18+). Rien n'est jamais garanti au
+			foot. Le contenu à venir sera précisé ici avant le lancement.
 		</p>
 	</section>
 
