@@ -4,6 +4,13 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#F8F1E4" />
+		<!-- Icônes (fichiers dans /static). SVG en premier pour les navigateurs récents,
+		     .ico en repli (tue le 404 sur /favicon.ico), apple-touch pour iOS, manifeste
+		     pour l'ajout à l'écran d'accueil (condition des notifications iPhone). -->
+		<link rel="icon" type="image/svg+xml" href="/mtj-logo.svg" />
+		<link rel="icon" sizes="any" href="/favicon.ico" />
+		<link rel="apple-touch-icon" href="/mtj-logo-192.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
 		<!-- CSS critique inline : le crème est posé avant tout, jamais de flash blanc (§13.4). -->
 		<style>
 			html {

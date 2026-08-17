@@ -1,12 +1,10 @@
 <script lang="ts">
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
+<!-- Les icônes (favicon, apple-touch, manifeste) sont déclarées dans app.html —
+     globales et présentes dès le prérendu, sans dépendre du montage d'un composant. -->
 
 {@render children()}

@@ -47,6 +47,18 @@
 <svelte:head>
 	<title>Muscle Ton Jeu</title>
 	<meta name="description" content="Envoie la capture de ton ticket. On te montre le match qui va le faire tomber, et ta version renforcée." />
+	<!-- Aperçu de partage (WhatsApp, réseaux) : le logo. Page prérendue → l'URL de
+	     l'image doit être ABSOLUE (domaine canonique, comme le reste du code). -->
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Muscle Ton Jeu" />
+	<meta property="og:title" content="Muscle Ton Jeu" />
+	<meta property="og:description" content="Le match qui va tuer ton ticket, tu le vois avant. Outil d'analyse — pas un pronostic. 18+." />
+	<meta property="og:image" content="https://muscletonjeu.com/mtj-logo-1024.png" />
+	<meta property="og:image:width" content="1024" />
+	<meta property="og:image:height" content="1024" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Muscle Ton Jeu" />
+	<meta name="twitter:image" content="https://muscletonjeu.com/mtj-logo-1024.png" />
 </svelte:head>
 
 <!-- Ligne de ticket papier (desktop + hero) : marché en français, ▲ ocre si fragile, barré si retiré -->
@@ -71,7 +83,10 @@
 	<!-- Wordmark à gauche, entrée de compte à droite. L'auth n'est JAMAIS en accent :
 	     le seul accent au-dessus de la ligne de flottaison reste « Analyser mon ticket ». -->
 	<nav style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,3.5vw,40px);box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px">
-		<a href="/" style="font-family:{ANTON};font-size:20px;line-height:1;letter-spacing:-0.5px;text-transform:uppercase;color:#24201B;text-decoration:none">Muscle Ton Jeu</a>
+		<a href="/" aria-label="Muscle Ton Jeu — accueil" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;min-width:0">
+			<img src="/mtj-logo-transparent-1024.png" alt="" width="28" height="28" decoding="async" style="display:block;flex:0 0 auto" />
+			<span style="font-family:{ANTON};font-size:20px;line-height:1;letter-spacing:-0.5px;text-transform:uppercase;color:#24201B">Muscle Ton Jeu</span>
+		</a>
 		<!-- Page prérendue (statique, CDN) : le bon bouton est choisi côté client
 		     AVANT le premier affichage par le script en tête de app.html (cookie-
 		     indice non sensible mtj_hint). Défaut sans JS = « Se connecter ». Les

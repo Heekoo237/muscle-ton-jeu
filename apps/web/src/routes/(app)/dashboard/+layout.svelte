@@ -82,8 +82,9 @@
 <div class="shell">
 	<!-- SIDEBAR (desktop) -->
 	<aside class="sidebar">
-		<a class="logo" href="/dashboard" style="font-family:{ANTON}" aria-label="Muscle Ton Jeu — accueil">
-			Muscle<br />Ton Jeu
+		<a class="logo" href="/dashboard" aria-label="Muscle Ton Jeu — accueil">
+			<img class="logo-mark" src="/mtj-logo-transparent-1024.png" alt="" width="40" height="40" decoding="async" />
+			<span class="logo-name" style="font-family:{ANTON}">Muscle<br />Ton Jeu</span>
 		</a>
 
 		<nav class="nav">
@@ -332,12 +333,23 @@
 			box-sizing: border-box;
 		}
 		.logo {
-			font-size: 26px;
+			display: flex;
+			align-items: center;
+			gap: var(--s-3);
+			text-decoration: none;
+		}
+		.logo-mark {
+			width: 40px;
+			height: 40px;
+			display: block;
+			flex: 0 0 auto;
+		}
+		.logo-name {
+			font-size: 24px;
 			line-height: 0.95;
 			letter-spacing: -0.5px;
 			text-transform: uppercase;
 			color: var(--c-ink);
-			text-decoration: none;
 		}
 		.nav {
 			display: flex;

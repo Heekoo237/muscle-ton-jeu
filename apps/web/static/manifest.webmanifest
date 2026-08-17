@@ -1,0 +1,18 @@
+{
+	"name": "Muscle Ton Jeu",
+	"short_name": "Muscle Ton Jeu",
+	"description": "Le match qui va tuer ton ticket, tu le vois avant. Outil d'analyse — pas un pronostic. 18+.",
+	"id": "/",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait",
+	"lang": "fr",
+	"dir": "ltr",
+	"background_color": "#F8F1E4",
+	"theme_color": "#F8F1E4",
+	"icons": [
+		{ "src": "/mtj-logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/mtj-logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+	]
+}

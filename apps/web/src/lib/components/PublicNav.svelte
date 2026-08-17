@@ -13,7 +13,10 @@
 
 <nav class="public-nav" aria-label="Navigation principale">
 	<div class="container inner">
-		<a class="wordmark" href="/" aria-label="Muscle Ton Jeu — accueil">MTJ</a>
+		<a class="brand" href="/" aria-label="Muscle Ton Jeu — accueil">
+			<img class="brand-mark" src="/mtj-logo-transparent-1024.png" alt="" width="30" height="30" decoding="async" />
+			<span class="brand-name">Muscle Ton Jeu</span>
+		</a>
 		<ul class="links t-body">
 			{#each links as link (link.href)}
 				<li>
@@ -41,12 +44,27 @@
 		align-items: center;
 		justify-content: space-between;
 	}
-	.wordmark {
-		font-family: var(--font-title);
-		font-size: 24px;
-		color: var(--c-ink);
-		letter-spacing: -0.5px;
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--s-2);
 		text-decoration: none;
+		min-width: 0;
+	}
+	.brand-mark {
+		width: 30px;
+		height: 30px;
+		display: block;
+		flex: 0 0 auto;
+	}
+	.brand-name {
+		font-family: var(--font-title);
+		font-size: 22px;
+		line-height: 1;
+		letter-spacing: -0.5px;
+		text-transform: uppercase;
+		color: var(--c-ink);
+		white-space: nowrap;
 	}
 	.links {
 		display: none;

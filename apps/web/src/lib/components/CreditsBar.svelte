@@ -16,7 +16,10 @@
 			</span>
 			<a class="btn-primary-sm" href="/recharge">Recharger</a>
 		{:else}
-			<a class="wordmark" href="/dashboard" aria-label="Muscle Ton Jeu — accueil">MTJ</a>
+			<a class="brand" href="/dashboard" aria-label="Muscle Ton Jeu — accueil">
+				<img class="brand-mark" src="/mtj-logo-transparent-1024.png" alt="" width="28" height="28" decoding="async" />
+				<span class="brand-name">Muscle Ton Jeu</span>
+			</a>
 		{/if}
 	</div>
 </header>
@@ -50,12 +53,27 @@
 	.mot {
 		color: var(--c-ink-2);
 	}
-	.wordmark {
-		font-family: var(--font-title);
-		font-size: 22px;
-		letter-spacing: -0.5px;
-		color: var(--c-ink);
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--s-2);
 		text-decoration: none;
+		min-width: 0;
+	}
+	.brand-mark {
+		width: 28px;
+		height: 28px;
+		display: block;
+		flex: 0 0 auto;
+	}
+	.brand-name {
+		font-family: var(--font-title);
+		font-size: 20px;
+		line-height: 1;
+		letter-spacing: -0.5px;
+		text-transform: uppercase;
+		color: var(--c-ink);
+		white-space: nowrap;
 	}
 	.btn-primary-sm {
 		display: inline-flex;

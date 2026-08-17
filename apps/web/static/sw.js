@@ -13,6 +13,10 @@ self.addEventListener('push', (event) => {
 	event.waitUntil(
 		self.registration.showNotification(data.titre, {
 			body: data.corps,
+			// Icône de la notif (grande vignette) + badge (petite pastille Android, en
+			// haut de l'écran). Fichiers servis depuis /static.
+			icon: '/mtj-logo-192.png',
+			badge: '/mtj-logo-192.png',
 			data: { url: data.url || '/' },
 			tag: data.url || 'mtj' // remplace une notif du même sujet plutôt que d'empiler
 		})
