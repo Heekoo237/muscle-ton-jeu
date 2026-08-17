@@ -41,6 +41,22 @@
 </script>
 
 <div class="compare">
+	<!-- A · RÉSUMÉ (mobile uniquement) — le chiffre central du produit, AU-DESSUS des
+	     deux tickets, pour qu'il soit vu sans scroller. Sur desktop les tickets sont
+	     côte à côte : l'annonce serait redondante, on la masque. Quand rien n'est
+	     retiré (single), un seul chiffre — sinon l'utilisateur ne comprend pas
+	     l'absence de second ticket. -->
+	<div class="resume">
+		<span class="resume-label">Tes chances</span>
+		<span class="resume-vals" style="font-family:{MONO}">
+			<span class="resume-from">{pct(probaTotalePct)}</span>
+			{#if !single}
+				<span class="resume-fleche" aria-hidden="true">→</span>
+				<span class="resume-to">{pct(probaRenforceePct)}</span>
+			{/if}
+		</span>
+	</div>
+
 	<!-- Ton ticket -->
 	<div class="col left">
 		<div class="collabel">Ton ticket</div>
@@ -74,6 +90,13 @@
 	</div>
 
 	{#if !single}
+	<!-- B · SÉPARATEUR (mobile) — pleine largeur, juste APRÈS « TES CHANCES » du
+	     premier ticket, pour qu'on sache qu'il y a un second ticket en dessous. -->
+	<div class="bridge" aria-hidden="true">
+		<span class="bridge-fleche">↓</span>
+		<span class="bridge-label">ton ticket renforcé</span>
+	</div>
+	<!-- Flèche desktop (côte à côte) : pastille centrale entre les deux tickets. -->
 	<div class="arrow" style="font-family:{MONO}" aria-hidden="true">→</div>
 
 	<!-- Ton ticket renforcé -->
@@ -121,6 +144,65 @@
 		align-items: stretch;
 		gap: var(--s-5);
 	}
+	/* A · Résumé mobile : le chiffre central, au-dessus des tickets. Sobre, sans
+	   animation. Masqué en desktop (tickets côte à côte → annonce redondante). */
+	.resume {
+		display: flex;
+		align-items: baseline;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 4px 10px;
+		padding: var(--s-3) var(--s-4);
+		background: var(--c-canvas-sunk);
+		border-radius: var(--r-md);
+	}
+	.resume-label {
+		font-size: 14px;
+		font-weight: 600;
+		letter-spacing: 0.4px;
+		text-transform: uppercase;
+		color: var(--c-ink-3);
+	}
+	.resume-vals {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 10px;
+		font-variant-numeric: tabular-nums;
+	}
+	.resume-from {
+		font-size: 22px;
+		color: var(--c-ink);
+	}
+	.resume-fleche {
+		font-size: 16px;
+		color: var(--c-ink-3);
+	}
+	.resume-to {
+		font-size: 22px;
+		font-weight: 600;
+		color: var(--c-accent);
+	}
+	/* B · Séparateur mobile : pleine largeur, juste après le premier ticket. */
+	.bridge {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--s-2);
+		padding: var(--s-2) 0;
+		border-top: 1px dashed var(--c-line-strong);
+		color: var(--c-ink-2);
+	}
+	.bridge-fleche {
+		font-size: 18px;
+		line-height: 1;
+		color: var(--c-ink-2);
+	}
+	.bridge-label {
+		font-size: 14px;
+		font-weight: 600;
+		letter-spacing: 0.6px;
+		text-transform: uppercase;
+	}
 	.col {
 		display: flex;
 		flex-direction: column;
@@ -134,6 +216,11 @@
 		letter-spacing: 0.6px;
 		text-transform: uppercase;
 		color: var(--c-ink-3);
+	}
+	/* Mobile : le séparateur `.bridge` nomme déjà « ton ticket renforcé » juste au-
+	   dessus → on masque le libellé redondant de la colonne de droite. */
+	.col.right .collabel {
+		display: none;
 	}
 	.ticket {
 		display: flex;
@@ -268,6 +355,8 @@
 	.ppct.accent {
 		color: var(--c-accent);
 	}
+	/* La pastille-flèche est le connecteur DESKTOP (entre tickets côte à côte). Sur
+	   mobile, c'est le séparateur pleine largeur `.bridge` qui joue ce rôle → masquée. */
 	.arrow {
 		align-self: center;
 		width: 44px;
@@ -275,21 +364,25 @@
 		border-radius: var(--r-pill);
 		background: var(--c-canvas-sunk);
 		border: 1px solid var(--c-line-strong);
-		display: flex;
+		display: none;
 		align-items: center;
 		justify-content: center;
 		font-size: 18px;
 		color: var(--c-ink-2);
-		transform: rotate(90deg);
 	}
 
-	/* Desktop : côte à côte, arrow au centre, léger décalage « papier ». */
+	/* Desktop : côte à côte, arrow au centre, léger décalage « papier ». Le résumé
+	   et le séparateur mobile disparaissent (les deux tickets sont déjà visibles). */
 	@media (min-width: 760px) {
 		.compare {
 			flex-direction: row;
 			align-items: center;
 			justify-content: center;
 			gap: 0;
+		}
+		.resume,
+		.bridge {
+			display: none;
 		}
 		.col {
 			flex: 0 1 420px;
@@ -301,10 +394,13 @@
 			transform: rotate(0.6deg);
 		}
 		.arrow {
+			display: flex;
 			flex: 0 0 auto;
 			margin: 0 -18px;
 			z-index: 2;
-			transform: none;
+		}
+		.col.right .collabel {
+			display: block;
 		}
 	}
 </style>
