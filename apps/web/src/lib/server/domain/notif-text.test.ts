@@ -63,7 +63,7 @@ describe('règle d’or n°2 — AUCUN vocabulaire de gain dans une notification
 	it('le rendez-vous du matin (deux variantes) ne contient aucun mot interdit', () => {
 		const offerte = buildMorningNotification(true, '/analyser');
 		const habitue = buildMorningNotification(false, '/analyser');
-		expect(offerte.corps).toBe("Ta première analyse est offerte. Les matchs du jour t'attendent.");
+		expect(offerte.corps).toBe("Il te reste des analyses offertes. Les matchs du jour t'attendent.");
 		expect(habitue.corps).toBe('Les matchs du jour sont analysés. Vérifie ton ticket avant de le valider.');
 		// Un habitué ne s'entend JAMAIS promettre une gratuité.
 		expect(habitue.corps).not.toContain('offerte');

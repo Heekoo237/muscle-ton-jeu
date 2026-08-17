@@ -8,13 +8,12 @@ import {
 } from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
-import { hasRecharged, markPremierTicketUtilise, record } from '$lib/server/fixtures/userStore';
+import { hasRecharged, consommerAnalyseOfferte, record } from '$lib/server/fixtures/userStore';
 import { getAppSession } from '$lib/server/session';
 import { predictions, writing, stats } from '$lib/server/services';
 import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
 import { regimeOf } from '$lib/server/domain/regime';
 import { computeCharge } from '$lib/server/domain/billing';
-import { hasConsumedOffer, recordOfferConsumed } from '$lib/server/fixtures/offeredDeviceStore';
 import { checkGeneratedText } from '$lib/server/domain/guards';
 import type { WritingInput, AnalyseTexte, RetraitEnrichi } from '$lib/server/services/writing';
 import {
@@ -237,38 +236,30 @@ export const load: PageServerLoad = async (event) => {
 	//    Idempotent : une fois `billing` posé, on ne recalcule ni ne redébite.
 	let billing = ticket.billing;
 	if (!billing) {
-		// Trois vérifications pour le ticket offert :
-		//  1) le compte n'a jamais consommé son offre (premier_ticket_utilise faux),
-		//  2) l'empreinte d'appareil n'a pas déjà consommé une offre,
-		//  3) le ticket est substantiel : ≥ 3 sélections analysables, non « tout solide ».
-		const fp = cookies.get('mtj_fp') ?? '';
-		const offreDejaSurAppareil = fp !== '' && (await hasConsumedOffer(fp));
-		// « Tout solide » (rien retiré ET pas « toutes fragiles ») ne mérite pas l'offre :
-		// le service rendu est mince. « Toutes fragiles », lui, a de la valeur → éligible.
-		const toutSolide = r.rienARetirer && !r.toutesFragiles;
-		const compteEligible = !session.premierTicketUtilise && nbAnalysables >= 3 && !toutSolide;
-		const promoEligible = compteEligible && !offreDejaSurAppareil;
-
-		const charge = computeCharge({
+		// Gratuités permanentes d'abord (tout solide, moins de 3, même ticket 24 h).
+		// Le ticket substantiel qui SERAIT facturé ouvre le dernier recours : l'analyse
+		// OFFERTE (bêta), consommée ATOMIQUEMENT — jamais gaspillée sur un ticket déjà
+		// gratuit. Le garde est le compteur PAR COMPTE ; l'empreinte d'appareil est
+		// relâchée pendant la bêta (voir README, dette de bêta), la vraie défense
+		// multi-compte étant le rate-limit de /analyser (C1).
+		let charge = computeCharge({
 			nbAnalysables,
-			premierTicket: promoEligible,
 			rienARetirer: r.rienARetirer,
 			toutesFragiles: r.toutesFragiles
 		});
 
-		if (charge.raison === 'premier_ticket') {
-			// Offre accordée : on la consomme à l'affichage réussi (compte + appareil).
-			await recordOfferConsumed(fp);
-			await markPremierTicketUtilise(session.userId);
-		} else if (!charge.gratuit && !charge.bloque) {
-			const cost = charge.credits ?? 0;
-			// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
-			if (session.credits < cost) {
-				// Empreinte déjà servie sur un compte neuf : message honnête, sans reproche.
-				const motif = compteEligible && offreDejaSurAppareil ? '&motif=empreinte' : '';
-				redirect(303, `/recharge?besoin=${cost}&retour=/resultat${motif}`);
+		if (!charge.gratuit && !charge.bloque) {
+			const offerte = session.analysesOffertesRestantes > 0 && (await consommerAnalyseOfferte(session.userId));
+			if (offerte) {
+				charge = { gratuit: true, raison: 'offerte', credits: 0, bloque: false };
+			} else {
+				const cost = charge.credits ?? 0;
+				// Blocage de l'affichage si le solde est insuffisant (jamais l'entrée).
+				if (session.credits < cost) {
+					redirect(303, `/recharge?besoin=${cost}&retour=/resultat`);
+				}
+				await record(session.userId, -cost, 'debit_analyse', ticket.id); // débit à l'affichage
 			}
-			await record(session.userId, -cost, 'debit_analyse', ticket.id); // débit à l'affichage
 		}
 
 		billing = { gratuit: charge.gratuit, credits: charge.credits ?? 0 };

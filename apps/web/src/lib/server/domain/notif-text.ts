@@ -86,7 +86,7 @@ export function buildMorningNotification(
 	url?: string
 ): NotificationPayload {
 	const corps = premiereOffreDisponible
-		? "Ta première analyse est offerte. Les matchs du jour t'attendent."
+		? "Il te reste des analyses offertes. Les matchs du jour t'attendent."
 		: 'Les matchs du jour sont analysés. Vérifie ton ticket avant de le valider.';
 	return { titre: 'Muscle Ton Jeu', corps, url };
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { ANALYSES_OFFERTES } from '$lib/offer';
 	let { data }: { data: PageData } = $props();
 
 	const ticket = $derived(data.contexte === 'ticket');
@@ -10,7 +11,7 @@
 <main class="container">
 	{#if ticket}
 		<h1 class="t-h1">Ton ticket est prêt.</h1>
-		<p class="t-body-lg intro">Connecte-toi pour voir le résultat. Le premier est offert.</p>
+		<p class="t-body-lg intro">Connecte-toi pour voir le résultat. Tes {ANALYSES_OFFERTES} premières analyses sont offertes.</p>
 	{:else}
 		<h1 class="t-h1">Content de te revoir.</h1>
 		<p class="t-body-lg intro">Connecte-toi en un tap.</p>

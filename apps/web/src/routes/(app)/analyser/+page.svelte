@@ -3,6 +3,7 @@
 	import { enhance, applyAction } from '$app/forms';
 	import type { ActionData, PageData } from './$types';
 	import { compressImage } from '$lib/compressImage';
+	import { libelleOffertes } from '$lib/offer';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import LoadingCurtain from '$lib/components/LoadingCurtain.svelte';
 
@@ -15,7 +16,8 @@
 		illisible: "On n'arrive pas à lire. Réessaie ou saisis à la main.",
 		manuscrit: 'On lit les captures d’écran, pas les tickets papier.',
 		pas_un_ticket: "Cette image n'est pas un ticket. Envoie la capture de ton ticket.",
-		indisponible: 'La lecture est momentanément indisponible. Réessaie, ou écris au support.'
+		indisponible: 'La lecture est momentanément indisponible. Réessaie, ou écris au support.',
+		trop_de_tentatives: 'Trop de tentatives. Réessaie dans quelques minutes.'
 	};
 	let erreurMsg = $derived(form?.erreur ? (ERREURS[form.erreur] ?? ERREURS.illisible) : null);
 
@@ -98,8 +100,9 @@
 <FlowHeader title="Analyser un ticket" back="/" />
 
 <main class="container">
-	{#if data.offert}
-		<div class="offert-banner t-body">Ton premier ticket est offert.</div>
+	{#if data.offertesRestantes > 0}
+		<!-- Décompte : une information utile pour le testeur, pas une pression. -->
+		<div class="offert-banner t-body">Il te reste {libelleOffertes(data.offertesRestantes)}.</div>
 	{/if}
 
 	<p class="t-body-lg intro measure">Envoie 1 à 3 captures de ton ticket. Rien d'autre.</p>

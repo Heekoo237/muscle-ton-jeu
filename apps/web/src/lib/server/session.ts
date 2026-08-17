@@ -7,6 +7,7 @@
  */
 import type { RequestEvent } from '@sveltejs/kit';
 import { ensureAppUser, memDemoUser } from '$lib/server/fixtures/userStore';
+import { analysesOffertesRestantes } from '$lib/offer';
 
 export const SESSION_COOKIE = 'session';
 
@@ -41,6 +42,8 @@ export interface AppSession {
 	email: string;
 	credits: number;
 	premierTicketUtilise: boolean;
+	/** Analyses OFFERTES encore disponibles pour ce compte (bêta). */
+	analysesOffertesRestantes: number;
 	/** Photo de profil Google, si disponible ; sinon null (repli initiale). */
 	avatarUrl: string | null;
 }
@@ -74,6 +77,7 @@ async function resolveAppSession(event: RequestEvent): Promise<AppSession | null
 			email: appUser.email,
 			credits: appUser.credits,
 			premierTicketUtilise: appUser.premierTicketUtilise,
+			analysesOffertesRestantes: analysesOffertesRestantes(appUser.analysesOffertesUtilisees),
 			avatarUrl
 		};
 	}
@@ -87,6 +91,7 @@ async function resolveAppSession(event: RequestEvent): Promise<AppSession | null
 		email: u.email,
 		credits: u.credits,
 		premierTicketUtilise: u.premierTicketUtilise,
+		analysesOffertesRestantes: analysesOffertesRestantes(u.analysesOffertesUtilisees),
 		avatarUrl: null
 	};
 }

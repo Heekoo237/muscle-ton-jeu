@@ -3,6 +3,7 @@
 	// Page autonome : bandeau défilant en haut, son propre pied de page en bas
 	// (donc hors du groupe (public) qui ajoute nav + footer).
 	import AmbianceBanner from '$lib/components/AmbianceBanner.svelte';
+	import { ANALYSES_OFFERTES, libelleOffertes } from '$lib/offer';
 
 	const ANTON = "'Anton', Impact, sans-serif";
 	const MONO = "'JetBrains Mono', ui-monospace, monospace";
@@ -39,6 +40,7 @@
 		['Pourquoi vous montrez vos analyses ratées ?', 'Parce qu’un historique trié ne vaut rien.']
 	];
 	const faqRight = [
+		['C’est payant ?', `Tu as ${libelleOffertes(ANALYSES_OFFERTES)}. Ensuite, Mobile Money à partir de 500 F.`],
 		['Comment je paie ?', 'Mobile Money, à partir de 500 F.'],
 		['D’où viennent les données ?', 'De résultats de matchs, saison après saison.']
 	];
@@ -324,7 +326,7 @@
 			</div>
 
 			<div style="display:flex;flex-wrap:wrap;gap:8px">
-				{#each ['Mobile Money', 'Pas d’abonnement', 'Ton premier ticket est offert'] as chip (chip)}
+				{#each ['Mobile Money', 'Pas d’abonnement', libelleOffertes(ANALYSES_OFFERTES)] as chip (chip)}
 					<span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:#F8F1E4;border:1px solid #E2D6C0;border-radius:999px;font-size:14px;color:#4A4238">{chip}</span>
 				{/each}
 			</div>

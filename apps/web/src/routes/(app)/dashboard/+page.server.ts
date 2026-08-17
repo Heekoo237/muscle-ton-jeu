@@ -100,6 +100,8 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		prenom: session.prenom,
 		credits: session.credits,
+		// Bêta : analyses offertes restantes, affichées à côté du solde de crédits.
+		analysesOffertesRestantes: session.analysesOffertesRestantes,
 		stats: statsFinal,
 		daily,
 		dailyVue,

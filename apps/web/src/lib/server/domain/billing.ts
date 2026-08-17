@@ -7,14 +7,15 @@
 import { creditCost } from './ticket';
 
 export type GratuitReason =
-	| 'premier_ticket'
 	| 'tout_solide'
 	| 'moins_de_3'
-	| 'meme_ticket_24h';
+	| 'meme_ticket_24h'
+	/** Analyse OFFERTE (bêta). Posée par l'appelant APRÈS consommation atomique du
+	 *  compteur — jamais par computeCharge (qui ne connaît pas l'état du compteur). */
+	| 'offerte';
 
 export interface ChargeContext {
 	nbAnalysables: number;
-	premierTicket: boolean;
 	rienARetirer: boolean;
 	/**
 	 * Rien retiré parce que TOUTES les sélections sont trop justes. Ce cas est
@@ -37,8 +38,14 @@ export interface Charge {
 }
 
 /**
- * Détermine le coût d'une analyse et les gratuités permanentes (PRD §8.4).
- * L'ordre des gratuités suit « éviter de facturer un service non rendu ».
+ * Détermine le coût d'une analyse et les gratuités PERMANENTES (PRD §8.4).
+ *
+ * L'analyse OFFERTE (bêta) n'est PAS ici : elle est appliquée en DERNIER recours par
+ * l'appelant (après consommation atomique du compteur), pour ne JAMAIS gaspiller une
+ * offerte sur un ticket déjà gratuit. L'ordre est donc :
+ *   tout solide → moins de 3 → même ticket 24 h → [OFFERTE, côté appelant] → facturé
+ * Ainsi, quand computeCharge renvoie « facturé », l'appelant sait que le ticket est
+ * substantiel (≥ 3, non tout-solide) et tente l'offerte seulement là.
  */
 export function computeCharge(ctx: ChargeContext): Charge {
 	const cost = creditCost(ctx.nbAnalysables);
@@ -51,13 +58,13 @@ export function computeCharge(ctx: ChargeContext): Charge {
 	// classé gratuit ici. Il tombe donc dans le régime normal (moins_de_3, puis coût).
 	const toutSolide = ctx.rienARetirer && !ctx.toutesFragiles;
 
-	// Gratuités permanentes.
-	if (ctx.premierTicket) return { gratuit: true, raison: 'premier_ticket', credits: 0, bloque: false };
+	// Gratuités permanentes, du service le plus mince au plus substantiel.
 	if (toutSolide) return { gratuit: true, raison: 'tout_solide', credits: 0, bloque: false };
 	if (ctx.nbAnalysables < 3) return { gratuit: true, raison: 'moins_de_3', credits: 0, bloque: false };
 	if (ctx.dejaAnalyseSous24h)
 		return { gratuit: true, raison: 'meme_ticket_24h', credits: 0, bloque: false };
 
+	// Ticket substantiel qui serait facturé : l'appelant peut y appliquer une offerte.
 	return { gratuit: false, credits: cost, bloque: false };
 }
 

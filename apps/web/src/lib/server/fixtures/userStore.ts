@@ -9,6 +9,7 @@
  * en est le cache. Le crédit se débite à l'affichage réussi (facturation n°1).
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { ANALYSES_OFFERTES } from '$lib/offer';
 import type { StoredResult } from './ticketStore';
 
 export type LedgerReason = 'recharge' | 'debit_analyse' | 'offert' | 'parrainage';
@@ -19,6 +20,8 @@ export interface AppUser {
 	email: string;
 	credits: number;
 	premierTicketUtilise: boolean;
+	/** Nombre d'analyses OFFERTES déjà consommées (bêta : plafond ANALYSES_OFFERTES). */
+	analysesOffertesUtilisees: number;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -29,7 +32,8 @@ const memUser: AppUser = {
 	prenom: 'Démo',
 	email: 'demo@example.com',
 	credits: 0,
-	premierTicketUtilise: false
+	premierTicketUtilise: false,
+	analysesOffertesUtilisees: 0
 };
 const memLedger: { motif: LedgerReason }[] = [];
 
@@ -50,14 +54,14 @@ export async function ensureAppUserDetailed(
 	const sb = supabaseAdmin();
 	const { data: found } = await sb
 		.from('users')
-		.select('id, prenom, email, credits, premier_ticket_utilise')
+		.select('id, prenom, email, credits, premier_ticket_utilise, analyses_offertes_utilisees')
 		.eq('google_id', googleId)
 		.maybeSingle();
 	if (found) return { user: toAppUser(found), isNew: false };
 	const { data: created, error } = await sb
 		.from('users')
 		.insert({ google_id: googleId, email, prenom })
-		.select('id, prenom, email, credits, premier_ticket_utilise')
+		.select('id, prenom, email, credits, premier_ticket_utilise, analyses_offertes_utilisees')
 		.single();
 	if (error) throw error;
 	return { user: toAppUser(created), isNew: true };
@@ -78,7 +82,7 @@ export async function getUserById(userId: number): Promise<AppUser | null> {
 	const sb = supabaseAdmin();
 	const { data } = await sb
 		.from('users')
-		.select('id, prenom, email, credits, premier_ticket_utilise')
+		.select('id, prenom, email, credits, premier_ticket_utilise, analyses_offertes_utilisees')
 		.eq('id', userId)
 		.maybeSingle();
 	return data ? toAppUser(data) : null;
@@ -106,12 +110,25 @@ export async function record(
 	await sb.from('users').update({ credits: (u?.credits ?? 0) + delta }).eq('id', userId);
 }
 
-export async function markPremierTicketUtilise(userId: number): Promise<void> {
+/**
+ * Consomme UNE analyse offerte, ATOMIQUEMENT et une seule fois. L'`UPDATE`
+ * conditionnel (`analyses_offertes_utilisees < plafond`) n'incrémente que s'il
+ * reste une offerte — deux requêtes concurrentes ne peuvent pas en accorder deux.
+ * Renvoie true si une offerte a bien été accordée, false sinon (plafond atteint).
+ * (Même garde d'atomicité que la recharge — pas de read-then-write.)
+ */
+export async function consommerAnalyseOfferte(userId: number): Promise<boolean> {
 	if (!isSupabaseConfigured()) {
-		memUser.premierTicketUtilise = true;
-		return;
+		if (memUser.analysesOffertesUtilisees >= ANALYSES_OFFERTES) return false;
+		memUser.analysesOffertesUtilisees += 1;
+		return true;
 	}
-	await supabaseAdmin().from('users').update({ premier_ticket_utilise: true }).eq('id', userId);
+	const { data, error } = await supabaseAdmin().rpc('consommer_analyse_offerte', {
+		p_user: userId,
+		p_plafond: ANALYSES_OFFERTES
+	});
+	if (error) throw error;
+	return data === true;
 }
 
 export async function hasRecharged(userId: number): Promise<boolean> {
@@ -137,13 +154,15 @@ function toAppUser(row: {
 	email: string | null;
 	credits: number | null;
 	premier_ticket_utilise: boolean | null;
+	analyses_offertes_utilisees?: number | null;
 }): AppUser {
 	return {
 		id: row.id,
 		prenom: row.prenom ?? 'Invité',
 		email: row.email ?? '',
 		credits: row.credits ?? 0,
-		premierTicketUtilise: row.premier_ticket_utilise ?? false
+		premierTicketUtilise: row.premier_ticket_utilise ?? false,
+		analysesOffertesUtilisees: row.analyses_offertes_utilisees ?? 0
 	};
 }
 

@@ -2,62 +2,48 @@ import { describe, it, expect } from 'vitest';
 import { computeCharge, featuredPack } from './billing';
 
 describe('computeCharge — gratuités et paliers (PRD §8)', () => {
-	it('premier ticket toujours gratuit', () => {
-		const c = computeCharge({ nbAnalysables: 9, premierTicket: true, rienARetirer: false });
-		expect(c).toMatchObject({ gratuit: true, raison: 'premier_ticket', credits: 0 });
-	});
+	// L'analyse OFFERTE n'est PLUS dans computeCharge : elle est appliquée en dernier
+	// recours par l'appelant (résultat), après consommation atomique du compteur. Ici
+	// on teste l'ordre des gratuités PERMANENTES et le cas facturé.
 
 	it('ticket entièrement solide : gratuit', () => {
-		const c = computeCharge({ nbAnalysables: 9, premierTicket: false, rienARetirer: true });
+		const c = computeCharge({ nbAnalysables: 9, rienARetirer: true });
 		expect(c).toMatchObject({ gratuit: true, raison: 'tout_solide' });
 	});
 
 	it('toutes fragiles (≥ 3 analysables) : FACTURÉ, jamais « tout solide »', () => {
 		// Rien n'est retiré, mais on a rendu un vrai service (« tout ton ticket est
 		// trop juste ») → on facture, contrairement au cas « tout solide ».
-		const c = computeCharge({
-			nbAnalysables: 4,
-			premierTicket: false,
-			rienARetirer: true,
-			toutesFragiles: true
-		});
+		const c = computeCharge({ nbAnalysables: 4, rienARetirer: true, toutesFragiles: true });
 		expect(c.gratuit).toBe(false);
 		expect(c.raison).toBeUndefined();
 		expect(c.credits).toBe(1);
 	});
 
 	it('toutes fragiles mais < 3 analysables : gratuit (moins_de_3 prime)', () => {
-		const c = computeCharge({
-			nbAnalysables: 2,
-			premierTicket: false,
-			rienARetirer: true,
-			toutesFragiles: true
-		});
+		const c = computeCharge({ nbAnalysables: 2, rienARetirer: true, toutesFragiles: true });
 		expect(c).toMatchObject({ gratuit: true, raison: 'moins_de_3' });
 	});
 
 	it('moins de 3 sélections analysables : gratuit', () => {
-		const c = computeCharge({ nbAnalysables: 2, premierTicket: false, rienARetirer: false });
+		const c = computeCharge({ nbAnalysables: 2, rienARetirer: false });
 		expect(c).toMatchObject({ gratuit: true, raison: 'moins_de_3' });
 	});
 
 	it('même ticket sous 24 h : gratuit', () => {
-		const c = computeCharge({
-			nbAnalysables: 9,
-			premierTicket: false,
-			rienARetirer: false,
-			dejaAnalyseSous24h: true
-		});
+		const c = computeCharge({ nbAnalysables: 9, rienARetirer: false, dejaAnalyseSous24h: true });
 		expect(c).toMatchObject({ gratuit: true, raison: 'meme_ticket_24h' });
 	});
 
-	it('cas facturé : applique le palier', () => {
-		const c = computeCharge({ nbAnalysables: 9, premierTicket: false, rienARetirer: false });
+	it('ticket substantiel facturé : appelant pourra y appliquer une offerte', () => {
+		// computeCharge renvoie « facturé » : c'est LÀ (et seulement là) que l'appelant
+		// tente l'offerte. Jamais une offerte gaspillée sur un ticket déjà gratuit.
+		const c = computeCharge({ nbAnalysables: 9, rienARetirer: false });
 		expect(c).toMatchObject({ gratuit: false, credits: 2, bloque: false });
 	});
 
 	it('au-delà de 20 : blocage dur', () => {
-		const c = computeCharge({ nbAnalysables: 21, premierTicket: false, rienARetirer: false });
+		const c = computeCharge({ nbAnalysables: 21, rienARetirer: false });
 		expect(c).toMatchObject({ bloque: true, credits: null });
 	});
 });

@@ -45,6 +45,13 @@
 			<span class="num t-chiffre-md">{data.credits}</span>
 			<span class="lbl t-small">crédit{data.credits > 1 ? 's' : ''} restant{data.credits > 1 ? 's' : ''}</span>
 		</div>
+		{#if data.analysesOffertesRestantes > 0}
+			<!-- Bêta : décompte des analyses offertes, discret, à côté du solde. -->
+			<div class="stat">
+				<span class="num t-chiffre-md">{data.analysesOffertesRestantes}</span>
+				<span class="lbl t-small">analyse{data.analysesOffertesRestantes > 1 ? 's' : ''} offerte{data.analysesOffertesRestantes > 1 ? 's' : ''}</span>
+			</div>
+		{/if}
 		<div class="stat">
 			<span class="num t-chiffre-md">{data.stats.ticketsAnalyses}</span>
 			<span class="lbl t-small">ticket{data.stats.ticketsAnalyses > 1 ? 's' : ''} analysé{data.stats.ticketsAnalyses > 1 ? 's' : ''}</span>

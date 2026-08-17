@@ -53,7 +53,14 @@ template) : on **mesure**, on ne se fie pas à la vigilance.
   (`AsyncLocalStorage`) ; le hook serveur journalise le total et émet un **WARN**
   au-delà de `DB_QUERY_WARN_THRESHOLD` (15). C'est ce qui rend visible une boucle
   N+1 (une lecture par match) — un bug qui, sans ça, passe la revue. Cherche
-  `[dbmeter]` dans les logs Vercel.
+  `[dbmeter]` dans les logs Vercel. Au-delà du **plafond dur** `DB_QUERY_HARD_CAP`
+  (60, très au-dessus du baseline ~11), le **coupe-circuit** lève et coupe la
+  requête emballée avant qu'elle ne martèle la base.
+- **Limitation de débit** (`src/lib/server/ratelimit.ts` + migration `0015`). Fenêtre
+  fixe atomique en base (`hit_rate_limit`), donc partagée entre instances serverless.
+  Appliquée à l'appel vision de `/analyser` (coûteux, non authentifié) — par IP et par
+  compte (`RATE_LIMITS`). **Fail-open** : une panne du limiteur laisse passer (on ne
+  bloque jamais un utilisateur légitime), l'incident est journalisé.
 - **Session mise en cache par requête** (`getAppSession` via `event.locals`) : les
   trois `load` d'une page (layout app, layout dashboard, page) ne résolvent la
   session qu'**une** fois — plus de triple `auth.getUser` + triple lecture `users`.
@@ -63,6 +70,19 @@ template) : on **mesure**, on ne se fie pas à la vigilance.
   frontière : l'auth ne passe pas par `section()` (une session absente redirige) ;
   tout le reste, oui. Le `handleError` global reste le dernier filet (message
   lisible + lien support, jamais la stack à l'écran).
+
+## Dette de bêta (à revoir à la fin de la bêta)
+
+- **Offre à 7 analyses** : `ANALYSES_OFFERTES` (`src/lib/offer.ts`) vaut 7 pendant la
+  bêta pour laisser les testeurs voir plusieurs cas. À la fin : repasser à **1**,
+  sans migration (la base ne stocke que le nombre CONSOMMÉ, `users.analyses_offertes_utilisees` ;
+  restantes = `max(0, ANALYSES_OFFERTES − utilisees)`).
+- **Empreinte d'appareil relâchée pour l'offre** : le garde est le **compteur par
+  compte** (7 sur un même téléphone, sinon les analyses 2–7 seraient bloquées). La
+  vraie défense multi-compte est le **rate-limit de `/analyser`** (C1). À la fin de
+  la bêta, décider avec les données d'usage : remettre l'empreinte, OU garder le
+  compteur par compte si C1 protège assez. `offeredDeviceStore` reste en place mais
+  n'est plus consulté par le chemin de l'offre.
 
 ## Stratégie de construction
 

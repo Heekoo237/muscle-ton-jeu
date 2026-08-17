@@ -1,6 +1,7 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { PACKS } from '$lib/server/domain/billing';
+import { ANALYSES_OFFERTES, libelleOffertes } from '$lib/offer';
 import { getAppSession } from '$lib/server/session';
 import { creerTransaction, rechargeEnCours } from '$lib/server/fixtures/rechargeStore';
 import { paiementActif, paiementModeTest } from '$lib/server/paymentMode';
@@ -16,9 +17,11 @@ export const load: PageServerLoad = async (event) => {
 	if (!session) redirect(303, '/connexion?retour=/recharge');
 	const { url, cookies } = event;
 	const besoin = Number(url.searchParams.get('besoin')) || 0;
+	// Redirigé pour manque de crédits alors que les analyses offertes sont épuisées :
+	// on le dit clairement (il sait ce qu'il a eu, il sait ce qui suit).
 	const message =
-		url.searchParams.get('motif') === 'empreinte'
-			? 'Le ticket offert a déjà été utilisé sur cet appareil. Recharge à partir de 500 F pour continuer.'
+		besoin > 0 && session.analysesOffertesRestantes === 0
+			? `Tu as utilisé tes ${libelleOffertes(ANALYSES_OFFERTES)}. Recharge à partir de 500 F pour continuer.`
 			: null;
 
 	// Une recharge déjà en cours ? On le dit et on offre de la reprendre (au lieu d'en

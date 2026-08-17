@@ -12,6 +12,8 @@ import {
 	storeCaptures
 } from '$lib/server/fixtures/captureStore';
 import { getAppSession } from '$lib/server/session';
+import { ANALYSES_OFFERTES } from '$lib/offer';
+import { rateLimit, RATE_LIMITS } from '$lib/server/ratelimit';
 
 // Fenêtre d'exécution de la fonction Vercel. SANS ce réglage, la valeur par
 // défaut de la plateforme (≈10 s) coupe la fonction AVANT nos propres garde-fous
@@ -40,10 +42,12 @@ function setTicketCookie(cookies: import('@sveltejs/kit').Cookies, id: string): 
  */
 export const load: PageServerLoad = async (event) => {
 	const session = await getAppSession(event);
+	// Restantes : le vrai décompte si connecté ; l'offre pleine pour un visiteur anonyme
+	// (il ne s'est pas encore connecté, on montre ce qui l'attend).
+	const offertesRestantes = session ? session.analysesOffertesRestantes : ANALYSES_OFFERTES;
 	return {
-		ticketOffert: !session || !session.premierTicketUtilise,
-		// Bandeau « premier ticket offert » pour un compte tout juste créé (?offert=1).
-		offert: event.url.searchParams.get('offert') === '1'
+		ticketOffert: offertesRestantes > 0,
+		offertesRestantes
 	};
 };
 
@@ -96,6 +100,20 @@ export const actions: Actions = {
 			if (deja.statut === 'analyse') redirect(303, '/resultat?reutilise=1');
 			redirect(303, '/analyser/validation?reutilise=1');
 		}
+
+		// C1 — LIMITATION DE DÉBIT juste avant l'appel vision (coûteux, non authentifié).
+		// Par IP, et par compte si connecté. Un ticket réutilisé (étape 3) n'appelle pas
+		// la vision et n'est donc pas compté. Message lisible, jamais une 500.
+		const ip = event.getClientAddress();
+		const okIp = await rateLimit(`analyser:ip:${ip}`, RATE_LIMITS.analyserIp.fenetreS, RATE_LIMITS.analyserIp.max);
+		const okCompte = session
+			? await rateLimit(
+					`analyser:compte:${session.userId}`,
+					RATE_LIMITS.analyserCompte.fenetreS,
+					RATE_LIMITS.analyserCompte.max
+				)
+			: true;
+		if (!okIp || !okCompte) return fail(429, { erreur: 'trop_de_tentatives' });
 
 		// 4. Lecture réelle. Échec explicite = message clair, aucun crédit débité.
 		//    Un service indisponible (ex. clé vision absente en production) ne doit

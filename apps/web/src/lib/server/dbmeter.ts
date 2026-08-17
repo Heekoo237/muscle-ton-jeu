@@ -23,6 +23,22 @@ export interface DbMeter {
 /** Au-delà, un WARN part dans les logs : quelque chose fait trop de requêtes. */
 export const DB_QUERY_WARN_THRESHOLD = 15;
 
+/**
+ * COUPE-CIRCUIT (C1) : plafond DUR, très au-dessus du baseline (~11). Une requête
+ * HTTP qui dépasse ça part en boucle (N+1 emballé, amplification) — on la coupe
+ * NET, avant qu'elle ne martèle la base. handleError la transforme en message
+ * lisible. Ce n'est pas le seuil de WARN (15) : c'est le disjoncteur.
+ */
+export const DB_QUERY_HARD_CAP = 60;
+
+/** Levée par le coupe-circuit quand une seule requête HTTP dépasse le plafond dur. */
+export class DbQueryFloodError extends Error {
+	constructor(count: number) {
+		super(`[dbmeter] coupe-circuit : ${count} requêtes base sur une seule requête HTTP (plafond ${DB_QUERY_HARD_CAP})`);
+		this.name = 'DbQueryFloodError';
+	}
+}
+
 const store = new AsyncLocalStorage<DbMeter>();
 
 /** Exécute `fn` dans un contexte de mesure neuf (un par requête HTTP). */
@@ -30,12 +46,14 @@ export function runWithDbMeter<T>(fn: () => T): T {
 	return store.run({ count: 0, byTable: {} }, fn);
 }
 
-/** Incrémente le compteur de la requête courante (appelé par le client instrumenté). */
+/** Incrémente le compteur de la requête courante (appelé par le client instrumenté).
+ *  Lève `DbQueryFloodError` au-delà du plafond dur : la requête emballée est coupée. */
 export function meterQuery(table: string): void {
 	const m = store.getStore();
 	if (!m) return; // hors contexte (jobs, tests) : on ne compte pas
 	m.count += 1;
 	m.byTable[table] = (m.byTable[table] ?? 0) + 1;
+	if (m.count > DB_QUERY_HARD_CAP) throw new DbQueryFloodError(m.count);
 }
 
 /** Le relevé de la requête courante, ou null hors contexte. */

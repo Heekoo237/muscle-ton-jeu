@@ -13,6 +13,7 @@ import { supabaseAdmin } from '$lib/server/supabase';
 import { notifications } from '$lib/server/services';
 import { runSettlement, type SettlePorts, type TicketARegler, type SettleStats } from '$lib/server/domain/notif-settle';
 import { buildMorningNotification } from '$lib/server/domain/notif-text';
+import { ANALYSES_OFFERTES } from '$lib/offer';
 import { enHeuresCalmes } from '$lib/server/domain/notif-schedule';
 import type { FinalScore } from '$lib/server/domain/settle';
 
@@ -177,12 +178,15 @@ export async function runMorningJob(origin: string, nowMs: number): Promise<Morn
 	const eligibles = [...new Set(((abonnes ?? []) as { user_id: number }[]).map((a) => a.user_id))];
 	if (eligibles.length === 0) return { matchs24h, eligibles: 0, notifies: 0 };
 
-	// Variante de texte selon la gratuité RÉELLE (premier ticket encore disponible ?).
-	const { data: users } = await db.from('users').select('id, premier_ticket_utilise').in('id', eligibles);
+	// Variante de texte selon la gratuité RÉELLE (des analyses offertes restent-elles ?).
+	const { data: users } = await db
+		.from('users')
+		.select('id, analyses_offertes_utilisees')
+		.in('id', eligibles);
 	const offreDispo = new Map(
-		((users ?? []) as { id: number; premier_ticket_utilise: boolean }[]).map((u) => [
+		((users ?? []) as { id: number; analyses_offertes_utilisees: number | null }[]).map((u) => [
 			u.id,
-			u.premier_ticket_utilise === false
+			(u.analyses_offertes_utilisees ?? 0) < ANALYSES_OFFERTES
 		])
 	);
 
