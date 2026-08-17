@@ -50,7 +50,12 @@ export class SupabaseSportsData implements SportsDataService {
 			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
 			.eq('statut', 'scheduled')
 			.gte('date_utc', nowIso)
-			.lt('date_utc', horizonIso);
+			.lt('date_utc', horizonIso)
+			// ORDRE DÉTERMINISTE (date puis id) : sans lui, Postgres renvoie les lignes
+			// dans un ordre non garanti — d'où « fixtures[0] » arbitraire et l'analyse du
+			// jour qui sautait d'un match à l'autre à la reconnexion.
+			.order('date_utc', { ascending: true })
+			.order('id', { ascending: true });
 		if (error) throw error;
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({
@@ -76,7 +81,10 @@ export class SupabaseSportsData implements SportsDataService {
 			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
 			.in('statut', ['scheduled', 'finished'])
 			.gte('date_utc', fromIso)
-			.lt('date_utc', toIso);
+			.lt('date_utc', toIso)
+			// ORDRE DÉTERMINISTE (date puis id) : Postgres ne garantit aucun ordre sans lui.
+			.order('date_utc', { ascending: true })
+			.order('id', { ascending: true });
 		if (error) throw error;
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({
@@ -110,7 +118,10 @@ export class SupabaseSportsData implements SportsDataService {
 			.from('fixtures')
 			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
 			.eq('statut', 'finished')
-			.gte('date_utc', sinceIso);
+			.gte('date_utc', sinceIso)
+			// ORDRE DÉTERMINISTE (date puis id) : Postgres ne garantit aucun ordre sans lui.
+			.order('date_utc', { ascending: true })
+			.order('id', { ascending: true });
 		if (error) throw error;
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({

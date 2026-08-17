@@ -60,6 +60,7 @@
 	{#if data.daily}
 		<section class="bloc">
 			<h2 class="t-h2">L'analyse du jour</h2>
+			<p class="t-small dim intro">Voici une lecture du jour.</p>
 			{#if !dailyOpen}
 				<div class="daily vue">
 					<div class="row1">
@@ -75,9 +76,12 @@
 						<span class="t-cote">{heure.format(new Date(data.daily.dateMs))}</span>
 					</div>
 					<div class="row1">
-						<span class="t-small dim">{data.daily.marche} · chances réelles</span>
+						<span class="t-small dim">{data.daily.libelleFr} · chances réelles</span>
 						<span class="t-chiffre-md">{pct(data.daily.probabilitePct)}</span>
 					</div>
+					<!-- Le ton ne propose JAMAIS : on montre ce que disent les chances, on ne
+					     conseille pas de jouer. Cette ligne suit toujours le nombre. -->
+					<p class="t-small dim pronostic">Ce n'est pas un pronostic. On montre ce que disent les chances.</p>
 					{#if data.dailyVue}
 						<p class="t-small dim">Prochaine analyse offerte demain matin.</p>
 					{/if}
@@ -218,6 +222,9 @@
 	.dim {
 		color: var(--c-ink-2);
 		margin: 0;
+	}
+	.intro {
+		margin-top: calc(-1 * var(--s-2));
 	}
 	.liste {
 		display: flex;

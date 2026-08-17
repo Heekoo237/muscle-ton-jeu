@@ -1,47 +1,53 @@
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { sports, predictions } from '$lib/server/services';
-import { marketLabelFr } from '$lib/server/domain/market-map';
+import {
+	choisirAnalyseDuJour,
+	cleDuJour,
+	type AnalyseDuJour,
+	type CandidatJour
+} from '$lib/server/domain/daily-analysis';
+import type { Market } from '$lib/types';
 import { dashboardStats, ticketsEnCours } from '$lib/server/fixtures/dashboardStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { DEMO_MODE, demoStats, demoTicketsEnCours, demoHistoryItems } from '$lib/server/demo';
 
-export interface DailyMatch {
-	matchLabel: string;
-	dateMs: number;
-	marche: string;
-	probabilitePct: number;
-}
-
-/** Clé de jour local (approx. WAT/GMT) — l'analyse offerte se réinitialise à minuit. */
-function dayKey(d = new Date()): string {
-	return d.toISOString().slice(0, 10);
-}
+/** L'analyse offerte du jour, telle que la vue la reçoit. */
+export type DailyMatch = AnalyseDuJour;
 
 export const load: PageServerLoad = async (event) => {
 	// Le +layout impose déjà la session (sinon redirection vers connexion).
 	const session = (await getAppSession(event))!;
 
-	// Analyse offerte du jour : le match le plus probable, affiché directement.
+	// Analyse du jour : DÉTERMINISTE, graine = le jour civil local. Le même jour,
+	// tout le monde voit la même lecture, figée. On la choisit par intérêt (jamais
+	// « la proba la plus haute », qui donnait toujours une double chance) parmi les
+	// matchs du jour. La sélection vit dans domain/daily-analysis.ts (fonction pure,
+	// testée). Ici on n'assemble que les candidats — on ne calcule aucune proba.
+	const jour = cleDuJour(Date.now());
 	const fixtures = await sports.upcomingFixtures();
-	let daily: DailyMatch | null = null;
-	if (fixtures.length > 0) {
-		const f = fixtures[0];
-		const preds = await predictions.forFixture(f.id);
-		if (preds.length > 0) {
-			const best = preds.reduce((a, b) => (b.probabilite > a.probabilite ? b : a));
-			daily = {
-				matchLabel: `${f.teamHome} – ${f.teamAway}`,
+	// On borne aux matchs du MÊME jour civil local : c'est « la lecture du jour »,
+	// et ça borne le nombre de lectures de predictions.
+	const duJour = fixtures.filter((f) => cleDuJour(Date.parse(f.dateUtc)) === jour);
+	const candidats: CandidatJour[] = await Promise.all(
+		duJour.map(async (f) => {
+			const preds = await predictions.forFixture(f.id);
+			const probas: Partial<Record<Market, number>> = {};
+			for (const p of preds) probas[p.marche] = p.probabilite;
+			return {
+				fixtureId: f.id,
+				teamHome: f.teamHome,
+				teamAway: f.teamAway,
 				dateMs: Date.parse(f.dateUtc),
-				marche: marketLabelFr(best.marche, f.teamHome, f.teamAway),
-				probabilitePct: Math.round(best.probabilite * 100 * 10) / 10
+				probas
 			};
-		}
-	}
+		})
+	);
+	const daily: DailyMatch | null = choisirAnalyseDuJour(candidats, jour);
 
 	// État « vue » : une fois consultée dans la journée, on n'affiche plus le
 	// chiffre — on montre le prochain rendez-vous. Consulter = charger l'accueil.
-	const today = dayKey();
+	const today = jour;
 	const dailyVue = event.cookies.get('mtj_daily') === today;
 	if (!dailyVue && daily) {
 		event.cookies.set('mtj_daily', today, {
