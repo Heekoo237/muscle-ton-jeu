@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveShareCode } from '$lib/server/fixtures/shareStore';
 import { getTicket } from '$lib/server/fixtures/ticketStore';
-import { shareVMFromTicket, renderShareSvg } from '$lib/server/shareImage';
+import { shareVMFromTicket, renderShareSvg, type ShareVM } from '$lib/server/shareImage';
 import { rateLimit, RATE_LIMITS } from '$lib/server/ratelimit';
 
 /**
@@ -25,19 +25,17 @@ export const GET: RequestHandler = async ({ params, getClientAddress }) => {
 	const vm = ticket ? shareVMFromTicket(ticket) : null;
 	if (!vm) error(404, 'Partage introuvable');
 
+	// Deux échecs, deux traitements DISTINCTS :
+	//  - binaire resvg indisponible (cas plateforme) → SVG autonome, qui embarque les
+	//    polices et REND le texte dans un navigateur : un repli acceptable ;
+	//  - polices non rendues (auto-test échoué) → on REFUSE d'émettre. Une image sans
+	//    texte diffusée à mille personnes est pire qu'une absence d'image (exigence
+	//    produit : jamais d'image vide partagée).
+	let renderSharePng: (vm: ShareVM) => Uint8Array;
 	try {
-		// Import paresseux : si le binaire natif resvg ne se charge pas, on tombe
-		// proprement sur le SVG (l'endpoint ne renvoie jamais 500).
-		const { renderSharePng } = await import('$lib/server/shareImagePng');
-		const png = renderSharePng(vm) as unknown as BodyInit;
-		return new Response(png, {
-			headers: {
-				'Content-Type': 'image/png',
-				'Cache-Control': 'public, max-age=86400, immutable'
-			}
-		});
-	} catch {
-		// Repli : SVG autonome (polices embarquées). Rare.
+		({ renderSharePng } = await import('$lib/server/shareImagePng'));
+	} catch (e) {
+		console.error('[partage] binaire resvg indisponible — repli SVG :', e);
 		return new Response(renderShareSvg(vm, true), {
 			headers: {
 				'Content-Type': 'image/svg+xml; charset=utf-8',
@@ -45,4 +43,20 @@ export const GET: RequestHandler = async ({ params, getClientAddress }) => {
 			}
 		});
 	}
+
+	let png: Uint8Array;
+	try {
+		png = renderSharePng(vm);
+	} catch (e) {
+		// Polices absentes : rendu vide probable → on ne sert RIEN plutôt qu'une image
+		// blanche. 503 (temporaire) sans cache : le prochain déploiement corrigé reprend.
+		console.error('[partage] polices indisponibles — image REFUSÉE (jamais de blanc) :', e);
+		error(503, 'Image de partage momentanément indisponible.');
+	}
+	return new Response(png as unknown as BodyInit, {
+		headers: {
+			'Content-Type': 'image/png',
+			'Cache-Control': 'public, max-age=86400, immutable'
+		}
+	});
 };

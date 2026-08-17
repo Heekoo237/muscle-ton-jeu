@@ -109,8 +109,14 @@ function ticket(x: number, side: 'left' | 'right', vm: ShareVM): string {
 		// « RETIRÉ ». On doit voir d'un coup d'œil que des lignes ont sauté.
 		const mCol = strike ? INK3 : ocre ? OCRE : INK;
 		const sCol = strike ? INK3 : ocre ? OCRE : INK3;
-		const match = clip(l.matchLabel, strike ? 18 : 24) + (ocre ? '  ▲' : '');
+		const match = clip(l.matchLabel, strike ? 18 : 24);
 		rows += `<text x="${x + 34}" y="${yy}" font-family="${MONO}" font-weight="500" font-size="26" fill="${mCol}">${esc(match)}</text>`;
+		// Marqueur « fragile » : triangle DESSINÉ (les polices sont sous-ensemblées
+		// latin-fr — ▲/→ n'y sont pas et sortiraient en tofu). Vecteur = zéro glyphe.
+		if (ocre) {
+			const tx = x + W - 48;
+			rows += `<polygon points="${tx},${yy - 22} ${tx - 10},${yy - 4} ${tx + 10},${yy - 4}" fill="${OCRE}"/>`;
+		}
 		rows += `<text x="${x + 34}" y="${yy + 30}" font-family="${MONO}" font-weight="500" font-size="22" fill="${sCol}">${esc(clip(l.libelleFr, 26))}</text>`;
 		if (strike) {
 			// Rature nette et sombre, en travers des DEUX lignes.
@@ -158,7 +164,7 @@ export function renderShareSvg(vm: ShareVM, standalone = true): string {
   ${ticket(60, 'left', vm)}
   ${ticket(570, 'right', vm)}
 
-  <text x="540" y="905" text-anchor="middle" font-family="${GEIST}" font-weight="400" font-size="40" fill="${INK}">${esc(retraits)}. <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">→</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan></text>
+  <text x="540" y="905" text-anchor="middle" font-family="${GEIST}" font-weight="400" font-size="40" fill="${INK}">${esc(retraits)}. <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan></text>
 
   <line x1="90" y1="970" x2="990" y2="970" stroke="${LINE}" stroke-width="1"/>
 
