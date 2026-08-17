@@ -164,11 +164,12 @@
 				Tes chances passent de <span class="v">{pctBig(vm.probaTotalePct)}</span> à
 				<span class="v">{pctBig(vm.probaRenforceePct)}</span>.
 			</div>
-		{:else if vm.retraitBloqueParPlancher}
-			<!-- (c) Fragile MAIS retrait bloqué par le plancher : on le DIT, jamais
-			     « tient debout ». La ligne la plus serrée est le pari fragile lui-même. -->
+		{:else if vm.toutesFragiles}
+			<!-- (c) TOUTES les sélections sont fragiles : alléger viderait le ticket, on ne
+			     le fait pas. On le DIT, jamais « tient debout ». La ligne la plus serrée
+			     est la plus faible du lot. -->
 			<div class="t-body-lg">
-				On ne peut pas alléger ce ticket : il ne reste pas assez de matchs analysés.
+				Toutes tes sélections sont fragiles. On ne peut pas alléger ce ticket sans le vider.
 			</div>
 			{#if vm.laPlusSerree}
 				<div class="serree t-body">

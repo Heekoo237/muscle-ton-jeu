@@ -38,7 +38,11 @@ describe('productProbability', () => {
 	});
 });
 
-describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4)', () => {
+describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 1)', () => {
+	it('le plancher est à 1', () => {
+		expect(REINFORCED_FLOOR).toBe(1);
+	});
+
 	it('retire les sélections fragiles et améliore la probabilité', () => {
 		const s = [sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.72), sel(5, 0.3)];
 		const r = buildReinforced(s);
@@ -47,13 +51,31 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4
 		expect(r.rienARetirer).toBe(false);
 	});
 
-	it('ne descend jamais sous 4 sélections, même si le seuil le justifierait', () => {
-		// 5 sélections, 4 fragiles : on ne peut en retirer qu’une (plancher 4).
+	it('RÉGRESSION : ticket de 4, une fragile → elle EST retirée (plus le plancher 4)', () => {
+		// Le bug signalé : 4 matchs, 1 fragile, l’ancien plancher de 4 laissait tout
+		// intact. Désormais on la barre et le renforcé descend à 3 lignes.
+		const s = [sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.3)];
+		const r = buildReinforced(s);
+		expect(r.retirees).toEqual([4]);
+		expect(r.rienARetirer).toBe(false);
+		expect(r.toutesFragiles).toBe(false);
+		const gardees = r.selections.filter((x) => !x.retireeDuRenforce && x.marche).length;
+		expect(gardees).toBe(3);
+	});
+
+	it('2 sélections, 1 fragile → renforcé à 1 seule ligne', () => {
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.3)]);
+		expect(r.retirees).toEqual([2]);
+		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
+		expect(gardees).toBe(1);
+	});
+
+	it('garde au moins une ligne : 5 sélections, 4 fragiles → il en reste 1', () => {
 		const s = [sel(1, 0.9), sel(2, 0.3), sel(3, 0.2), sel(4, 0.25), sel(5, 0.35)];
 		const r = buildReinforced(s);
 		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
-		expect(gardees).toBe(REINFORCED_FLOOR);
-		expect(r.retirees).toEqual([3]); // la plus fragile d’abord (proba 0,2)
+		expect(gardees).toBe(1); // la seule solide (0,9) reste
+		expect(r.retirees).toEqual([2, 3, 4, 5]); // les quatre fragiles partent
 	});
 
 	it('« rien à retirer » quand aucune sélection n’est fragile', () => {
@@ -61,36 +83,39 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 4
 		const r = buildReinforced(s);
 		expect(r.rienARetirer).toBe(true);
 		expect(r.retirees).toEqual([]);
-		// Cas (b) : rien de fragile → le plancher n'est PAS en cause.
-		expect(r.retraitBloqueParPlancher).toBe(false);
+		// Cas (b) : rien de fragile → ce n'est PAS « toutes fragiles ».
+		expect(r.toutesFragiles).toBe(false);
 	});
 
-	it('(c) fragile MAIS retrait bloqué par le plancher : rienARetirer sans « tient debout »', () => {
-		// Une seule ligne analysable, fragile (0,11 < seuil) : le plancher de 4 interdit
-		// tout retrait. On ne doit PAS conclure « ticket solide » — le drapeau le dit.
+	it('(c) une SEULE ligne, fragile → toutes fragiles : rien retiré, jamais « tient debout »', () => {
+		// On ne vide jamais le ticket : la seule ligne, même fragile, reste.
 		const r = buildReinforced([sel(1, 0.11)]);
 		expect(r.rienARetirer).toBe(true);
 		expect(r.retirees).toEqual([]);
-		expect(r.retraitBloqueParPlancher).toBe(true);
+		expect(r.toutesFragiles).toBe(true);
 	});
 
-	it('(c) tient aussi avec 2-3 analysables fragiles sous le plancher', () => {
+	it('(c) TOUTES fragiles (2-3 lignes) → on ne retire rien, on garde tout', () => {
 		const r = buildReinforced([sel(1, 0.11), sel(2, 0.2), sel(3, 0.25)]);
 		expect(r.rienARetirer).toBe(true);
-		expect(r.retraitBloqueParPlancher).toBe(true);
+		expect(r.toutesFragiles).toBe(true);
+		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
+		expect(gardees).toBe(3); // aucune retirée : on ne vide pas
 	});
 
-	it('(a) un vrai retrait n’est jamais marqué « bloqué par plancher »', () => {
+	it('(a) un vrai retrait n’est jamais marqué « toutes fragiles »', () => {
 		const r = buildReinforced([sel(1, 0.8), sel(2, 0.75), sel(3, 0.7), sel(4, 0.72), sel(5, 0.3)]);
 		expect(r.rienARetirer).toBe(false);
-		expect(r.retraitBloqueParPlancher).toBe(false);
+		expect(r.toutesFragiles).toBe(false);
 	});
 
-	it('ne retire jamais sous le plancher même avec beaucoup de fragiles', () => {
+	it('toutes fragiles, beaucoup de lignes → on garde tout (on ne vide jamais)', () => {
 		const s = Array.from({ length: 6 }, (_, i) => sel(i + 1, 0.2));
 		const r = buildReinforced(s);
+		expect(r.toutesFragiles).toBe(true);
+		expect(r.retirees).toEqual([]);
 		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
-		expect(gardees).toBe(REINFORCED_FLOOR);
+		expect(gardees).toBe(6);
 	});
 });
 

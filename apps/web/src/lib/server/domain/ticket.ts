@@ -5,7 +5,8 @@
  * - Le seuil « fragile » est calibré sur données réelles (brief §2.3c) ; ici on
  *   reçoit le seuil, on ne le fixe pas arbitrairement dans le code.
  * - Le ticket renforcé est construit PAR RETRAIT (règle d'or n°3), jamais par
- *   ajout ni remplacement, avec un plancher de 4 sélections.
+ *   ajout ni remplacement. Plancher à 1 : on peut alléger jusqu'à une seule ligne.
+ *   Le SEUL cas interdit est de tout retirer — il reste toujours au moins une ligne.
  *
  * Les probabilités proviennent de la table `predictions` (lues en amont) ;
  * cette couche ne calcule jamais une probabilité de marché.
@@ -14,8 +15,14 @@ import type { Selection } from '$lib/types';
 import { badgeVisible, fragileThreshold } from './markets-meta';
 import { isUnmeasured } from './regime';
 
-/** Plancher absolu du ticket renforcé (règle d'or n°3). */
-export const REINFORCED_FLOOR = 4;
+/**
+ * Plancher absolu du ticket renforcé (règle d'or n°3) : il reste TOUJOURS au moins
+ * une ligne. Un plancher plus haut (l'ancien 4) empêchait l'analyse de servir sur
+ * les petits tickets : un ticket de 4 avec un fragile ressortait intact. On retire
+ * désormais dès qu'il reste une ligne — sauf si TOUTES sont fragiles (on ne vide
+ * jamais le ticket : voir `toutesFragiles`).
+ */
+export const REINFORCED_FLOOR = 1;
 
 /**
  * RÈGLE UNIQUE « analysable » — résolu ≠ analysable. Une sélection compte (calcul,
@@ -90,26 +97,26 @@ export interface ReinforcedResult {
 	/** Vrai si rien n'a été retiré → « Rien à retirer. Ton ticket tient debout. » */
 	rienARetirer: boolean;
 	/**
-	 * Vrai si rien n'a été retiré ALORS QU'une sélection est fragile : le plancher
-	 * de 4 empêche le retrait (trop peu de matchs analysés). Cas distinct du « tout
-	 * solide » — il ne faut JAMAIS dire « ton ticket tient debout » ici.
+	 * Vrai si rien n'a été retiré ALORS QUE TOUTES les sélections analysables sont
+	 * fragiles : alléger reviendrait à vider le ticket, ce qui est interdit. On le
+	 * DIT (« Toutes tes sélections sont fragiles… ») — jamais « ton ticket tient
+	 * debout », qui serait le mensonge latent (ticket faible, message rassurant).
 	 */
-	retraitBloqueParPlancher: boolean;
+	toutesFragiles: boolean;
 	/** Vrai si le produit est faussé par deux sélections sur le même match. */
 	conflitMemeMatch: boolean;
 }
 
 /**
  * Construit le ticket renforcé par retrait des sélections fragiles, les plus
- * fragiles d'abord, sans jamais descendre sous le plancher de 4 sélections.
+ * fragiles d'abord. On garde au moins `floor` ligne (plancher à 1). Le seul cas
+ * interdit est de tout retirer : si toutes les sélections sont fragiles, on ne
+ * retire rien et on l'annonce (`toutesFragiles`) — on ne vide jamais le ticket.
  */
 export function buildReinforced(input: Selection[], floor = REINFORCED_FLOOR): ReinforcedResult {
 	const selections = markFragile(input);
 	const analysables = selections.filter(isAnalysable);
 	const probaTotale = productProbability(analysables);
-
-	// Combien peut-on retirer sans passer sous le plancher ?
-	const removable = Math.max(0, analysables.length - floor);
 
 	// Candidats au retrait : sous leur seuil de marché, du plus fragile au moins.
 	// (Classement interne : inclut les marchés « sûrs » sans badge — ex. double
@@ -117,6 +124,11 @@ export function buildReinforced(input: Selection[], floor = REINFORCED_FLOOR): R
 	const fragilesTries = analysables
 		.filter(belowThreshold)
 		.sort((a, b) => (a.probabilite as number) - (b.probabilite as number));
+
+	// TOUT fragile → on ne vide jamais le ticket : on ne retire rien, on l'annonce.
+	// Sinon, on retire les fragiles en gardant au moins `floor` ligne(s).
+	const toutesFragiles = analysables.length > 0 && fragilesTries.length === analysables.length;
+	const removable = toutesFragiles ? 0 : Math.max(0, analysables.length - floor);
 
 	const aRetirer = new Set<number>(fragilesTries.slice(0, removable).map((s) => s.ordre));
 
@@ -134,9 +146,7 @@ export function buildReinforced(input: Selection[], floor = REINFORCED_FLOOR): R
 		probaTotale,
 		probaRenforcee,
 		rienARetirer: aRetirer.size === 0,
-		// Rien retiré MAIS des candidats fragiles existent → c'est le plancher qui a
-		// bloqué (removable = 0 : trop peu de matchs analysés), pas un ticket sain.
-		retraitBloqueParPlancher: aRetirer.size === 0 && fragilesTries.length > 0,
+		toutesFragiles,
 		conflitMemeMatch: hasSameFixtureConflict(analysables)
 	};
 }

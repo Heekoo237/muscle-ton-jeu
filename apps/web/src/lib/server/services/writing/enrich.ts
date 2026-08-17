@@ -140,11 +140,11 @@ function synthNeutre(matchs: string, mMot: string, nbRetirees: number): string[]
 }
 
 function synthRienARetirer(input: WritingInput): string {
-	// Cas (c) : une sélection EST fragile mais le plancher empêche le retrait. Ne
-	// JAMAIS dire « tient debout » — ce serait le mensonge latent (ticket faible,
-	// message rassurant). On le dit honnêtement.
-	if (input.retraitBloqueParPlancher)
-		return 'On ne peut pas alléger ce ticket : il ne reste pas assez de matchs analysés.';
+	// Cas (c) : TOUTES les sélections sont fragiles. Alléger viderait le ticket, on ne
+	// le fait pas. Ne JAMAIS dire « tient debout » — ce serait le mensonge latent
+	// (ticket faible, message rassurant). On le dit honnêtement.
+	if (input.toutesFragiles)
+		return 'Toutes tes sélections sont fragiles. On ne peut pas alléger ce ticket sans le vider.';
 	// Cas (b) : rien de fragile — le ticket tient vraiment.
 	const variantes = ['Rien à retirer. Ton ticket tient debout.', 'Rien à retirer. Ton ticket est solide.'];
 	return variantes[input.nbMatchs % variantes.length];

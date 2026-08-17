@@ -54,10 +54,10 @@ export interface WritingInput {
 	retraits: RetraitEnrichi[];
 	rienARetirer: boolean;
 	/**
-	 * Rien retiré ALORS qu'une sélection est fragile : le plancher bloque le retrait.
-	 * La synthèse ne doit PAS dire « tient debout » dans ce cas.
+	 * Rien retiré parce que TOUTES les sélections sont fragiles : alléger viderait le
+	 * ticket. La synthèse ne doit PAS dire « tient debout » dans ce cas — on le dit.
 	 */
-	retraitBloqueParPlancher?: boolean;
+	toutesFragiles?: boolean;
 }
 
 /** Sortie deux niveaux : une synthèse, puis une explication par sélection retirée. */

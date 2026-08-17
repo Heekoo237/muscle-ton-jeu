@@ -192,10 +192,10 @@ export interface ResultVM {
 	explications: ExplicationVM[];
 	rienARetirer: boolean;
 	/**
-	 * Rien retiré ALORS qu'une sélection est fragile : le plancher de 4 bloque le
-	 * retrait. On n'affiche JAMAIS « ton ticket tient debout » dans ce cas.
+	 * Rien retiré parce que TOUTES les sélections sont fragiles : alléger viderait le
+	 * ticket. On n'affiche JAMAIS « ton ticket tient debout » dans ce cas — on le dit.
 	 */
-	retraitBloqueParPlancher: boolean;
+	toutesFragiles: boolean;
 	conflitMemeMatch: boolean;
 	/** Lignes analysables (résolues ET avec probabilité en base). */
 	nbAnalysables: number;
@@ -204,7 +204,7 @@ export interface ResultVM {
 	/**
 	 * Quand rien n'est retiré : la ligne analysable la plus serrée (probabilité la
 	 * plus basse). `matchLabel` pour l'info neutre « tient debout », `libelleFr` (le
-	 * pari) pour le cas « retrait bloqué ». Calculé en code (min sur des probabilités
+	 * pari) pour le cas « toutes fragiles ». Calculé en code (min sur des probabilités
 	 * lues) — jamais un conseil. `null` s'il y a un retrait, ou aucune ligne analysable.
 	 */
 	laPlusSerree: { matchLabel: string; libelleFr: string; pct: number } | null;

@@ -29,7 +29,7 @@ function sel(ordre: number, proba: number, seuil: number): Selection {
 	};
 }
 
-/** Cinq sélections : quatre solides, une faible (retirée, plancher 4). */
+/** Cinq sélections : quatre solides, une faible (retirée). */
 function jeuAvecUnRetrait(): Selection[] {
 	return [sel(1, 0.8, 0.5), sel(2, 0.8, 0.5), sel(3, 0.8, 0.5), sel(4, 0.8, 0.5), sel(5, 0.3, 0.9)];
 }

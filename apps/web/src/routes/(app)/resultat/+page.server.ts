@@ -101,8 +101,11 @@ async function writeSafely(input: WritingInput, maskNames: string[]): Promise<An
 			`raison=${raison} détail=${detail || '—'}`
 	);
 	return {
+		// Repli SANS IA : on passe par la synthèse déterministe, qui distingue « tout
+		// solide » de « toutes fragiles ». Un texte codé en dur ici (« tient debout »)
+		// pouvait contredire le verdict quand une sélection est fragile.
 		synthese: input.rienARetirer
-			? 'Rien à retirer. Ton ticket tient debout.'
+			? syntheseDeterministe(input)
 			: 'On a repéré les sélections fragiles de ton ticket. Regarde la version renforcée.',
 		parSelection: []
 	};
@@ -150,7 +153,7 @@ export const load: PageServerLoad = async (event) => {
 		})
 	);
 
-	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 4).
+	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 1).
 	const r = buildReinforced(withProbs);
 	// « Analysable » = résolu ET dont la probabilité EXISTE en base (règle UNIQUE,
 	// `isAnalysable`). Une ligne résolue mais sans prédiction n'est PAS analysable :
@@ -191,7 +194,7 @@ export const load: PageServerLoad = async (event) => {
 			synthese: syntheseDeterministe({
 				probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
 				nbFragiles, retraits: [], rienARetirer: r.rienARetirer,
-				retraitBloqueParPlancher: r.retraitBloqueParPlancher
+				toutesFragiles: r.toutesFragiles
 			}),
 			parSelection: []
 		};
@@ -225,7 +228,7 @@ export const load: PageServerLoad = async (event) => {
 		const writingInput: WritingInput = {
 			probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
 			nbFragiles, retraits, rienARetirer: r.rienARetirer,
-			retraitBloqueParPlancher: r.retraitBloqueParPlancher
+			toutesFragiles: r.toutesFragiles
 		};
 		analyse = await writeSafely(writingInput, ticketNames(r.selections));
 	}
@@ -326,7 +329,7 @@ export const load: PageServerLoad = async (event) => {
 		synthese: analyse.synthese,
 		explications,
 		rienARetirer: r.rienARetirer,
-		retraitBloqueParPlancher: r.retraitBloqueParPlancher,
+		toutesFragiles: r.toutesFragiles,
 		conflitMemeMatch: r.conflitMemeMatch,
 		nbAnalysables,
 		nbTotal,

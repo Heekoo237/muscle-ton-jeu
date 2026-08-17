@@ -68,7 +68,9 @@ garanti · sûr · gagnant · imbattable · secret · méthode · gains · fixed
 
 On retire des sélections que l'utilisateur a lui-même choisies. On n'en ajoute jamais, on n'en remplace jamais.
 
-Plancher : jamais moins de 4 sélections dans le ticket renforcé.
+**Plancher : au moins UNE sélection dans le ticket renforcé.** Le seul cas interdit est de tout retirer — on ne vide jamais le ticket. Un plancher plus haut (l'ancien « jamais moins de 4 ») produisait l'effet inverse de son intention : sur un ticket de 4 avec une sélection fragile, il empêchait tout retrait et le renforcé ressortait intact — l'analyse ne servait plus. On barre donc dès qu'il reste une ligne : deux matchs dont un fragile → renforcé à un match ; un seul match fragile → on le dit, sans produire de ticket vide.
+
+**Si TOUTES les sélections sont fragiles**, on ne retire rien et on l'annonce : « Toutes tes sélections sont fragiles. On ne peut pas alléger ce ticket sans le vider. » On ne descend jamais à un renforcé qui ne serait qu'une fragile de plus.
 
 Cette règle est juridique autant que produit. Proposer une sélection que l'utilisateur n'a pas choisie transforme l'outil en pronostiqueur.
 

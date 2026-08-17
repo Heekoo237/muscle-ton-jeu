@@ -98,13 +98,13 @@ describe('synthèse neutre — un retrait sans badge ne se contredit pas', () =>
 		expect(deux).toContain('les sélections les moins solides');
 	});
 
-	it('(c) retrait bloqué par le plancher : jamais « tient debout », on le DIT', () => {
+	it('(c) toutes fragiles : jamais « tient debout », on le DIT', () => {
 		const s = syntheseDeterministe(
-			input([], { rienARetirer: true, retraitBloqueParPlancher: true, nbMatchs: 1, nbFragiles: 1 })
+			input([], { rienARetirer: true, toutesFragiles: true, nbMatchs: 1, nbFragiles: 1 })
 		);
-		expect(s).toContain('On ne peut pas alléger');
+		expect(s).toContain('Toutes tes sélections sont fragiles');
+		expect(s).toContain('sans le vider');
 		expect(s).not.toContain('tient debout');
-		expect(s).not.toContain('solide');
 	});
 
 	it('(b) rien de fragile : synthèse « tient debout » / « solide »', () => {
