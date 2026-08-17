@@ -6,10 +6,10 @@
  * fragiles, et combien de ces fragiles sont effectivement tombés. Aucun « ticket
  * gagné », aucun taux de réussite personnel, aucun gain.
  */
-import { listAnalysedTickets } from './ticketStore';
+import { listAnalysedTickets, type StoredTicket } from './ticketStore';
 import { settleMarket } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
-import type { Market } from '$lib/types';
+import type { Fixture, Market } from '$lib/types';
 
 export interface DashboardStats {
 	ticketsAnalyses: number;
@@ -27,16 +27,36 @@ export interface TicketEnCours {
 }
 
 /**
+ * Charge UNE FOIS les données partagées de l'accueil : tickets analysés de
+ * l'utilisateur, calendrier à venir, matchs terminés. Avant, `dashboardStats` et
+ * `ticketsEnCours` relisaient chacun ces mêmes tables (tickets ×2, à venir ×2,
+ * terminés ×2). On lit ici en parallèle, une seule fois, et les fonctions de
+ * calcul deviennent PURES (aucune requête).
+ */
+export interface DashboardData {
+	analysed: StoredTicket[];
+	upcoming: Fixture[];
+	finished: Fixture[];
+}
+export async function loadDashboardData(userId: number, upcoming: Fixture[]): Promise<DashboardData> {
+	const [analysed, finished] = await Promise.all([
+		listAnalysedTickets(userId),
+		sports.resultsSince(new Date(0).toISOString())
+	]);
+	return { analysed, upcoming, finished };
+}
+
+/**
  * Statistiques d'accueil. `fragilesTombes` se règle contre les matchs terminés
  * (calcul déterministe) ; tant que le pipeline n'a pas de résultats, il vaut 0.
+ * PURE : reçoit les données déjà lues (voir loadDashboardData).
  */
-export async function dashboardStats(userId: number): Promise<DashboardStats> {
-	const analysed = await listAnalysedTickets(userId);
+export function dashboardStats(data: DashboardData): DashboardStats {
+	const { analysed, finished } = data;
 	const ticketsAnalyses = analysed.length;
 	const fragilesMarques = analysed.reduce((n, t) => n + (t.result?.nbFragiles ?? 0), 0);
 
 	// Matchs terminés connus, indexés par fixture.
-	const finished = await sports.resultsSince(new Date(0).toISOString());
 	const scoreOf = new Map<number, { h: number; a: number }>();
 	for (const f of finished) {
 		if (f.scoreHome != null && f.scoreAway != null) {
@@ -60,17 +80,14 @@ export async function dashboardStats(userId: number): Promise<DashboardStats> {
 
 /**
  * Tickets dont au moins un match n'est pas terminé. Trié du plus proche coup
- * d'envoi au plus lointain quand l'horaire est connu.
+ * d'envoi au plus lointain quand l'horaire est connu. PURE : reçoit les données
+ * déjà lues (voir loadDashboardData).
  */
-export async function ticketsEnCours(userId: number): Promise<TicketEnCours[]> {
-	const [analysed, upcoming] = await Promise.all([
-		listAnalysedTickets(userId),
-		sports.upcomingFixtures()
-	]);
+export function ticketsEnCours(data: DashboardData): TicketEnCours[] {
+	const { analysed, upcoming, finished } = data;
 	const dateOf = new Map<number, number>();
 	for (const f of upcoming) dateOf.set(f.id, Date.parse(f.dateUtc));
 
-	const finished = await sports.resultsSince(new Date(0).toISOString());
 	const finishedIds = new Set(finished.map((f) => f.id));
 
 	const out: TicketEnCours[] = [];

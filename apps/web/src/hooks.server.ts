@@ -9,6 +9,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { env } from '$env/dynamic/public';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
+import { runWithDbMeter, currentDbMeter, DB_QUERY_WARN_THRESHOLD } from '$lib/server/dbmeter';
 
 /**
  * Toute erreur non rattrapée (load, rendu, chargement de module) passe ici. On
@@ -49,8 +50,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.safeGetSession = async () => ({ user: null });
 	}
 
-	return resolve(event, {
-		filterSerializedResponseHeaders: (name) =>
-			name === 'content-range' || name === 'x-supabase-api-version'
+	// Chaque requête tourne dans un contexte de MESURE : on compte les requêtes base
+	// et on alerte au-delà du seuil (garde-fou anti-boucle, cf. dbmeter.ts).
+	return runWithDbMeter(async () => {
+		const response = await resolve(event, {
+			filterSerializedResponseHeaders: (name) =>
+				name === 'content-range' || name === 'x-supabase-api-version'
+		});
+		const m = currentDbMeter();
+		// On n'alerte que sur les pages/données (au moins une requête) — pas les assets.
+		if (m && m.count > DB_QUERY_WARN_THRESHOLD) {
+			console.warn(
+				`[dbmeter] ${event.request.method} ${event.url.pathname} — ${m.count} requêtes base ` +
+					`(seuil ${DB_QUERY_WARN_THRESHOLD}) ${JSON.stringify(m.byTable)}`
+			);
+		}
+		return response;
 	});
 };

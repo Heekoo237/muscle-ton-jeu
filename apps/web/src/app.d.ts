@@ -8,6 +8,13 @@ declare global {
 			supabase: SupabaseClient | null;
 			/** Session Auth validée (getUser côté serveur). */
 			safeGetSession: () => Promise<{ user: User | null }>;
+			/**
+			 * Cache PAR REQUÊTE de la session applicative. Les trois `load` d'une page
+			 * (layout app, layout dashboard, page) appelaient `getAppSession` chacun —
+			 * soit 3× `auth.getUser` + 3× lecture `users`. On résout une seule fois et on
+			 * réutilise la promesse (dédoublonnage concurrent).
+			 */
+			appSession?: Promise<import('$lib/server/session').AppSession | null>;
 		}
 		// interface Error {}
 		// interface PageData {}

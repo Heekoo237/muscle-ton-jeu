@@ -45,7 +45,17 @@ export interface AppSession {
 	avatarUrl: string | null;
 }
 
-export async function getAppSession(event: RequestEvent): Promise<AppSession | null> {
+export function getAppSession(event: RequestEvent): Promise<AppSession | null> {
+	// Dédoublonnage PAR REQUÊTE : layout app, layout dashboard et page appellent tous
+	// getAppSession. Sans cache, c'est 3× auth.getUser (réseau) + 3× lecture `users`.
+	// On mémorise la PROMESSE (pas la valeur) pour couvrir les appels concurrents.
+	if (event.locals.appSession) return event.locals.appSession;
+	const p = resolveAppSession(event);
+	event.locals.appSession = p;
+	return p;
+}
+
+async function resolveAppSession(event: RequestEvent): Promise<AppSession | null> {
 	// Chemin réel : Auth Google via Supabase.
 	if (event.locals.supabase) {
 		const { user } = await event.locals.safeGetSession();

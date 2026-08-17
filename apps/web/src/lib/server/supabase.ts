@@ -11,11 +11,37 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
+import { meterQuery } from './dbmeter';
 
 let client: SupabaseClient | null = null;
 
 export function isSupabaseConfigured(): boolean {
 	return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/**
+ * Instrumente le client : chaque `.from(table)` / `.rpc(fn)` est COMPTÉ (dbmeter)
+ * pour la requête HTTP courante. Le comptage est le seul ajout — le comportement
+ * du client ne change pas. Sert au garde-fou « trop de requêtes par page ».
+ */
+function instrument(c: SupabaseClient): SupabaseClient {
+	return new Proxy(c, {
+		get(target, prop, receiver) {
+			if (prop === 'from') {
+				return (table: string) => {
+					meterQuery(table);
+					return target.from(table);
+				};
+			}
+			if (prop === 'rpc') {
+				return (fn: string, ...args: unknown[]) => {
+					meterQuery(`rpc:${fn}`);
+					return (target.rpc as (...a: unknown[]) => unknown)(fn, ...args);
+				};
+			}
+			return Reflect.get(target, prop, receiver);
+		}
+	}) as SupabaseClient;
 }
 
 /** Client admin (service_role). Lève si la configuration est absente. */
@@ -24,9 +50,11 @@ export function supabaseAdmin(): SupabaseClient {
 		throw new Error('Supabase non configuré (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
 	}
 	if (!client) {
-		client = createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
-			auth: { persistSession: false, autoRefreshToken: false }
-		});
+		client = instrument(
+			createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
+				auth: { persistSession: false, autoRefreshToken: false }
+			})
+		);
 	}
 	return client;
 }

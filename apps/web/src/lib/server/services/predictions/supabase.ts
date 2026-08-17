@@ -65,19 +65,31 @@ export class SupabasePredictions implements PredictionsService {
 		return out;
 	}
 
-	async countAnalysees(fixtureIds: number[]): Promise<number> {
-		if (fixtureIds.length === 0) return 0;
-		// On lit les fixture_id présents dans predictions parmi ceux demandés, et on
-		// compte les matchs DISTINCTS (plusieurs marchés/jours par match). La limite
-		// haute couvre largement une fenêtre de 21 jours × marchés.
+	async forFixtures(fixtureIds: number[]): Promise<Map<number, Prediction[]>> {
+		const out = new Map<number, Prediction[]>();
+		if (fixtureIds.length === 0) return out;
+		// UNE requête pour tous les matchs demandés (au lieu d'une par match). Tri par
+		// jour décroissant : on garde la ligne la plus récente par (match, marché).
 		const { data, error } = await supabaseAdmin()
 			.from('predictions')
-			.select('fixture_id')
+			.select(COLS)
 			.in('fixture_id', fixtureIds)
-			.limit(20000);
+			.order('jour_calcul', { ascending: false });
 		if (error) throw error;
-		const distincts = new Set<number>();
-		for (const r of (data ?? []) as { fixture_id: number }[]) distincts.add(Number(r.fixture_id));
-		return distincts.size;
+		const seen = new Map<number, Set<Market>>();
+		for (const r of (data ?? []) as Row[]) {
+			const fid = Number(r.fixture_id);
+			let marches = seen.get(fid);
+			if (!marches) {
+				marches = new Set();
+				seen.set(fid, marches);
+			}
+			if (marches.has(r.marche)) continue; // déjà pris la ligne la plus récente
+			marches.add(r.marche);
+			const list = out.get(fid) ?? [];
+			list.push(toPrediction(r));
+			out.set(fid, list);
+		}
+		return out;
 	}
 }

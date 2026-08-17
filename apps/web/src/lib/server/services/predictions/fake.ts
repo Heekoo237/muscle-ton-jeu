@@ -41,8 +41,9 @@ export class FakePredictions implements PredictionsService {
 		}));
 	}
 
-	async countAnalysees(fixtureIds: number[]): Promise<number> {
-		// En factice, tout match a des probabilités (forFixture en renvoie toujours).
-		return fixtureIds.length;
+	async forFixtures(fixtureIds: number[]): Promise<Map<number, Prediction[]>> {
+		const out = new Map<number, Prediction[]>();
+		for (const id of fixtureIds) out.set(id, await this.forFixture(id));
+		return out;
 	}
 }

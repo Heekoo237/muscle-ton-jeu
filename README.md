@@ -43,6 +43,27 @@ interdit) sont vérifiés en CI.
 > dans `predictions` sur Supabase — jamais dans une fonction serverless. Vision :
 > Gemini Flash ; rédaction : Claude (branchés en Session 8, derrière les services).
 
+## Garde-fous d'exécution (perf + erreurs)
+
+Un même principe que les garde-fous chiffrés du rédacteur (taux de bascule
+template) : on **mesure**, on ne se fie pas à la vigilance.
+
+- **Compteur de requêtes base par page** (`src/lib/server/dbmeter.ts`). Chaque
+  requête `supabaseAdmin().from/rpc` est comptée dans un contexte par-requête
+  (`AsyncLocalStorage`) ; le hook serveur journalise le total et émet un **WARN**
+  au-delà de `DB_QUERY_WARN_THRESHOLD` (15). C'est ce qui rend visible une boucle
+  N+1 (une lecture par match) — un bug qui, sans ça, passe la revue. Cherche
+  `[dbmeter]` dans les logs Vercel.
+- **Session mise en cache par requête** (`getAppSession` via `event.locals`) : les
+  trois `load` d'une page (layout app, layout dashboard, page) ne résolvent la
+  session qu'**une** fois — plus de triple `auth.getUser` + triple lecture `users`.
+- **Isolation d'erreur par section** (`src/lib/server/section.ts`) : un `load`
+  enveloppe chaque lecture indépendante ; si une échoue, elle est journalisée et
+  retombe sur un repli — la page rend le reste, jamais une 500 entière. La
+  frontière : l'auth ne passe pas par `section()` (une session absente redirige) ;
+  tout le reste, oui. Le `handleError` global reste le dernier filet (message
+  lisible + lien support, jamais la stack à l'écran).
+
 ## Stratégie de construction
 
 L'application complète est bâtie **avec des données factices**, chaque source

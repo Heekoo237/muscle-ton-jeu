@@ -11,11 +11,11 @@ export interface PredictionsService {
 	/** Toutes les probabilités stockées d'un match. */
 	forFixture(fixtureId: number): Promise<Prediction[]>;
 	/**
-	 * Combien de matchs, parmi `fixtureIds`, ont au moins une probabilité en table
-	 * (donc « analysés en ce moment »). Sert au compteur honnête du dashboard quand
-	 * aucune lecture du jour n'est disponible. Compte des matchs DISTINCTS.
+	 * Probabilités stockées pour PLUSIEURS matchs, en UNE requête. Renvoie une map
+	 * fixtureId → prédictions (dernière ligne par marché). Remplace l'appel par-match
+	 * (`forFixture` en boucle) qui faisait N requêtes sur le dashboard.
 	 */
-	countAnalysees(fixtureIds: number[]): Promise<number>;
+	forFixtures(fixtureIds: number[]): Promise<Map<number, Prediction[]>>;
 }
 
 import { FakePredictions } from './fake';
