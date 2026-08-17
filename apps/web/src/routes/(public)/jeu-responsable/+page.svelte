@@ -6,7 +6,7 @@
 	<title>Jeu responsable — Muscle Ton Jeu</title>
 	<meta
 		name="description"
-		content="Muscle Ton Jeu est un outil d'analyse. Une probabilité n'est pas une garantie. 18+."
+		content="Muscle Ton Jeu est un outil d'analyse. Rien n'est jamais garanti au foot. 18+."
 	/>
 </svelte:head>
 
@@ -21,7 +21,7 @@
 		bookmaker : on n'accepte aucune mise et on ne verse aucun gain.
 	</p>
 
-	<h2 class="t-h2">Une probabilité n'est pas une garantie</h2>
+	<h2 class="t-h2">Rien n'est jamais garanti au foot</h2>
 	<p class="t-body">
 		Une analyse dit où sont les sélections fragiles d'un ticket. Elle ne dit pas
 		ce qui va arriver. Aucun résultat n'est certain. Ne joue jamais un argent dont

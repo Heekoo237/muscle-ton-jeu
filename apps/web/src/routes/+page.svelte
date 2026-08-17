@@ -253,7 +253,7 @@
 			<!-- Ligne de résultat -->
 			<div style="background:#F8F1E4;border:1px solid #C9B79A;border-radius:14px;padding:clamp(16px,2vw,24px);display:flex;flex-direction:column;gap:8px">
 				<div style="font-size:18px;line-height:1.45;color:#24201B">3 matchs retirés. Tes chances passent de <span style="font-weight:600;font-variant-numeric:tabular-nums">1,3&nbsp;%</span> à <span style="font-weight:600;font-variant-numeric:tabular-nums">7,5&nbsp;%</span>.</div>
-				<div style="font-size:14px;line-height:1.4;color:#6E6357">18+ · Outil d’aide à la décision, pas un pronostic garanti. Une probabilité n’est pas une garantie.</div>
+				<div style="font-size:14px;line-height:1.4;color:#6E6357">18+ · Outil d’aide à la décision, pas un pronostic garanti. Rien n’est jamais garanti au foot.</div>
 			</div>
 
 			<a href="/analyser" style="width:100%;max-width:360px;height:52px;background:transparent;color:#24201B;border:1px solid #C9B79A;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none">Voir le détail</a>

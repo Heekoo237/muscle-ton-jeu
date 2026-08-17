@@ -72,7 +72,7 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 			? 'Retirée du ticket renforcé — sélection la plus fragile.'
 			: 'Retirée du ticket renforcé — sélection fragile.';
 	}
-	if (l.fragile) return 'Sélection fragile — probabilité sous le seuil.';
+	if (l.fragile) return 'Ce pari est trop juste.';
 	return 'Sélection solide.';
 }
 

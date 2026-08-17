@@ -24,8 +24,8 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote(base)).toBe('Sélection solide.');
 	});
 
-	it('ligne fragile → note fragile ; ligne retirée → note retirée', () => {
-		expect(ligneNote({ ...base, fragile: true })).toContain('fragile');
+	it('ligne fragile → « Ce pari est trop juste » ; ligne retirée → note retirée', () => {
+		expect(ligneNote({ ...base, fragile: true })).toBe('Ce pari est trop juste.');
 		expect(ligneNote({ ...base, fragile: true, retiree: true })).toContain('Retirée');
 	});
 
