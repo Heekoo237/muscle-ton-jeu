@@ -12,6 +12,9 @@ import json
 import sys
 from collections import defaultdict
 from datetime import timedelta
+from pathlib import Path
+
+import psycopg
 
 from ..constants import (
     ALT_TOTALS_MARGIN_PCT,
@@ -287,6 +290,39 @@ def _vision_incomplete_rate(cur, alerts: list[str]) -> None:
         print(f"vision      OK — {incompletes}/{lignes} lectures incomplètes aujourd'hui")
 
 
+def _schema_manifest_path() -> Path:
+    """packages/model/mtj_model/pipeline/health.py → packages/db/schema_manifest.json."""
+    return Path(__file__).resolve().parents[3] / "db" / "schema_manifest.json"
+
+
+def _schema_drift(alerts: list[str]) -> None:
+    """Décalage code/base : un objet que le code EXIGE mais que la base n'a pas =
+    une migration non appliquée → 500 côté app, découvert par l'utilisateur. On lit
+    le manifeste (source de vérité unique) et on interroge `verifier_schema` (0019).
+
+    Connexion ISOLÉE : si le moteur est absent, la transaction avortée ne doit pas
+    contaminer les autres contrôles. Rien à écrire (lecture seule)."""
+    path = _schema_manifest_path()
+    try:
+        manifest = path.read_text(encoding="utf-8")
+    except OSError:
+        return  # pas de manifeste dans cet environnement : rien à vérifier
+    try:
+        with connect() as con, con.cursor() as cur:
+            cur.execute("select objet, migration from verifier_schema(%s::jsonb)", (manifest,))
+            rows = cur.fetchall()
+    except psycopg.errors.UndefinedFunction:
+        alerts.append(
+            "schéma : fonction verifier_schema (migration 0019) absente — surveillance "
+            "du décalage code/base INACTIVE. Applique 0019."
+        )
+        return
+    for objet, migration in rows:
+        alerts.append(f"schéma : Manquant : {objet} (migration {migration})")
+    if not rows:
+        print(f"schéma      OK — {path.name} aligné avec la base")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -299,6 +335,8 @@ def check() -> list[str]:
         _nightly_coverage(cur, alerts)
         _repli_promu_rate(cur, alerts)
         _vision_incomplete_rate(cur, alerts)
+    # Contrôle de schéma en DERNIER, connexion isolée (moteur potentiellement absent).
+    _schema_drift(alerts)
     return alerts
 
 

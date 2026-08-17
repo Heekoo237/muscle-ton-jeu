@@ -1,0 +1,24 @@
+{
+  "_doc": "Contrat de schéma : objets base que le CODE DÉPLOYÉ exige pour ne pas tomber en 500. Source de vérité UNIQUE, lue par l'endpoint /api/health/schema (app) ET par la surveillance health.py (cron 6 h → email). RÈGLE : toute migration qui ajoute une table/colonne/fonction lue par le code AJOUTE sa ligne ici, dans le même commit. Voir CLAUDE.md.",
+  "columns": [
+    { "table": "users", "column": "analyses_offertes_utilisees", "migration": "0014" },
+    { "table": "tickets", "column": "resultat_originale", "migration": "0018" },
+    { "table": "tickets", "column": "nb_fragiles", "migration": "0002" },
+    { "table": "tickets", "column": "nb_retirees", "migration": "0002" },
+    { "table": "selections", "column": "raison", "migration": "0002" },
+    { "table": "selections", "column": "match_label", "migration": "0002" },
+    { "table": "selections", "column": "libelle_fr", "migration": "0002" },
+    { "table": "transactions", "column": "reference", "migration": "0013" }
+  ],
+  "tables": [
+    { "table": "rate_limits", "migration": "0015" }
+  ],
+  "functions": [
+    { "name": "confirmer_recharge", "migration": "0013" },
+    { "name": "consommer_analyse_offerte", "migration": "0014" },
+    { "name": "hit_rate_limit", "migration": "0015" },
+    { "name": "debiter_credits", "migration": "0017" },
+    { "name": "record_vision_read", "migration": "0011" },
+    { "name": "reserver_notification", "migration": "0012" }
+  ]
+}
