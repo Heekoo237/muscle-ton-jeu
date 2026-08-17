@@ -40,4 +40,9 @@ export class FakePredictions implements PredictionsService {
 			source: 'model' as const
 		}));
 	}
+
+	async countAnalysees(fixtureIds: number[]): Promise<number> {
+		// En factice, tout match a des probabilités (forFixture en renvoie toujours).
+		return fixtureIds.length;
+	}
 }

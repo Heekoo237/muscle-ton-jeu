@@ -4,6 +4,7 @@ import { sports, predictions } from '$lib/server/services';
 import {
 	choisirAnalyseDuJour,
 	cleDuJour,
+	joursDecart,
 	type AnalyseDuJour,
 	type CandidatJour
 } from '$lib/server/domain/daily-analysis';
@@ -21,16 +22,21 @@ export const load: PageServerLoad = async (event) => {
 
 	// Analyse du jour : DÉTERMINISTE, graine = le jour civil local. Le même jour,
 	// tout le monde voit la même lecture, figée. On la choisit par intérêt (jamais
-	// « la proba la plus haute », qui donnait toujours une double chance) parmi les
-	// matchs du jour. La sélection vit dans domain/daily-analysis.ts (fonction pure,
-	// testée). Ici on n'assemble que les candidats — on ne calcule aucune proba.
+	// « la proba la plus haute », qui donnait toujours une double chance). PRIORITÉ AU
+	// JOUR MÊME ; à défaut, les deux jours suivants (≈ 48 h) — un jour creux, le
+	// dashboard garde un contenu. La sélection vit dans domain/daily-analysis.ts
+	// (fonction pure, testée). Ici on n'assemble que les candidats — aucune proba
+	// n'est calculée : on lit la table predictions.
 	const jour = cleDuJour(Date.now());
 	const fixtures = await sports.upcomingFixtures();
-	// On borne aux matchs du MÊME jour civil local : c'est « la lecture du jour »,
-	// et ça borne le nombre de lectures de predictions.
-	const duJour = fixtures.filter((f) => cleDuJour(Date.parse(f.dateUtc)) === jour);
+	// On borne à aujourd'hui + les deux jours suivants : c'est la fenêtre où la
+	// lecture du jour peut piocher, et ça borne le nombre de lectures de predictions.
+	const fenetre = fixtures.filter((f) => {
+		const d = joursDecart(jour, cleDuJour(Date.parse(f.dateUtc)));
+		return d >= 0 && d <= 2;
+	});
 	const candidats: CandidatJour[] = await Promise.all(
-		duJour.map(async (f) => {
+		fenetre.map(async (f) => {
 			const preds = await predictions.forFixture(f.id);
 			const probas: Partial<Record<Market, number>> = {};
 			for (const p of preds) probas[p.marche] = p.probabilite;
@@ -44,6 +50,12 @@ export const load: PageServerLoad = async (event) => {
 		})
 	);
 	const daily: DailyMatch | null = choisirAnalyseDuJour(candidats, jour);
+
+	// Cas vraiment vide : rien d'intéressant sur 48 h. On ne montre pas un bloc vide,
+	// on montre le compteur honnête — combien de matchs sont analysés en ce moment
+	// (matchs distincts de la fenêtre d'analyse ayant au moins une probabilité).
+	const analyseesEnCours =
+		daily === null ? await predictions.countAnalysees(fixtures.map((f) => f.id)) : 0;
 
 	// État « vue » : une fois consultée dans la journée, on n'affiche plus le
 	// chiffre — on montre le prochain rendez-vous. Consulter = charger l'accueil.
@@ -77,6 +89,7 @@ export const load: PageServerLoad = async (event) => {
 		stats: statsFinal,
 		daily,
 		dailyVue,
+		analyseesEnCours,
 		ticketsEnCours: enCoursFinal,
 		historique: marquee
 	};

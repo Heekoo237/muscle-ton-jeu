@@ -22,6 +22,15 @@
 	// bouton « Ouvrir » pour la revoir.
 	let openedManually = $state(false);
 	const dailyOpen = $derived(!data.dailyVue || openedManually);
+
+	// On DIT quand la lecture ne porte pas sur aujourd'hui : jamais faire passer
+	// demain pour le jour même. Priorité au jour même, sinon les 48 h qui suivent.
+	const INTRO: Record<'jour' | 'demain' | 'apres', string> = {
+		jour: 'Voici une lecture du jour.',
+		demain: 'Voici une lecture pour demain.',
+		apres: 'Voici une lecture pour après-demain.'
+	};
+	const introTexte = $derived(data.daily ? INTRO[data.daily.horizon] : '');
 </script>
 
 <svelte:head><title>Accueil — Muscle Ton Jeu</title></svelte:head>
@@ -60,7 +69,7 @@
 	{#if data.daily}
 		<section class="bloc">
 			<h2 class="t-h2">L'analyse du jour</h2>
-			<p class="t-small dim intro">Voici une lecture du jour.</p>
+			<p class="t-small dim intro">{introTexte}</p>
 			{#if !dailyOpen}
 				<div class="daily vue">
 					<div class="row1">
@@ -73,7 +82,11 @@
 				<div class="daily">
 					<div class="row1">
 						<span class="t-body">{data.daily.matchLabel}</span>
-						<span class="t-cote">{heure.format(new Date(data.daily.dateMs))}</span>
+						<span class="t-cote">
+							{data.daily.horizon === 'jour'
+								? heure.format(new Date(data.daily.dateMs))
+								: kickoff(data.daily.dateMs)}
+						</span>
 					</div>
 					<div class="row1">
 						<span class="t-small dim">{data.daily.libelleFr} · chances réelles</span>
@@ -88,6 +101,22 @@
 					<LegalNote />
 				</div>
 			{/if}
+		</section>
+	{:else if data.analyseesEnCours > 0}
+		<!-- CAS VRAIMENT VIDE : rien d'intéressant sur 48 h. On ne montre pas un bloc
+		     vide — le dashboard a toujours quelque chose à montrer. Compteur honnête
+		     (matchs réellement analysés en ce moment) + invite à envoyer son ticket. -->
+		<section class="bloc">
+			<div class="compteur">
+				<p class="t-h3">
+					{data.analyseesEnCours} match{data.analyseesEnCours > 1 ? 's' : ''} analysé{data.analyseesEnCours >
+					1
+						? 's'
+						: ''} en ce moment.
+				</p>
+				<p class="t-body dim">Envoie ton ticket, on te dit ce qu'il vaut.</p>
+				<a class="btn-primary" href="/analyser">Analyser un ticket</a>
+			</div>
 		</section>
 	{/if}
 
@@ -212,6 +241,22 @@
 	.daily.vue {
 		background: var(--c-canvas-sunk);
 		border-color: var(--c-line);
+	}
+	.compteur {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+		background: var(--c-surface);
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+		padding: var(--s-5);
+	}
+	.compteur .t-h3 {
+		margin: 0;
+	}
+	.compteur .btn-primary {
+		align-self: flex-start;
+		margin-top: var(--s-1);
 	}
 	.row1 {
 		display: flex;

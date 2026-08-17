@@ -36,6 +36,13 @@ export interface CandidatJour {
 	probas: Partial<Record<Market, number>>;
 }
 
+/**
+ * Quand se joue le match de la lecture, par rapport au jour civil de la graine.
+ * On PRIORISE le jour même ; à défaut on pioche dans les deux jours suivants
+ * (≈ 48 h) — mais on le DIT, on ne fait jamais passer demain pour aujourd'hui.
+ */
+export type HorizonJour = 'jour' | 'demain' | 'apres';
+
 export interface AnalyseDuJour {
 	matchLabel: string;
 	dateMs: number;
@@ -43,6 +50,7 @@ export interface AnalyseDuJour {
 	libelleFr: string;
 	probabilitePct: number;
 	famille: FamilleJour;
+	horizon: HorizonJour;
 }
 
 /** Hash déterministe d'une chaîne (jour) → entier positif. Pas de Math.random. */
@@ -58,6 +66,12 @@ export function hashJour(cle: string): number {
 /** Clé de jour LOCALE (UTC+1) — l'analyse se fige par jour civil. */
 export function cleDuJour(nowMs: number): string {
 	return new Date(nowMs + 3600_000).toISOString().slice(0, 10);
+}
+
+/** Écart en jours civils entre deux clés « YYYY-MM-DD » (b − a). Déterministe. */
+export function joursDecart(a: string, b: string): number {
+	const ms = (k: string) => Date.parse(`${k}T00:00:00Z`);
+	return Math.round((ms(b) - ms(a)) / 86_400_000);
 }
 
 function entropie1x2(ph: number, pd: number, pa: number): number {
@@ -119,18 +133,19 @@ function evaluer(c: CandidatJour, famille: FamilleJour): Choix | null {
 }
 
 /**
- * Choisit l'analyse du jour, déterministe pour `dayKey`. Rotation de famille par le
- * jour ; à défaut de candidat pour la famille du jour, on essaie les autres familles
- * (ordre déterministe). Renvoie null si AUCUN match non-évident n'est disponible.
+ * Dans un POOL donné, la meilleure lecture selon la rotation de famille (celle du
+ * jour d'abord, puis les autres). Renvoie le candidat + son choix, ou null si aucun
+ * match non-évident n'est intéressant dans ce pool. Déterministe pour `graine`.
  */
-export function choisirAnalyseDuJour(candidats: CandidatJour[], dayKey: string): AnalyseDuJour | null {
-	const graine = hashJour(dayKey);
-	// Ordre des familles à essayer : celle du jour d'abord, puis les autres.
+function choisirDansPool(
+	pool: CandidatJour[],
+	graine: number
+): { c: CandidatJour; choix: Choix; famille: FamilleJour } | null {
 	const depart = graine % FAMILLES.length;
 	const ordre = [0, 1, 2].map((i) => FAMILLES[(depart + i) % FAMILLES.length]);
 
 	for (const famille of ordre) {
-		const notes = candidats
+		const notes = pool
 			.map((c) => ({ c, choix: evaluer(c, famille) }))
 			.filter((x): x is { c: CandidatJour; choix: Choix } => x.choix !== null)
 			// Tri déterministe : score desc, puis fixtureId (stable, jamais l'ordre DB).
@@ -139,16 +154,42 @@ export function choisirAnalyseDuJour(candidats: CandidatJour[], dayKey: string):
 
 		// Parmi le haut du panier, la graine choisit lequel (varie d'un jour à l'autre).
 		const topK = notes.slice(0, Math.min(5, notes.length));
-		const pick = topK[graine % topK.length];
-		const { c, choix } = pick;
-		return {
-			matchLabel: `${c.teamHome} – ${c.teamAway}`,
-			dateMs: c.dateMs,
-			marche: choix.marche,
-			libelleFr: marketLabelFr(choix.marche, c.teamHome, c.teamAway),
-			probabilitePct: Math.round(choix.proba * 100 * 10) / 10,
-			famille
-		};
+		const { c, choix } = topK[graine % topK.length];
+		return { c, choix, famille };
 	}
 	return null;
+}
+
+/**
+ * Choisit l'analyse du jour, déterministe pour `dayKey`. PRIORITÉ AU JOUR MÊME :
+ * on cherche d'abord une lecture parmi les matchs d'aujourd'hui ; si aucun n'est
+ * intéressant (ou qu'il n'y en a pas), on pioche dans les deux jours suivants
+ * (≈ 48 h) — un jour creux, le dashboard garde ainsi un contenu. Le champ `horizon`
+ * dit honnêtement si la lecture porte sur aujourd'hui, demain ou après-demain.
+ *
+ * Renvoie null seulement si RIEN n'est intéressant sur 48 h : l'appelant montre
+ * alors le compteur honnête plutôt qu'un bloc vide.
+ */
+export function choisirAnalyseDuJour(candidats: CandidatJour[], dayKey: string): AnalyseDuJour | null {
+	const graine = hashJour(dayKey);
+	const ecart = (c: CandidatJour) => joursDecart(dayKey, cleDuJour(c.dateMs));
+	const aujourdhui = candidats.filter((c) => ecart(c) === 0);
+	const suivants = candidats.filter((c) => ecart(c) === 1 || ecart(c) === 2);
+
+	// Le jour même d'abord ; à défaut, les deux jours suivants.
+	const r = choisirDansPool(aujourdhui, graine) ?? choisirDansPool(suivants, graine);
+	if (!r) return null;
+
+	const { c, choix, famille } = r;
+	const d = ecart(c);
+	const horizon: HorizonJour = d === 0 ? 'jour' : d === 1 ? 'demain' : 'apres';
+	return {
+		matchLabel: `${c.teamHome} – ${c.teamAway}`,
+		dateMs: c.dateMs,
+		marche: choix.marche,
+		libelleFr: marketLabelFr(choix.marche, c.teamHome, c.teamAway),
+		probabilitePct: Math.round(choix.proba * 100 * 10) / 10,
+		famille,
+		horizon
+	};
 }

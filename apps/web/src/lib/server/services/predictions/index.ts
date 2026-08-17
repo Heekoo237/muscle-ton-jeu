@@ -10,6 +10,12 @@ export interface PredictionsService {
 	get(fixtureId: number, marche: Market): Promise<Prediction | null>;
 	/** Toutes les probabilités stockées d'un match. */
 	forFixture(fixtureId: number): Promise<Prediction[]>;
+	/**
+	 * Combien de matchs, parmi `fixtureIds`, ont au moins une probabilité en table
+	 * (donc « analysés en ce moment »). Sert au compteur honnête du dashboard quand
+	 * aucune lecture du jour n'est disponible. Compte des matchs DISTINCTS.
+	 */
+	countAnalysees(fixtureIds: number[]): Promise<number>;
 }
 
 import { FakePredictions } from './fake';

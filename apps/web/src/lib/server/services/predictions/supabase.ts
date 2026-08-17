@@ -64,4 +64,20 @@ export class SupabasePredictions implements PredictionsService {
 		}
 		return out;
 	}
+
+	async countAnalysees(fixtureIds: number[]): Promise<number> {
+		if (fixtureIds.length === 0) return 0;
+		// On lit les fixture_id présents dans predictions parmi ceux demandés, et on
+		// compte les matchs DISTINCTS (plusieurs marchés/jours par match). La limite
+		// haute couvre largement une fenêtre de 21 jours × marchés.
+		const { data, error } = await supabaseAdmin()
+			.from('predictions')
+			.select('fixture_id')
+			.in('fixture_id', fixtureIds)
+			.limit(20000);
+		if (error) throw error;
+		const distincts = new Set<number>();
+		for (const r of (data ?? []) as { fixture_id: number }[]) distincts.add(Number(r.fixture_id));
+		return distincts.size;
+	}
 }
