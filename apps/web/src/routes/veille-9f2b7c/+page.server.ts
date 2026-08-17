@@ -23,12 +23,18 @@ import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 
 type Periode = 'jour' | '7j' | '30j';
 
-/** Début de la fenêtre, en ISO. « jour » = depuis minuit UTC ; 7j/30j = glissant. */
+// Fuseau des utilisateurs (Afrique de l'Ouest/Centrale, UTC+1). « Aujourd'hui »
+// commence à MINUIT LOCAL, pas à minuit UTC : en soirée — juste quand ils jouent —
+// une fenêtre calée sur Londres montrerait déjà « demain ». Les chiffres suivent
+// LEUR journée. 7j/30j restent glissants (insensibles au fuseau).
+const UTC_OFFSET_MS = 3_600_000;
+
+/** Début de la fenêtre, en ISO. « jour » = depuis minuit LOCAL (UTC+1) ; 7j/30j = glissant. */
 function depuisDe(p: Periode, nowMs: number): string {
 	if (p === 'jour') {
-		const d = new Date(nowMs);
-		d.setUTCHours(0, 0, 0, 0);
-		return d.toISOString();
+		const local = new Date(nowMs + UTC_OFFSET_MS);
+		local.setUTCHours(0, 0, 0, 0); // minuit dans le repère local…
+		return new Date(local.getTime() - UTC_OFFSET_MS).toISOString(); // …reconverti en UTC
 	}
 	const jours = p === '30j' ? 30 : 7;
 	return new Date(nowMs - jours * 86_400_000).toISOString();
