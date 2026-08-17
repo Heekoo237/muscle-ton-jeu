@@ -109,7 +109,7 @@
 
 	{#if vm.conflitMemeMatch}
 		<p class="t-small conflit" role="note">
-			Deux sélections portent sur le même match. La probabilité combinée est approchée.
+			Deux paris sont sur le même match : les chances affichées sont approximatives.
 		</p>
 	{/if}
 
@@ -164,12 +164,20 @@
 				Tes chances passent de <span class="v">{pctBig(vm.probaTotalePct)}</span> à
 				<span class="v">{pctBig(vm.probaRenforceePct)}</span>.
 			</div>
+			{#if vm.majoriteRetiree}
+				<!-- Plus de la moitié retirée : le renforcé est un ticket très différent.
+				     On le dit — on ne fait pas passer un bout du ticket pour le sien. -->
+				<p class="serree t-body">
+					On a retiré {vm.nbRetirees} de tes {vm.nbAnalysables} matchs. Ce qui reste est plus solide,
+					mais c'est un ticket très différent du tien.
+				</p>
+			{/if}
 		{:else if vm.toutesFragiles}
-			<!-- (c) TOUTES les sélections sont fragiles : alléger viderait le ticket, on ne
-			     le fait pas. On le DIT, jamais « tient debout ». La ligne la plus serrée
+			<!-- (c) TOUTES les sélections sont trop justes : alléger viderait le ticket, on
+			     ne le fait pas. On le DIT, jamais « tient debout ». La ligne la plus serrée
 			     est la plus faible du lot. -->
 			<div class="t-body-lg">
-				Toutes tes sélections sont fragiles. On ne peut pas alléger ce ticket sans le vider.
+				Toutes tes sélections sont trop justes. On ne peut pas alléger ce ticket sans le vider.
 			</div>
 			{#if vm.laPlusSerree}
 				<div class="serree t-body">

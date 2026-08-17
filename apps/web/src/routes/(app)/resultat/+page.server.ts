@@ -243,13 +243,17 @@ export const load: PageServerLoad = async (event) => {
 		//  3) le ticket est substantiel : ≥ 3 sélections analysables, non « tout solide ».
 		const fp = cookies.get('mtj_fp') ?? '';
 		const offreDejaSurAppareil = fp !== '' && (await hasConsumedOffer(fp));
-		const compteEligible = !session.premierTicketUtilise && nbAnalysables >= 3 && !r.rienARetirer;
+		// « Tout solide » (rien retiré ET pas « toutes fragiles ») ne mérite pas l'offre :
+		// le service rendu est mince. « Toutes fragiles », lui, a de la valeur → éligible.
+		const toutSolide = r.rienARetirer && !r.toutesFragiles;
+		const compteEligible = !session.premierTicketUtilise && nbAnalysables >= 3 && !toutSolide;
 		const promoEligible = compteEligible && !offreDejaSurAppareil;
 
 		const charge = computeCharge({
 			nbAnalysables,
 			premierTicket: promoEligible,
-			rienARetirer: r.rienARetirer
+			rienARetirer: r.rienARetirer,
+			toutesFragiles: r.toutesFragiles
 		});
 
 		if (charge.raison === 'premier_ticket') {
@@ -330,6 +334,8 @@ export const load: PageServerLoad = async (event) => {
 		explications,
 		rienARetirer: r.rienARetirer,
 		toutesFragiles: r.toutesFragiles,
+		// Plus de la moitié des analysables retirées (strictement) → on prévient.
+		majoriteRetiree: nbRetirees * 2 > nbAnalysables,
 		conflitMemeMatch: r.conflitMemeMatch,
 		nbAnalysables,
 		nbTotal,

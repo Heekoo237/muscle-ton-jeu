@@ -35,7 +35,7 @@
 	];
 	const faqLeft = [
 		['C’est un site de paris ?', 'Non. On n’accepte aucune mise et on ne verse rien.'],
-		['Vous garantissez que je vais gagner ?', 'Non, jamais. On donne une probabilité, pas une promesse.'],
+		['Vous garantissez que je vais gagner ?', 'Non, jamais. On donne des chances, pas une promesse.'],
 		['Pourquoi vous montrez vos analyses ratées ?', 'Parce qu’un historique trié ne vaut rien.']
 	];
 	const faqRight = [

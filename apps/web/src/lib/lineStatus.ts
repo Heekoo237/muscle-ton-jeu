@@ -30,7 +30,7 @@ const RAISON_LIGNE: Record<RaisonNonAnalyse, string> = {
 	hors_couverture: 'pas au catalogue des compétitions',
 	hors_fenetre: 'match trop loin dans le temps',
 	non_resolu: "on n'a pas retrouvé ce match",
-	non_couvert: 'marché non couvert (buteur, corners…)',
+	non_couvert: 'pari qu’on ne couvre pas (buteur, corners…)',
 	inconnu: 'lecture incertaine',
 	ambigu: 'lecture incertaine',
 	sans_donnee: 'pas encore de données pour ce match'
@@ -42,7 +42,7 @@ const RAISON_RESUME: Record<RaisonNonAnalyse, { un: string; plur: string }> = {
 	hors_couverture: { un: "n'est pas au catalogue", plur: 'ne sont pas au catalogue' },
 	hors_fenetre: { un: 'est trop loin dans le temps', plur: 'sont trop loin dans le temps' },
 	non_resolu: { un: "n'a pas été retrouvé", plur: "n'ont pas été retrouvés" },
-	non_couvert: { un: 'porte sur un marché non couvert', plur: 'portent sur un marché non couvert' },
+	non_couvert: { un: 'porte sur un pari qu’on ne couvre pas', plur: 'portent sur un pari qu’on ne couvre pas' },
 	inconnu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
 	ambigu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
 	sans_donnee: { un: "n'a pas encore de données", plur: "n'ont pas encore de données" }

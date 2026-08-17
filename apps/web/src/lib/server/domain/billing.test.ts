@@ -12,6 +12,30 @@ describe('computeCharge — gratuités et paliers (PRD §8)', () => {
 		expect(c).toMatchObject({ gratuit: true, raison: 'tout_solide' });
 	});
 
+	it('toutes fragiles (≥ 3 analysables) : FACTURÉ, jamais « tout solide »', () => {
+		// Rien n'est retiré, mais on a rendu un vrai service (« tout ton ticket est
+		// trop juste ») → on facture, contrairement au cas « tout solide ».
+		const c = computeCharge({
+			nbAnalysables: 4,
+			premierTicket: false,
+			rienARetirer: true,
+			toutesFragiles: true
+		});
+		expect(c.gratuit).toBe(false);
+		expect(c.raison).toBeUndefined();
+		expect(c.credits).toBe(1);
+	});
+
+	it('toutes fragiles mais < 3 analysables : gratuit (moins_de_3 prime)', () => {
+		const c = computeCharge({
+			nbAnalysables: 2,
+			premierTicket: false,
+			rienARetirer: true,
+			toutesFragiles: true
+		});
+		expect(c).toMatchObject({ gratuit: true, raison: 'moins_de_3' });
+	});
+
 	it('moins de 3 sélections analysables : gratuit', () => {
 		const c = computeCharge({ nbAnalysables: 2, premierTicket: false, rienARetirer: false });
 		expect(c).toMatchObject({ gratuit: true, raison: 'moins_de_3' });

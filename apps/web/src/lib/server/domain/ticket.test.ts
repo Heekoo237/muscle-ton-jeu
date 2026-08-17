@@ -4,6 +4,7 @@ import {
 	creditCost,
 	productProbability,
 	hasSameFixtureConflict,
+	isAnalysable,
 	REINFORCED_FLOOR
 } from './ticket';
 import type { Selection } from '$lib/types';
@@ -116,6 +117,33 @@ describe('buildReinforced — règle d’or n°3 (retrait uniquement, plancher 1
 		expect(r.retirees).toEqual([]);
 		const gardees = r.selections.filter((x) => !x.retireeDuRenforce).length;
 		expect(gardees).toBe(6);
+	});
+});
+
+describe('petits tickets sous le plancher 1 — le renforcé garde du sens', () => {
+	// La règle « strictement plus de la moitié retirée » telle que l'écran la calcule.
+	const majoriteRetiree = (nbRetirees: number, nbAnalysables: number) =>
+		nbRetirees * 2 > nbAnalysables;
+
+	it('(a) 2 matchs, 1 fragile → renforcé à 1 ligne, sa proba a du sens', () => {
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.3)]);
+		const gardees = r.selections.filter((x) => isAnalysable(x));
+		expect(gardees.filter((x) => !x.retireeDuRenforce)).toHaveLength(1);
+		// La proba du renforcé = celle de la seule ligne gardée (0,8) : un nombre réel,
+		// pas un « combiné » d'une seule ligne qui n'aurait pas de sens.
+		expect(r.probaRenforcee).toBeCloseTo(0.8);
+		expect(r.probaRenforcee).toBeGreaterThan(r.probaTotale);
+		// 1 retiré sur 2 = exactement la moitié → PAS d'avertissement « très différent ».
+		expect(majoriteRetiree(r.retirees.length, 2)).toBe(false);
+	});
+
+	it('(b) 3 matchs, 2 fragiles → renforcé à 1 ligne, avertissement « majorité retirée »', () => {
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.3), sel(3, 0.35)]);
+		expect(r.retirees).toEqual([2, 3]);
+		expect(r.selections.filter((x) => !x.retireeDuRenforce && x.marche)).toHaveLength(1);
+		expect(r.probaRenforcee).toBeCloseTo(0.8);
+		// 2 retirés sur 3 → strictement plus de la moitié : on prévient.
+		expect(majoriteRetiree(r.retirees.length, 3)).toBe(true);
 	});
 });
 

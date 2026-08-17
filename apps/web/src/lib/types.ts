@@ -196,6 +196,13 @@ export interface ResultVM {
 	 * ticket. On n'affiche JAMAIS « ton ticket tient debout » dans ce cas — on le dit.
 	 */
 	toutesFragiles: boolean;
+	/**
+	 * Plus de la MOITIÉ des sélections analysables ont été retirées. On le DIT :
+	 * « c'est un ticket très différent du tien ». L'allègement reste honnête, mais on
+	 * ne laisse pas croire que le renforcé est « son » ticket quand il n'en reste qu'un
+	 * bout. Compté en code (nbRetirees vs nbAnalysables) — jamais un jugement.
+	 */
+	majoriteRetiree: boolean;
 	conflitMemeMatch: boolean;
 	/** Lignes analysables (résolues ET avec probabilité en base). */
 	nbAnalysables: number;

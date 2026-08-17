@@ -70,7 +70,9 @@ On retire des sélections que l'utilisateur a lui-même choisies. On n'en ajoute
 
 **Plancher : au moins UNE sélection dans le ticket renforcé.** Le seul cas interdit est de tout retirer — on ne vide jamais le ticket. Un plancher plus haut (l'ancien « jamais moins de 4 ») produisait l'effet inverse de son intention : sur un ticket de 4 avec une sélection fragile, il empêchait tout retrait et le renforcé ressortait intact — l'analyse ne servait plus. On barre donc dès qu'il reste une ligne : deux matchs dont un fragile → renforcé à un match ; un seul match fragile → on le dit, sans produire de ticket vide.
 
-**Si TOUTES les sélections sont fragiles**, on ne retire rien et on l'annonce : « Toutes tes sélections sont fragiles. On ne peut pas alléger ce ticket sans le vider. » On ne descend jamais à un renforcé qui ne serait qu'une fragile de plus.
+**Si TOUTES les sélections sont fragiles**, on ne retire rien et on l'annonce : « Toutes tes sélections sont trop justes. On ne peut pas alléger ce ticket sans le vider. » On ajoute la sélection la plus serrée, pour qu'il reparte avec une information actionnable. On ne descend jamais à un renforcé qui ne serait qu'une fragile de plus. **Ce cas est facturé** (voir Règles de facturation) : on a lu, résolu, calculé et dit quelque chose d'utile.
+
+**Quand on retire plus de la MOITIÉ des sélections analysables**, on le dit : « On a retiré 2 de tes 3 matchs. Ce qui reste est plus solide, mais c'est un ticket très différent du tien. » Le plancher à 1 autorise ces retraits massifs ; on ne laisse jamais croire qu'un bout du ticket est encore « le sien ».
 
 Cette règle est juridique autant que produit. Proposer une sélection que l'utilisateur n'a pas choisie transforme l'outil en pronostiqueur.
 
@@ -103,6 +105,7 @@ Cette règle est juridique autant que produit. Proposer une sélection que l'uti
 | 3 | On ne bloque jamais l'entrée. On bloque uniquement l'affichage du résultat |
 | 4 | Après paiement, retour **exactement sur le ticket en cours**, jamais sur l'accueil |
 | 5 | Gratuit si : premier ticket, ticket entièrement solide, moins de 3 sélections analysables, même ticket sous 24 h |
+| 6 | **« Toutes fragiles » est FACTURÉ**, pas gratuit. C'est un vrai service rendu — lecture, résolution, calcul, et l'information la plus utile : « tout ton ticket est trop juste ». À distinguer de « tout solide » (rien à retirer, ticket sain), qui reste gratuit. La gratuité « moins de 3 analysables » s'applique quand même : un ticket de 2 tout-fragiles reste gratuit |
 
 **Match déjà commencé.** Un match dont le coup d'envoi est passé est **gardé dans le ticket, jamais analysé, jamais facturé**, et l'utilisateur en est **informé explicitement** (« Ce match a déjà commencé — on ne l'analyse pas »). Une analyse d'avant-match n'a plus de sens une fois le coup d'envoi donné, et laisserait croire qu'on prédit un résultat déjà en cours. On le **dit** — on ne prétend jamais ne pas avoir retrouvé le match. Un ticket mixte (matchs à venir + un commencé) analyse normalement les matchs à venir et signale seulement le commencé.
 

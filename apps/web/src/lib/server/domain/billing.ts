@@ -16,6 +16,13 @@ export interface ChargeContext {
 	nbAnalysables: number;
 	premierTicket: boolean;
 	rienARetirer: boolean;
+	/**
+	 * Rien retiré parce que TOUTES les sélections sont trop justes. Ce cas est
+	 * FACTURÉ (contrairement à « tout solide ») : on a lu, résolu, calculé et dit
+	 * quelque chose d'utile — « tout ton ticket est trop juste ». Un vrai service
+	 * rendu, différent de « rien à retirer, ton ticket tient debout ».
+	 */
+	toutesFragiles?: boolean;
 	/** Même ticket déjà analysé sous 24 h (via empreinte). */
 	dejaAnalyseSous24h?: boolean;
 }
@@ -39,9 +46,14 @@ export function computeCharge(ctx: ChargeContext): Charge {
 	// Blocage dur au-delà de 20 (PRD §8.2), y compris avec des crédits.
 	if (cost === null) return { gratuit: false, credits: null, bloque: true };
 
+	// « Tout solide » = rien retiré ET ce n'est PAS « toutes fragiles ». Ce dernier a
+	// de la valeur (on dit « tout ton ticket est trop juste ») → il est facturé, jamais
+	// classé gratuit ici. Il tombe donc dans le régime normal (moins_de_3, puis coût).
+	const toutSolide = ctx.rienARetirer && !ctx.toutesFragiles;
+
 	// Gratuités permanentes.
 	if (ctx.premierTicket) return { gratuit: true, raison: 'premier_ticket', credits: 0, bloque: false };
-	if (ctx.rienARetirer) return { gratuit: true, raison: 'tout_solide', credits: 0, bloque: false };
+	if (toutSolide) return { gratuit: true, raison: 'tout_solide', credits: 0, bloque: false };
 	if (ctx.nbAnalysables < 3) return { gratuit: true, raison: 'moins_de_3', credits: 0, bloque: false };
 	if (ctx.dejaAnalyseSous24h)
 		return { gratuit: true, raison: 'meme_ticket_24h', credits: 0, bloque: false };

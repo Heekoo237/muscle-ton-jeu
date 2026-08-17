@@ -122,7 +122,7 @@
 	<div class="actions-bas">
 		{#if matchResolu && !dejaNonCouvert}
 			<button type="button" class="nc-btn" onclick={onNonCouvert}>
-				Ce marché, on ne le couvre pas
+				Ce pari, on ne le couvre pas
 			</button>
 		{/if}
 		<button type="button" class="retirer" onclick={onRemove}>Retirer cette ligne du ticket</button>

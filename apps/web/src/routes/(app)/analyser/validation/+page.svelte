@@ -173,8 +173,8 @@
 		<div class="rien">
 			<p class="t-body">Aucun match analysable sur ce ticket.</p>
 			<p class="t-small">
-				Les matchs de championnats qu'on ne couvre pas encore, et les marchés non couverts, ne sont
-				pas analysés.
+				Les matchs de championnats qu'on ne couvre pas encore, et les paris qu'on ne couvre pas, ne
+				sont pas analysés.
 			</p>
 			<a class="btn-dark centre" href="/analyser">Analyser un autre ticket</a>
 		</div>

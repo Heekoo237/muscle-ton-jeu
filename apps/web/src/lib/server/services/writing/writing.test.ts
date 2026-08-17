@@ -102,7 +102,7 @@ describe('synthèse neutre — un retrait sans badge ne se contredit pas', () =>
 		const s = syntheseDeterministe(
 			input([], { rienARetirer: true, toutesFragiles: true, nbMatchs: 1, nbFragiles: 1 })
 		);
-		expect(s).toContain('Toutes tes sélections sont fragiles');
+		expect(s).toContain('Toutes tes sélections sont trop justes');
 		expect(s).toContain('sans le vider');
 		expect(s).not.toContain('tient debout');
 	});
