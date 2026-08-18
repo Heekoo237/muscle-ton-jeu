@@ -8,8 +8,8 @@ import {
 } from '$lib/server/fixtures/ticketStore';
 import { listHistoryMarquee } from '$lib/server/fixtures/historyStore';
 import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
-import { hasRecharged, consommerAnalyseOfferte, debiterCredits } from '$lib/server/fixtures/userStore';
-import { getAppSession } from '$lib/server/session';
+import { consommerAnalyseOfferte, debiterCredits } from '$lib/server/fixtures/userStore';
+import { getAppSession, hasRechargedCached } from '$lib/server/session';
 import { predictions, writing, stats } from '$lib/server/services';
 import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
 import { regimeOf } from '$lib/server/domain/regime';
@@ -135,22 +135,31 @@ export const load: PageServerLoad = async (event) => {
 	const session = await getAppSession(event);
 	if (!session) redirect(303, '/connexion?retour=/resultat');
 
-	// 1. Lire les probabilités en table (jamais de calcul ici — règle d'archi n°2).
-	const withProbs: Selection[] = await Promise.all(
-		ticket.selections.map(async (s) => {
-			if (s.etatResolution !== 'certain' || s.fixtureId === null || s.marche === null) return s;
-			const p = await predictions.get(s.fixtureId, s.marche);
-			// Match/marché absent de predictions → probabilité null : non analysé,
-			// non facturé, jamais retiré (règles d'archi). On lit, on ne devine pas.
-			// `source` décide le régime (mesure vs cote) : le texte et les faits en dépendent.
-			return {
-				...s,
-				probabilite: p?.probabilite ?? null,
-				seuilFragile: p?.seuilFragile ?? null,
-				source: p?.source ?? null
-			};
-		})
-	);
+	// 1. Lire les probabilités en table (jamais de calcul ici — règle d'archi n°2), en
+	//    UNE requête pour tout le ticket (avant : un `predictions.get` PAR ligne = N+1,
+	//    la cause de lenteur du résultat sur 3G, comme sur le dashboard).
+	const fixtureIds = [
+		...new Set(
+			ticket.selections
+				.filter((s) => s.etatResolution === 'certain' && s.fixtureId !== null && s.marche !== null)
+				.map((s) => s.fixtureId)
+				.filter((x): x is number => x !== null)
+		)
+	];
+	const predsParMatch = await predictions.forFixtures(fixtureIds);
+	const withProbs: Selection[] = ticket.selections.map((s) => {
+		if (s.etatResolution !== 'certain' || s.fixtureId === null || s.marche === null) return s;
+		// Match/marché absent de predictions → probabilité null : non analysé, non
+		// facturé, jamais retiré (règles d'archi). On lit, on ne devine pas. `source`
+		// décide le régime (mesure vs cote) : le texte et les faits en dépendent.
+		const p = (predsParMatch.get(s.fixtureId) ?? []).find((pr) => pr.marche === s.marche) ?? null;
+		return {
+			...s,
+			probabilite: p?.probabilite ?? null,
+			seuilFragile: p?.seuilFragile ?? null,
+			source: p?.source ?? null
+		};
+	});
 
 	// 2. Produit, marquage fragile PAR MARCHÉ, renforcé par retrait (plancher 1).
 	const r = buildReinforced(withProbs);
@@ -342,14 +351,18 @@ export const load: PageServerLoad = async (event) => {
 				}
 			: null
 	};
-	// Bandeau d'historique : sélections déjà marquées, matchs terminés, issue
-	// réelle. On ne l'affiche QUE s'il y a au moins 20 résultats en base — sinon,
-	// aucun remplissage de démonstration (le bandeau reste absent).
-	const histo = await listHistoryMarquee(40);
+	// Trois lectures INDÉPENDANTES entre elles → en PARALLÈLE (avant : trois attentes
+	// en série). `hasRechargedCached` réutilise la promesse déjà lancée par le layout
+	// (plus de double `count`).
+	//  - bandeau d'historique : affiché seulement si ≥ 20 résultats réels (sinon absent) ;
+	//  - lien de partage court et unique (n'expose aucune donnée de compte) ;
+	//  - a-t-il déjà rechargé (invitation à recharger).
+	const [histo, code, dejaRecharge] = await Promise.all([
+		listHistoryMarquee(40),
+		getOrCreateShareCode(ticket.id),
+		hasRechargedCached(event, session.userId)
+	]);
 	const historique = histo.length >= 20 ? histo : [];
-
-	// Lien de partage court et unique (n'expose aucune donnée de compte).
-	const code = await getOrCreateShareCode(ticket.id);
 	const shareUrl = `${event.url.origin}/p/${code}`;
 	const shareImage = `${event.url.origin}/p/${code}/image`;
 
@@ -363,7 +376,7 @@ export const load: PageServerLoad = async (event) => {
 		ticketId: ticket.id,
 		vm,
 		gratuit: billing.gratuit,
-		montreRecharge: !(await hasRecharged(session.userId)),
+		montreRecharge: !dejaRecharge,
 		historique,
 		shareUrl,
 		shareImage,

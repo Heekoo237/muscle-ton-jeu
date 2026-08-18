@@ -15,6 +15,12 @@ declare global {
 			 * réutilise la promesse (dédoublonnage concurrent).
 			 */
 			appSession?: Promise<import('$lib/server/session').AppSession | null>;
+			/**
+			 * Cache PAR REQUÊTE de `hasRecharged`. Le layout (bandeau crédits) ET la page
+			 * résultat (invitation à recharger) le demandent : sans cache, deux `count`
+			 * pour la même réponse. On résout une fois, on réutilise la promesse.
+			 */
+			rechargeMemo?: Promise<boolean>;
 		}
 		// interface Error {}
 		// interface PageData {}

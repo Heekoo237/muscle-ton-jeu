@@ -6,7 +6,7 @@
  * factice via le cookie 'session=demo'.
  */
 import type { RequestEvent } from '@sveltejs/kit';
-import { ensureAppUser, memDemoUser } from '$lib/server/fixtures/userStore';
+import { ensureAppUser, memDemoUser, hasRecharged } from '$lib/server/fixtures/userStore';
 import { analysesOffertesRestantes } from '$lib/offer';
 
 export const SESSION_COOKIE = 'session';
@@ -46,6 +46,15 @@ export interface AppSession {
 	analysesOffertesRestantes: number;
 	/** Photo de profil Google, si disponible ; sinon null (repli initiale). */
 	avatarUrl: string | null;
+}
+
+/**
+ * `hasRecharged` mémorisé PAR REQUÊTE. Le layout et la page résultat le demandent
+ * tous les deux ; sans cache, deux `count` identiques. On mémorise la promesse.
+ */
+export function hasRechargedCached(event: RequestEvent, userId: number): Promise<boolean> {
+	if (!event.locals.rechargeMemo) event.locals.rechargeMemo = hasRecharged(userId);
+	return event.locals.rechargeMemo;
 }
 
 export function getAppSession(event: RequestEvent): Promise<AppSession | null> {

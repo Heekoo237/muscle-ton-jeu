@@ -43,8 +43,18 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
 	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
-	// Disponibilité de la probabilité vérifiée EN AMONT, une lecture par ligne.
-	const flags = await Promise.all(ticket.selections.map(analysableEnBase));
+	// Disponibilité de la probabilité vérifiée EN AMONT, en UNE requête pour tout le
+	// ticket (avant : une lecture predictions PAR ligne = N+1, lent sur 3G). On lit le
+	// lot, puis on tranche par ligne avec la règle UNIQUE `isAnalysable`.
+	const fixtureIds = [
+		...new Set(ticket.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+	];
+	const preds = await predictions.forFixtures(fixtureIds);
+	const flags = ticket.selections.map((s) => {
+		if (s.fixtureId === null || s.marche === null) return false;
+		const p = (preds.get(s.fixtureId) ?? []).find((pr) => pr.marche === s.marche) ?? null;
+		return isAnalysable({ ...s, probabilite: p?.probabilite ?? null });
+	});
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
 	const selections: ValidationLineVM[] = ticket.selections.map((s, i) => {
