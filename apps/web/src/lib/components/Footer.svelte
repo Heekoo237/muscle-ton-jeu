@@ -11,11 +11,12 @@
 			<a href="/historique">Historique public</a>
 			<a href="/couverture">Compétitions couvertes</a>
 			<a href="/jeu-responsable">Jeu responsable</a>
+			<a href="/confidentialite">Confidentialité</a>
 			<a href="/aide">Aide</a>
 		</nav>
 		<div class="legal">
 			<BadgeAge inverse />
-			<a class="t-small legal-link" href="/legal">Mentions légales · CGU · Confidentialité</a>
+			<a class="t-small legal-link" href="/legal">Mentions légales · CGU</a>
 		</div>
 		<p class="t-small note">
 			Muscle Ton Jeu n’accepte aucune mise et ne verse aucun gain.

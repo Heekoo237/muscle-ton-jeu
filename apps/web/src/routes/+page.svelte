@@ -374,7 +374,7 @@
 						<a href="/jeu-responsable" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Jeu responsable</a>
 					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Mentions légales</a>
 					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">CGU</a>
-					<a href="/legal" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Confidentialité</a>
+					<a href="/confidentialite" style="display:inline-flex;align-items:center;height:48px;font-size:16px;font-weight:600;color:#F8F1E4;text-decoration-color:rgba(248,241,228,0.4)">Confidentialité</a>
 				</div>
 			</div>
 		</div>

@@ -8,6 +8,8 @@
 	<span class="age">18+</span>
 	<a href="/jeu-responsable">Jeu responsable</a>
 	<span class="sep" aria-hidden="true">·</span>
+	<a href="/confidentialite">Confidentialité</a>
+	<span class="sep" aria-hidden="true">·</span>
 	<a href="/legal">Mentions légales</a>
 </footer>
 
