@@ -46,6 +46,18 @@ describe('computeCharge — gratuités et paliers (PRD §8)', () => {
 		const c = computeCharge({ nbAnalysables: 21, rienARetirer: false });
 		expect(c).toMatchObject({ bloque: true, credits: null });
 	});
+
+	it('données incomplètes (ligne « pas encore de données ») : gratuit, prime sur le facturé', () => {
+		// Ticket qui SERAIT facturé (≥ 3 analysables, non tout-solide) mais avec un match
+		// résolu sans prédiction → service non rendu, jamais facturé.
+		const c = computeCharge({ nbAnalysables: 9, rienARetirer: false, donneesIncompletes: true });
+		expect(c).toMatchObject({ gratuit: true, raison: 'donnees_incompletes', credits: 0 });
+	});
+
+	it('données incomplètes mais > 20 : le blocage dur prime (jamais analysé)', () => {
+		const c = computeCharge({ nbAnalysables: 21, rienARetirer: false, donneesIncompletes: true });
+		expect(c).toMatchObject({ bloque: true, credits: null });
+	});
 });
 
 describe('featuredPack — met en avant le pack qui couvre le ticket', () => {

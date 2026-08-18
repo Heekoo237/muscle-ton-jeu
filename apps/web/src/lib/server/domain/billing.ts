@@ -7,6 +7,13 @@
 import { creditCost } from './ticket';
 
 export type GratuitReason =
+	/**
+	 * Au moins une ligne était résolue et couverte mais SANS prédiction en base
+	 * (« pas encore de données ») — un trou transitoire de NOTRE côté (le collecteur
+	 * ou le nocturne n'avait pas encore écrit la proba). On a rendu une analyse
+	 * INCOMPLÈTE : on ne facture pas un service non rendu (CLAUDE.md, en cas de doute).
+	 */
+	| 'donnees_incompletes'
 	| 'tout_solide'
 	| 'moins_de_3'
 	| 'meme_ticket_24h'
@@ -26,6 +33,13 @@ export interface ChargeContext {
 	toutesFragiles?: boolean;
 	/** Même ticket déjà analysé sous 24 h (via empreinte). */
 	dejaAnalyseSous24h?: boolean;
+	/**
+	 * Au moins une ligne « pas encore de données » (résolue, marché couvert, mais
+	 * probabilité absente en base) : trou TRANSITOIRE de notre côté. Analyse
+	 * incomplète → jamais facturée. Ne PAS confondre avec un marché/championnat non
+	 * couvert (définitif) : ceux-là ne déclenchent PAS cette gratuité.
+	 */
+	donneesIncompletes?: boolean;
 }
 
 export interface Charge {
@@ -52,6 +66,12 @@ export function computeCharge(ctx: ChargeContext): Charge {
 
 	// Blocage dur au-delà de 20 (PRD §8.2), y compris avec des crédits.
 	if (cost === null) return { gratuit: false, credits: null, bloque: true };
+
+	// Données incomplètes AVANT toute autre gratuité : c'est le message le plus utile
+	// (« reviens pour l'analyse complète ») ET la garantie qu'on ne facture jamais un
+	// résultat troué. On l'annonce même si le ticket aurait été gratuit autrement.
+	if (ctx.donneesIncompletes)
+		return { gratuit: true, raison: 'donnees_incompletes', credits: 0, bloque: false };
 
 	// « Tout solide » = rien retiré ET ce n'est PAS « toutes fragiles ». Ce dernier a
 	// de la valeur (on dit « tout ton ticket est trop juste ») → il est facturé, jamais

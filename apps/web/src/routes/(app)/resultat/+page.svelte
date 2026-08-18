@@ -107,6 +107,19 @@
 		</div>
 	{/if}
 
+	{#if data.donneesIncompletes}
+		<!-- Trou de données TRANSITOIRE : on ne facture pas un service non rendu, et on
+		     invite au retour. Le message disparaît de lui-même quand la donnée arrive. -->
+		<div class="incomplet" role="note">
+			<p class="t-body">
+				{data.nbSansDonnee > 1
+					? `${data.nbSansDonnee} matchs n'avaient`
+					: "Un match n'avait"} pas encore ses données. On ne te l'a pas facturé. Reviens
+				plus tard pour l'analyse complète — gratuite sous 24 h avec le même ticket.
+			</p>
+		</div>
+	{/if}
+
 	{#if vm.conflitMemeMatch}
 		<p class="t-small conflit" role="note">
 			Deux paris sont sur le même match : les chances affichées sont approximatives.
@@ -612,6 +625,16 @@
 		border: 1px solid var(--c-line);
 		border-radius: var(--r-md);
 		padding: var(--s-4);
+	}
+	.incomplet {
+		background: var(--c-ocre-wash);
+		border: 1px solid var(--c-ocre-line);
+		border-radius: var(--r-md);
+		padding: var(--s-4);
+	}
+	.incomplet .t-body {
+		margin: 0;
+		color: var(--c-ink);
 	}
 	.reutilise .t-body {
 		margin: 0;

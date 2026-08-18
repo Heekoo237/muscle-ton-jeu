@@ -170,6 +170,14 @@ export const load: PageServerLoad = async (event) => {
 	const nbAnalysables = withProbs.filter(isAnalysable).length;
 	const nbTotal = r.selections.length;
 
+	// Ligne « pas encore de données » = résolue, marché COUVERT, mais probabilité
+	// absente en base : trou TRANSITOIRE de notre côté (collecteur/nocturne pas encore
+	// passé). `raisonNonAnalyseDe` ne renvoie 'sans_donnee' QUE dans ce cas — les cas
+	// DÉFINITIFS (hors catalogue, pari non couvert, déjà commencé, hors fenêtre) portent
+	// leur propre raison et ne déclenchent NI la gratuité NI la promesse de retour.
+	const nbSansDonnee = r.selections.filter((s) => raisonNonAnalyseDe(s) === 'sans_donnee').length;
+	const donneesIncompletes = nbSansDonnee > 0;
+
 	// La ligne analysable la plus SERRÉE (probabilité la plus basse) quand rien n'est
 	// retiré — fait calculé en code (min sur des probabilités lues), jamais un conseil.
 	// Calculée dès 1 ligne analysable : le cas « retrait bloqué » (une seule ligne,
@@ -254,7 +262,8 @@ export const load: PageServerLoad = async (event) => {
 		let charge = computeCharge({
 			nbAnalysables,
 			rienARetirer: r.rienARetirer,
-			toutesFragiles: r.toutesFragiles
+			toutesFragiles: r.toutesFragiles,
+			donneesIncompletes
 		});
 
 		if (!charge.gratuit && !charge.bloque) {
@@ -381,6 +390,11 @@ export const load: PageServerLoad = async (event) => {
 		shareUrl,
 		shareImage,
 		reutilise,
+		// Trou de données TRANSITOIRE au moment de l'analyse : ticket non facturé, et on
+		// invite au retour (gratuit sous 24 h). Recalculé à chaque vue : le message
+		// disparaît de lui-même dès que la prédiction est arrivée en base.
+		donneesIncompletes,
+		nbSansDonnee,
 		analyseLeMs: ticket.creeLeMs
 	};
 };
