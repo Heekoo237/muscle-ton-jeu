@@ -8,7 +8,8 @@
     { "table": "selections", "column": "raison", "migration": "0002" },
     { "table": "selections", "column": "match_label", "migration": "0002" },
     { "table": "selections", "column": "libelle_fr", "migration": "0002" },
-    { "table": "transactions", "column": "reference", "migration": "0013" }
+    { "table": "transactions", "column": "reference", "migration": "0013" },
+    { "table": "ondemand_calls", "column": "raison", "migration": "0021" }
   ],
   "tables": [
     { "table": "rate_limits", "migration": "0015" },

@@ -8,14 +8,18 @@
  *
  * Invariants tenus, tous VÉRIFIÉS ailleurs ou ici :
  *  - Règle d'or n°1 : la proba vient du dévigeage (calcul), jamais d'un LLM.
- *  - Anti-clobber : on n'écrit QUE pour les matchs sans probabilité modèle — on ne
- *    rétrograde jamais une proba calibrée (comme l'intérim du collecteur).
- *  - Budget < 2 s : un délai DUR partagé (`DEADLINE_MS`) borne TOUS les appels ; ce
- *    qui n'arrive pas à temps retombe en silence sur « pas encore de données ».
+ *  - CIBLAGE PAR MARCHÉ JOUÉ : on n'appelle QUE si le marché réellement parié manque.
+ *    Un « Boca gagne » (1X2) ne déclenche jamais l'appel par événement (BTTS, ±1,5,
+ *    ±3,5). Un marché déjà connu (modèle OU cote seule) ne déclenche aucun appel.
+ *  - Budget < 2 s : un délai DUR PARTAGÉ (`Budget`) borne TOUS les appels des DEUX
+ *    passes (cotes manquantes + matchs non résolus). Appels ligue EN PARALLÈLE,
+ *    concurrence plafonnée à `CONCURRENCE` — la 3ᵉ ligue n'est plus affamée.
  *  - Panne = repli SILENCIEUX : aucune exception ne remonte à l'appelant.
  *  - Dédup (ligue + récence) : 20 utilisateurs sur le même match paient une fois.
  *  - Disjoncteur : trop d'échecs récents → on CESSE d'appeler (repli collecteur seul).
- *  - Journal : chaque appel fournisseur est tracé (`ondemand_calls`) — crédits inclus.
+ *  - Journal SANS ANGLE MORT : chaque appel ET chaque ABANDON est tracé avec sa
+ *    raison (`ondemand_calls.raison`), agrégé dans `/api/health/ondemand`. Un
+ *    `matchs_ecrits = 0` n'est plus un silence.
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 import { predictions } from '$lib/server/services';
@@ -29,10 +33,14 @@ import {
 } from './provider';
 import { devigMarches, type ProbaCote } from './devig';
 
-/** Délai DUR partagé par tous les appels d'une validation. Jamais > 2 s côté user. */
+/** Délai DUR par défaut, partagé par tous les appels d'une validation. Jamais > 2 s. */
 const DEADLINE_MS = 1500;
+/** On arrête d'engager un appel s'il reste moins que ça (le fetch n'aurait pas le temps). */
+const MARGE_MS = 200;
 /** Dédup : une même ligue (resp. un même événement) n'est ré-interrogée qu'après ce délai. */
 const DEDUP_TTL_S = 900; // 15 min
+/** Appels ligue simultanés MAX : couvre un ticket réel en une vague, borne les connexions. */
+const CONCURRENCE = 5;
 /** Plafond d'appels PAR ÉVÉNEMENT (marchés additionnels) sur une même validation. */
 const MAX_APPELS_EVENEMENT = 4;
 /** Disjoncteur : fenêtre, minimum d'essais avant de conclure, seuil d'échec. */
@@ -40,6 +48,49 @@ const CIRCUIT = { fenetreS: 1800, minEssais: 8, seuil: 0.5 };
 /** Confiance et seuil FIXES du régime cote seule (miroir de `constants.py`). */
 const CONFIANCE_COTE_SEULE = 0.33; // CONFIDENCE_VALUE["faible"]
 const SEUIL_FRAGILE_COTE_SEULE = 0.5; // FRAGILE_THRESHOLD_COTE_SEULE
+
+/** Marchés servis par l'appel LIGUE (h2h + totals 2,5, + double chance dérivée). */
+const LEAGUE_MARKETS: ReadonlySet<Market> = new Set<Market>([
+	'WIN_HOME',
+	'DRAW',
+	'WIN_AWAY',
+	'DC_HOME_DRAW',
+	'DC_DRAW_AWAY',
+	'DC_HOME_AWAY',
+	'OVER_2_5',
+	'UNDER_2_5'
+]);
+/** Marchés servis par l'appel PAR ÉVÉNEMENT (alternate_totals 1,5/3,5 + BTTS). */
+const EVENT_MARKETS: ReadonlySet<Market> = new Set<Market>([
+	'OVER_1_5',
+	'UNDER_1_5',
+	'OVER_3_5',
+	'UNDER_3_5',
+	'BTTS_YES',
+	'BTTS_NO'
+]);
+
+/** Quel appel sert ce marché ? (pilote le ciblage — testé). */
+export function besoinDe(marche: Market): 'league' | 'event' | null {
+	if (LEAGUE_MARKETS.has(marche)) return 'league';
+	if (EVENT_MARKETS.has(marche)) return 'event';
+	return null;
+}
+
+/** Budget de temps DUR partagé entre les deux passes d'une validation. */
+export interface Budget {
+	restant(): number;
+}
+export function nouveauBudget(ms: number = DEADLINE_MS): Budget {
+	const t0 = Date.now();
+	return { restant: () => Math.max(0, ms - (Date.now() - t0)) };
+}
+
+/** Une ligne du ticket à combler : le match ET le marché réellement joué. */
+export interface PickCible {
+	fixtureId: number;
+	marche: Market;
+}
 
 interface Cible {
 	fixtureId: number;
@@ -55,14 +106,55 @@ export interface JournalOndemand {
 	/** Crédits fournisseur consommés (somme des en-têtes x-requests-last). */
 	credits: number;
 	/**
-	 * Fixtures pour lesquels on a bien INTERROGÉ le fournisseur mais qui n'ont AUCUNE
-	 * cote dévigeable (le fournisseur ne price pas ce match) → message honnête
-	 * « pas encore coté », distinct du transitoire « pas encore de données ».
+	 * Fixtures INTERROGÉS mais dont le marché joué reste absent (le fournisseur ne
+	 * price pas ce match) → message honnête « pas encore coté », distinct du
+	 * transitoire « pas encore de données ».
 	 */
 	nonCotes: Set<number>;
 }
 
 const journalVide = (): JournalOndemand => ({ ecrits: 0, appels: 0, credits: 0, nonCotes: new Set() });
+
+type Ligne = ReturnType<typeof versLignes>[number];
+/** Raison d'un abandon (persistée, agrégée dans /api/health/ondemand). */
+type Raison =
+	| 'ligue_non_mappee'
+	| 'deja_connu'
+	| 'budget'
+	| 'plafond'
+	| 'dedup'
+	| 'non_apparie'
+	| 'devigeage_vide';
+
+/** Accumulateur de lignes de journal : on écrit TOUT en UNE insertion (latence). */
+type NoteRow = {
+	cle: string;
+	kind: 'league' | 'event' | 'skip';
+	ok: boolean;
+	credits: number;
+	matchs_ecrits: number;
+	raison: string | null;
+	erreur: string | null;
+};
+function creerJournalDb() {
+	const rows: NoteRow[] = [];
+	return {
+		appel(cle: string, kind: 'league' | 'event', ok: boolean, credits: number, ecrits: number, erreur?: string) {
+			rows.push({ cle, kind, ok, credits, matchs_ecrits: ecrits, raison: null, erreur: erreur ?? null });
+		},
+		skip(cle: string, raison: Raison) {
+			rows.push({ cle, kind: 'skip', ok: true, credits: 0, matchs_ecrits: 0, raison, erreur: null });
+		},
+		async flush() {
+			if (rows.length === 0) return;
+			try {
+				await supabaseAdmin().from('ondemand_calls').insert(rows);
+			} catch {
+				/* le journal ne doit jamais casser la validation */
+			}
+		}
+	};
+}
 
 /** Dédup atomique : TRUE si CE serveur remporte le droit d'appeler `cle` maintenant. */
 async function revendiquer(cle: string): Promise<boolean> {
@@ -79,7 +171,7 @@ async function revendiquer(cle: string): Promise<boolean> {
 	}
 }
 
-/** Disjoncteur ouvert ? (trop d'échecs récents). Fail-closed-safe : en cas de doute, fermé. */
+/** Disjoncteur ouvert ? (trop d'échecs récents). Fail-open : en cas de doute, fermé. */
 async function circuitOuvert(): Promise<boolean> {
 	try {
 		const { data, error } = await supabaseAdmin().rpc('ondemand_circuit_ouvert', {
@@ -94,34 +186,10 @@ async function circuitOuvert(): Promise<boolean> {
 	}
 }
 
-/** Journalise un appel fournisseur (succès/échec, crédits, matchs écrits). Jamais bloquant. */
-async function tracer(
-	cle: string,
-	kind: 'league' | 'event',
-	ok: boolean,
-	credits: number,
-	matchsEcrits: number,
-	erreur?: string
-): Promise<void> {
-	try {
-		await supabaseAdmin().from('ondemand_calls').insert({
-			cle,
-			kind,
-			ok,
-			credits,
-			matchs_ecrits: matchsEcrits,
-			erreur: erreur ?? null
-		});
-	} catch {
-		/* le journal ne doit jamais casser la validation */
-	}
-}
-
 /** Cibles à combler : fixtures À VENIR, résolus, mappés à une clé fournisseur. */
 async function chargerCibles(fixtureIds: number[]): Promise<Cible[]> {
 	if (fixtureIds.length === 0) return [];
 	const admin = supabaseAdmin();
-	// 1) fixtures à venir avec provider_ref (event id) et league_id.
 	const { data: fx } = await admin
 		.from('fixtures')
 		.select('id, provider_ref, league_id, date_utc, statut')
@@ -135,7 +203,6 @@ async function chargerCibles(fixtureIds: number[]): Promise<Cible[]> {
 		statut: string;
 	}[]).filter((r) => r.provider_ref && r.league_id && r.statut === 'scheduled' && r.date_utc > nowIso);
 	if (rows.length === 0) return [];
-	// 2) leagues → fd_code (leagues.provider_ref), puis league_catalog → odds_api_key.
 	const leagueIds = [...new Set(rows.map((r) => r.league_id as number))];
 	const { data: lg } = await admin.from('leagues').select('id, provider_ref').in('id', leagueIds);
 	const fdByLeague = new Map<number, string>();
@@ -159,24 +226,6 @@ async function chargerCibles(fixtureIds: number[]): Promise<Cible[]> {
 	return cibles;
 }
 
-/** Nos fixtures À VENIR correspondant à des event ids fournisseur (provider_ref). */
-async function fixturesParRef(refs: string[]): Promise<{ fixtureId: number; providerRef: string }[]> {
-	if (refs.length === 0) return [];
-	const nowIso = new Date().toISOString();
-	const { data } = await supabaseAdmin()
-		.from('fixtures')
-		.select('id, provider_ref, date_utc, statut')
-		.in('provider_ref', refs);
-	return ((data ?? []) as {
-		id: number;
-		provider_ref: string | null;
-		date_utc: string;
-		statut: string;
-	}[])
-		.filter((r) => r.provider_ref && r.statut === 'scheduled' && r.date_utc > nowIso)
-		.map((r) => ({ fixtureId: r.id, providerRef: r.provider_ref as string }));
-}
-
 /** Convertit les probas dévigées en lignes `predictions` (cote seule / dérivée). */
 function versLignes(fixtureId: number, jour: string, probas: ProbaCote[]) {
 	return probas.map((p) => ({
@@ -190,146 +239,191 @@ function versLignes(fixtureId: number, jour: string, probas: ProbaCote[]) {
 	}));
 }
 
+/** Écrit un lot de lignes `predictions` (upsert idempotent). Renvoie le nombre écrit. */
+async function ecrirePredictions(lignes: Ligne[]): Promise<number> {
+	if (lignes.length === 0) return 0;
+	const { error } = await supabaseAdmin()
+		.from('predictions')
+		.upsert(lignes, { onConflict: 'fixture_id,marche,jour_calcul' });
+	return error ? 0 : lignes.length;
+}
+
 /**
- * Comble les probabilités manquantes des `fixtureIds` donnés. Appelé DANS le chemin
- * d'écriture (validation), jamais dans la lecture temps réel. Ne lève jamais.
+ * Comble les probabilités manquantes pour les LIGNES JOUÉES (`picks`), UNIQUEMENT
+ * sur le marché réellement parié. Appelé DANS le chemin d'écriture (validation),
+ * jamais dans la lecture temps réel. Ne lève jamais. `budget` est partagé avec la
+ * passe « matchs non résolus » pour que le total reste < 2 s.
  */
-export async function remplirCotesManquantes(fixtureIds: number[]): Promise<JournalOndemand> {
+export async function remplirCotesManquantes(
+	picks: PickCible[],
+	budget: Budget = nouveauBudget()
+): Promise<JournalOndemand> {
 	const journal = journalVide();
-	if (!providerConfigured() || !isSupabaseConfigured()) return journal;
+	if (!providerConfigured() || !isSupabaseConfigured() || picks.length === 0) return journal;
+	const jdb = creerJournalDb();
 	try {
 		if (await circuitOuvert()) return journal; // repli collecteur seul (surveillance alerte)
 
+		const fixtureIds = [...new Set(picks.map((p) => p.fixtureId))];
 		const cibles = await chargerCibles(fixtureIds);
-		if (cibles.length === 0) return journal;
+		const cibleById = new Map(cibles.map((c) => [c.fixtureId, c]));
+		const dejaConnu = await predictions.forFixtures(cibles.map((c) => c.fixtureId));
+		const connus = (fid: number) => new Set((dejaConnu.get(fid) ?? []).map((p) => p.marche));
 
-		// Ne combler que les matchs SANS probabilité modèle (anti-clobber). On lit les
-		// prédictions existantes : un fixture déjà couvert (modèle) n'est pas une cible.
-		const uniqIds = [...new Set(cibles.map((c) => c.fixtureId))];
-		const dejaConnu = await predictions.forFixtures(uniqIds);
-		const MODELE = new Set(['odds', 'model', 'repli', 'model_marge_excessive']);
-		const marchesConnus = (fid: number) => new Set((dejaConnu.get(fid) ?? []).map((p) => p.marche));
-		const aProbaModele = (fid: number) =>
-			(dejaConnu.get(fid) ?? []).some((p) => p.source && MODELE.has(p.source));
-		const aCombler = cibles.filter((c) => !aProbaModele(c.fixtureId));
-		if (aCombler.length === 0) return journal;
-
-		const t0 = Date.now();
-		const restant = () => Math.max(0, DEADLINE_MS - (Date.now() - t0));
-		const jour = new Date().toISOString().slice(0, 10);
-		const lignes: ReturnType<typeof versLignes> = [];
-
-		// ── 1) Appel par LIGUE (comble 1X2 + plus/moins 2,5 de TOUS ses matchs ciblés) ──
-		const parLigue = new Map<string, Cible[]>();
-		for (const c of aCombler) {
-			const liste = parLigue.get(c.sportKey) ?? [];
-			liste.push(c);
-			parLigue.set(c.sportKey, liste);
-		}
-		const interrogees = new Set<number>(); // fixtures dont la ligue a répondu
-
-		for (const [sportKey, membres] of parLigue) {
-			if (restant() < 200) break; // plus de budget : on s'arrête proprement
-			if (!(await revendiquer(`od:lg:${sportKey}`))) continue; // déjà comblé récemment
-			const cle = `od:lg:${sportKey}`;
-			try {
-				const { evenements, credits } = await fetchLeagueOdds(sportKey, restant());
-				journal.appels++;
-				journal.credits += credits;
-				// La ligue a répondu : ses matchs du ticket courant sont « interrogés »
-				// (pour trancher ensuite « pas encore coté » vs « pas encore de données »).
-				for (const m of membres) interrogees.add(m.fixtureId);
-				// L'appel ligue (2 crédits) rapporte TOUS les matchs de la ligue : on
-				// comble d'un coup CHACUN de nos matchs à venir qui correspond (par
-				// provider_ref) et n'a pas de proba modèle — pas seulement ceux du ticket
-				// courant. Un prochain ticket sur cette ligue trouvera déjà la donnée.
-				const parRef = new Map<string, EvenementCotes>(evenements.map((e) => [e.eventId, e]));
-				const notres = await fixturesParRef([...parRef.keys()]);
-				const idsNouveaux = notres.map((f) => f.fixtureId).filter((id) => !dejaConnu.has(id));
-				if (idsNouveaux.length > 0) {
-					const sup = await predictions.forFixtures(idsNouveaux);
-					for (const [id, ps] of sup) dejaConnu.set(id, ps);
-				}
-				let ecrits = 0;
-				for (const f of notres) {
-					if (aProbaModele(f.fixtureId)) continue; // anti-clobber : jamais sur du modèle
-					const ev = parRef.get(f.providerRef);
-					if (!ev) continue;
-					const connus = marchesConnus(f.fixtureId);
-					const nouv = devigMarches(ev.cotes).filter((p) => !connus.has(p.marche));
-					const l = versLignes(f.fixtureId, jour, nouv);
-					lignes.push(...l);
-					ecrits += l.length;
-				}
-				await tracer(cle, 'league', true, credits, ecrits);
-			} catch (e) {
-				await tracer(cle, 'league', false, 0, 0, String(e));
+		// CIBLAGE PAR MARCHÉ JOUÉ : on route chaque pari vers l'appel qui le sert, et
+		// UNIQUEMENT si son marché manque encore. Déjà connu / non mappé → journalisé.
+		const besoinLigue = new Map<string, Cible[]>();
+		const besoinEvent: Cible[] = [];
+		const pushUnique = (arr: Cible[], c: Cible) => {
+			if (!arr.some((x) => x.fixtureId === c.fixtureId)) arr.push(c);
+		};
+		for (const p of picks) {
+			const c = cibleById.get(p.fixtureId);
+			if (!c) {
+				jdb.skip(`fx:${p.fixtureId}`, 'ligue_non_mappee');
+				continue;
+			}
+			if (connus(p.fixtureId).has(p.marche)) {
+				jdb.skip(`od:lg:${c.sportKey}`, 'deja_connu'); // déjà analysable → aucun appel (économie)
+				continue;
+			}
+			const besoin = besoinDe(p.marche);
+			if (besoin === 'league') {
+				const arr = besoinLigue.get(c.sportKey) ?? [];
+				pushUnique(arr, c);
+				besoinLigue.set(c.sportKey, arr);
+			} else if (besoin === 'event') {
+				pushUnique(besoinEvent, c);
 			}
 		}
 
-		// ── 2) Marchés ADDITIONNELS par événement (BTTS, plus/moins 1,5 et 3,5) ──
-		let appelsEvenement = 0;
-		for (const c of aCombler) {
-			if (appelsEvenement >= MAX_APPELS_EVENEMENT || restant() < 200) break;
-			if (!(await revendiquer(`od:ev:${c.providerRef}`))) continue;
-			const cle = `od:ev:${c.providerRef}`;
+		const jour = new Date().toISOString().slice(0, 10);
+		const lignes: Ligne[] = [];
+		const interrogees = new Set<number>();
+
+		// ── Appel LIGUE — un par championnat, EN PARALLÈLE (concurrence plafonnée) ──
+		const appelLigue = async (sportKey: string, cs: Cible[]) => {
+			const cle = `od:lg:${sportKey}`;
+			if (budget.restant() < MARGE_MS) {
+				for (const c of cs) jdb.skip(cle, 'budget');
+				return;
+			}
+			if (!(await revendiquer(cle))) {
+				for (const c of cs) jdb.skip(cle, 'dedup');
+				return;
+			}
 			try {
-				const { evenement, credits } = await fetchEventExtras(c.sportKey, c.providerRef, restant());
-				journal.appels++;
-				appelsEvenement++;
+				const { evenements, credits } = await fetchLeagueOdds(sportKey, budget.restant());
 				journal.credits += credits;
-				interrogees.add(c.fixtureId);
+				journal.appels++;
+				const parRef = new Map<string, EvenementCotes>(evenements.map((e) => [e.eventId, e]));
 				let ecrits = 0;
-				if (evenement) {
-					const connus = marchesConnus(c.fixtureId);
-					const nouv = devigMarches(evenement.cotes).filter((p) => !connus.has(p.marche));
+				for (const c of cs) {
+					interrogees.add(c.fixtureId);
+					const ev = parRef.get(c.providerRef);
+					if (!ev) {
+						jdb.skip(cle, 'non_apparie');
+						continue;
+					}
+					const nouv = devigMarches(ev.cotes).filter((p) => !connus(c.fixtureId).has(p.marche));
+					if (nouv.length === 0) {
+						jdb.skip(cle, 'devigeage_vide');
+						continue;
+					}
 					const l = versLignes(c.fixtureId, jour, nouv);
 					lignes.push(...l);
 					ecrits += l.length;
 				}
-				await tracer(cle, 'event', true, credits, ecrits);
+				jdb.appel(cle, 'league', true, credits, ecrits);
 			} catch (e) {
-				await tracer(cle, 'event', false, 0, 0, String(e));
+				jdb.appel(cle, 'league', false, 0, 0, String(e));
 			}
+		};
+
+		const groupes = [...besoinLigue.entries()];
+		for (let i = 0; i < groupes.length; i += CONCURRENCE) {
+			if (budget.restant() < MARGE_MS) {
+				for (const [sk, cs] of groupes.slice(i)) for (const c of cs) jdb.skip(`od:lg:${sk}`, 'budget');
+				break;
+			}
+			await Promise.all(groupes.slice(i, i + CONCURRENCE).map(([sk, cs]) => appelLigue(sk, cs)));
 		}
 
-		// ── 3) Écriture unique (upsert idempotent sur la clé du jour) ──
-		if (lignes.length > 0) {
-			const { error } = await supabaseAdmin()
-				.from('predictions')
-				.upsert(lignes, { onConflict: 'fixture_id,marche,jour_calcul' });
-			if (!error) journal.ecrits = lignes.length;
+		// ── Appel PAR ÉVÉNEMENT — marchés additionnels, plafonné, EN PARALLÈLE ──
+		const appelEvent = async (c: Cible) => {
+			const cle = `od:ev:${c.providerRef}`;
+			if (budget.restant() < MARGE_MS) {
+				jdb.skip(cle, 'budget');
+				return;
+			}
+			if (!(await revendiquer(cle))) {
+				jdb.skip(cle, 'dedup');
+				return;
+			}
+			try {
+				const { evenement, credits } = await fetchEventExtras(c.sportKey, c.providerRef, budget.restant());
+				journal.credits += credits;
+				journal.appels++;
+				interrogees.add(c.fixtureId);
+				let ecrits = 0;
+				if (evenement) {
+					const nouv = devigMarches(evenement.cotes).filter((p) => !connus(c.fixtureId).has(p.marche));
+					if (nouv.length > 0) {
+						const l = versLignes(c.fixtureId, jour, nouv);
+						lignes.push(...l);
+						ecrits += l.length;
+					} else {
+						jdb.skip(cle, 'devigeage_vide');
+					}
+				} else {
+					jdb.skip(cle, 'non_apparie');
+				}
+				jdb.appel(cle, 'event', true, credits, ecrits);
+			} catch (e) {
+				jdb.appel(cle, 'event', false, 0, 0, String(e));
+			}
+		};
+
+		const eventCibles = besoinEvent.slice(0, MAX_APPELS_EVENEMENT);
+		for (const c of besoinEvent.slice(MAX_APPELS_EVENEMENT)) jdb.skip(`od:ev:${c.providerRef}`, 'plafond');
+		for (let i = 0; i < eventCibles.length; i += CONCURRENCE) {
+			if (budget.restant() < MARGE_MS) {
+				for (const c of eventCibles.slice(i)) jdb.skip(`od:ev:${c.providerRef}`, 'budget');
+				break;
+			}
+			await Promise.all(eventCibles.slice(i, i + CONCURRENCE).map((c) => appelEvent(c)));
 		}
 
-		// ── 4) « Pas encore coté » : interrogé, mais toujours aucune proba écrite ──
+		journal.ecrits = await ecrirePredictions(lignes);
+
+		// « Pas encore coté » : interrogé, rien d'écrit, et le marché joué reste absent.
 		const ecritsParFixture = new Set(lignes.map((l) => l.fixture_id));
-		for (const c of aCombler) {
-			if (interrogees.has(c.fixtureId) && !ecritsParFixture.has(c.fixtureId)) {
-				// Le fournisseur a répondu pour la ligue mais ne price pas ce match.
-				if (!marchesConnus(c.fixtureId).size) journal.nonCotes.add(c.fixtureId);
+		for (const p of picks) {
+			if (
+				interrogees.has(p.fixtureId) &&
+				!ecritsParFixture.has(p.fixtureId) &&
+				!connus(p.fixtureId).has(p.marche)
+			) {
+				journal.nonCotes.add(p.fixtureId);
 			}
 		}
 		return journal;
 	} catch {
 		return journal; // panne = repli silencieux, jamais de crash à la validation
+	} finally {
+		await jdb.flush(); // UNE insertion, tout le journal (appels + abandons)
 	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXTENSION — matchs NON RÉSOLUS (le match n'est pas encore en base du tout).
 //
-// Cas distinct de `remplirCotesManquantes` : là, le fixture EXISTE mais n'a pas de
-// proba. Ici, le fixture N'EXISTE PAS — les deux équipes sont reconnues mais aucun
-// match ne les oppose en base (le collecteur ne l'a pas encore relevé : trou de
-// fraîcheur ≤ 6 h — le joueur compose samedi matin un match de l'après-midi). Pour
-// l'utilisateur c'est le même problème : son bookmaker affiche le match, nous non.
-//
-// On déclenche l'appel LIGUE (exigence a : seulement si les DEUX équipes sont
-// reconnues et partagent une ligue du catalogue), même dédup (b), même délai dur
-// (c). Si le fournisseur porte la paire : on CRÉE le fixture, on écrit les probas
-// dé-vigées, et on RE-RÉSOUT via `resolveTicket` (on ne réimplémente pas la
-// résolution — on fait juste EXISTER le match qui manquait). Sinon : message
-// honnête « pas encore coté » (jamais « on n'a pas retrouvé ce match »).
+// Cas distinct : ici le fixture N'EXISTE PAS — les deux équipes sont reconnues mais
+// aucun match ne les oppose en base (trou de fraîcheur ≤ 6 h). On déclenche l'appel
+// LIGUE seulement si les DEUX équipes sont reconnues et partagent une ligue du
+// catalogue ; si le fournisseur porte la paire, on CRÉE le fixture, on écrit les
+// probas, et on RE-RÉSOUT via `resolveTicket`. Sinon : « pas encore coté ».
+// Mêmes garde-fous : budget PARTAGÉ, dédup, disjoncteur, journal des abandons.
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface CibleNonResolue {
@@ -383,7 +477,6 @@ export function trouverEvenement(
 		const { home: evH, away: evA } = reconnaitreEquipes(`${ev.home} – ${ev.away}`, teams);
 		if (!evH || !evA || evH.id === evA.id) continue;
 		if (cible.has(evH.id) && cible.has(evA.id)) {
-			// Le côté vient de l'ÉVÉNEMENT (donnée), jamais de l'ordre du ticket.
 			return { ev, homeTeam: evH, awayTeam: evA };
 		}
 	}
@@ -419,21 +512,23 @@ async function upsertFixture(
 }
 
 /**
- * Comble les lignes NON RÉSOLUES d'un ticket : les deux équipes reconnues mais aucun
- * match en base. Renvoie les sélections mises à jour (re-résolues si le match a pu
- * être créé, sinon marquées `non_cote`). Appelé DANS le chemin d'écriture (validation).
+ * Comble les lignes NON RÉSOLUES d'un ticket. Renvoie les sélections mises à jour
+ * (re-résolues si le match a pu être créé, sinon marquées `non_cote`). `budget` est
+ * partagé avec la passe « cotes manquantes ». Appelé DANS le chemin d'écriture.
  * Ne lève jamais.
  */
 export async function remplirMatchsNonResolus(
 	selections: Selection[],
 	teams: Team[],
-	fixtures: Fixture[]
+	fixtures: Fixture[],
+	budget: Budget = nouveauBudget()
 ): Promise<ResultatNonResolus> {
 	const journal = journalVide();
 	const inchange: ResultatNonResolus = { selections, journal };
 	if (!providerConfigured() || !isSupabaseConfigured()) return inchange;
+	const jdb = creerJournalDb();
 	try {
-		// (a) Candidates : ligne non_resolu, DEUX équipes reconnues, MÊME ligue.
+		// Candidates : ligne non_resolu, DEUX équipes reconnues, MÊME ligue.
 		const cibles: CibleNonResolue[] = [];
 		for (const s of selections) {
 			if (s.raison !== 'non_resolu' || s.fixtureId !== null) continue;
@@ -443,19 +538,16 @@ export async function remplirMatchsNonResolus(
 			cibles.push({ selection: s, home, away, leagueId: home.leagueId });
 		}
 		if (cibles.length === 0) return inchange;
+		if (await circuitOuvert()) return inchange;
 
-		if (await circuitOuvert()) return inchange; // repli collecteur seul
-
-		// Ligue → clé fournisseur (catalogue). Sans clé : pas d'appel.
 		const sportByLeague = await sportKeysForLeagues([...new Set(cibles.map((c) => c.leagueId))]);
+		for (const c of cibles)
+			if (!sportByLeague.has(c.leagueId)) jdb.skip(`fx:${c.selection.ordre}`, 'ligue_non_mappee');
 		const actifs = cibles.filter((c) => sportByLeague.has(c.leagueId));
 		if (actifs.length === 0) return inchange;
 
-		const t0 = Date.now();
-		const restant = () => Math.max(0, DEADLINE_MS - (Date.now() - t0));
 		const jour = new Date().toISOString().slice(0, 10);
 
-		// Par LIGUE : un seul appel (b, dédup partagée avec `remplirCotesManquantes`).
 		const parLigue = new Map<string, CibleNonResolue[]>();
 		for (const c of actifs) {
 			const key = sportByLeague.get(c.leagueId)!;
@@ -467,19 +559,26 @@ export async function remplirMatchsNonResolus(
 		const crees: { selection: Selection; fixture: Fixture; cotes: EvenementCotes['cotes'] }[] = [];
 		const nonCotes = new Set<number>(); // ordre des lignes interrogées mais non portées
 
-		for (const [sportKey, membres] of parLigue) {
-			if (restant() < 200) break;
-			if (!(await revendiquer(`od:lg:${sportKey}`))) continue; // déjà interrogée récemment
+		const appelLigue = async (sportKey: string, membres: CibleNonResolue[]) => {
 			const cle = `od:lg:${sportKey}`;
+			if (budget.restant() < MARGE_MS) {
+				for (const m of membres) jdb.skip(cle, 'budget');
+				return;
+			}
+			if (!(await revendiquer(cle))) {
+				for (const m of membres) jdb.skip(cle, 'dedup');
+				return;
+			}
 			try {
-				const { evenements, credits } = await fetchLeagueOdds(sportKey, restant());
-				journal.appels++;
+				const { evenements, credits } = await fetchLeagueOdds(sportKey, budget.restant());
 				journal.credits += credits;
+				journal.appels++;
 				let ecrits = 0;
 				for (const m of membres) {
 					const trouve = trouverEvenement(evenements, m.home, m.away, teams);
 					if (!trouve || !trouve.ev.commenceIso) {
 						nonCotes.add(m.selection.ordre); // le fournisseur ne porte pas ce match
+						jdb.skip(cle, 'non_apparie');
 						continue;
 					}
 					const id = await upsertFixture(
@@ -506,24 +605,27 @@ export async function remplirMatchsNonResolus(
 					});
 					ecrits++;
 				}
-				await tracer(cle, 'league', true, credits, ecrits);
+				jdb.appel(cle, 'league', true, credits, ecrits);
 			} catch (e) {
-				await tracer(cle, 'league', false, 0, 0, String(e));
+				jdb.appel(cle, 'league', false, 0, 0, String(e));
 			}
+		};
+
+		const groupes = [...parLigue.entries()];
+		for (let i = 0; i < groupes.length; i += CONCURRENCE) {
+			if (budget.restant() < MARGE_MS) {
+				for (const [sk, ms] of groupes.slice(i)) for (const m of ms) jdb.skip(`od:lg:${sk}`, 'budget');
+				break;
+			}
+			await Promise.all(groupes.slice(i, i + CONCURRENCE).map(([sk, ms]) => appelLigue(sk, ms)));
 		}
 
 		// Écrire les probas dé-vigées des matchs créés.
 		const lignes = crees.flatMap((c) => versLignes(c.fixture.id, jour, devigMarches(c.cotes)));
-		if (lignes.length > 0) {
-			const { error } = await supabaseAdmin()
-				.from('predictions')
-				.upsert(lignes, { onConflict: 'fixture_id,marche,jour_calcul' });
-			if (!error) journal.ecrits = lignes.length;
-		}
+		journal.ecrits = await ecrirePredictions(lignes);
 
 		// RE-RÉSOLUTION des seules lignes créées : on réutilise `resolveTicket` avec les
-		// fixtures augmentés (le match existe désormais). On reconstruit le brut depuis
-		// `texteBrut` (ligne complète « Match  Marché  Cote »), on remet l'ordre d'origine.
+		// fixtures augmentés. On reconstruit le brut depuis `texteBrut`, on remet l'ordre.
 		let selectionsMaj = selections;
 		if (crees.length > 0) {
 			const fixturesAug = [...fixtures, ...crees.map((c) => c.fixture)];
@@ -549,5 +651,7 @@ export async function remplirMatchsNonResolus(
 		return { selections: selectionsMaj, journal };
 	} catch {
 		return inchange; // panne = repli silencieux, jamais de crash à la validation
+	} finally {
+		await jdb.flush();
 	}
 }

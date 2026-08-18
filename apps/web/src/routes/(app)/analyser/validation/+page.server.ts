@@ -4,7 +4,12 @@ import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { marketLabelFr } from '$lib/server/domain/market-map';
 import { creditCost, isAnalysable } from '$lib/server/domain/ticket';
 import { predictions, sports } from '$lib/server/services';
-import { remplirCotesManquantes, remplirMatchsNonResolus } from '$lib/server/odds/ondemand';
+import {
+	remplirCotesManquantes,
+	remplirMatchsNonResolus,
+	nouveauBudget,
+	type PickCible
+} from '$lib/server/odds/ondemand';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
 
@@ -164,10 +169,16 @@ export const actions: Actions = {
 		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
 
-		const fixtureIds = [
-			...new Set(ticket.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
-		];
-		const journal = await remplirCotesManquantes(fixtureIds);
+		// UN SEUL budget de temps DUR partagé par les deux passes (cotes manquantes +
+		// matchs non résolus) : le total reste < 2 s même si les deux tournent.
+		const budget = nouveauBudget();
+
+		// Ciblage PAR MARCHÉ JOUÉ : on ne comble que le pari réellement posé (« Boca
+		// gagne » ne va pas chercher les plus/moins). Une ligne résolue = (fixture, marché).
+		const picks: PickCible[] = ticket.selections
+			.filter((s) => s.fixtureId !== null && s.marche !== null)
+			.map((s) => ({ fixtureId: s.fixtureId as number, marche: s.marche as Market }));
+		const journal = await remplirCotesManquantes(picks, budget);
 
 		// Les matchs INTERROGÉS mais que le fournisseur ne price pas portent le message
 		// honnête « pas encore coté » (distinct du transitoire « pas encore de données »).
@@ -184,10 +195,10 @@ export const actions: Actions = {
 		// reconnues et partagent une ligue du catalogue, on interroge la ligue en
 		// direct — le match peut avoir été listé depuis la dernière collecte (trou de
 		// fraîcheur). Trouvé → on crée le fixture et on re-résout ; absent → « pas
-		// encore coté ». Borné < 2 s, jamais bloquant.
+		// encore coté ». Même budget partagé, jamais bloquant.
 		if (selections.some((s) => s.raison === 'non_resolu' && s.fixtureId === null)) {
 			const [fixtures, teams] = await Promise.all([sports.resolutionFixtures(), sports.teams()]);
-			selections = (await remplirMatchsNonResolus(selections, teams, fixtures)).selections;
+			selections = (await remplirMatchsNonResolus(selections, teams, fixtures, budget)).selections;
 		}
 
 		await updateTicket(ticket.id, { selections, statut: 'valide' });
