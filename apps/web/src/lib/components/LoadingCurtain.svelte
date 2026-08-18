@@ -7,6 +7,15 @@
 	//
 	// Contraintes respectées : CSS pur, aucune image, opacity + transform seulement,
 	// prefers-reduced-motion honoré, zéro Ko ajouté (la police est déjà chargée).
+	//
+	// POURQUOI PAS DE DÉRIVE SOUS 760 px (ne la remets pas « pour enrichir l'écran ») :
+	// mesuré au rendu réel à 360 px, la dérive (translate3d -8% sur 26 s) ne parcourt
+	// que ~1,5 px en 1,3 s — INVISIBLE — mais elle promeut un bloc de texte large comme
+	// le viewport en couche GPU (`will-change: transform`). Sur Android d'entrée de
+	// gamme (notre cible), c'est du poids pour rien. Le signal « ça travaille » perçu,
+	// c'est la PULSATION D'OPACITÉ, pas la dérive. On garde donc la pulsation partout,
+	// et la dérive UNIQUEMENT ≥ 760 px (desktop, où le déplacement devient visible et
+	// le GPU n'est pas un souci). Mouvement réduit : tout figé, comme avant.
 	let {
 		steps,
 		current = 0,
@@ -66,16 +75,31 @@
 		white-space: nowrap;
 		color: var(--c-ink);
 		opacity: 0.05;
-		will-change: transform, opacity;
-		animation:
-			curtain-pulse 3.4s ease-in-out infinite,
-			curtain-drift 26s linear infinite;
+		/* Mobile : SEULE la pulsation d'opacité (le signal réellement perçu). Pas de
+		   `will-change: transform` — aucune dérive ici, donc pas de calque GPU inutile. */
+		will-change: opacity;
+		animation: curtain-pulse 3.4s ease-in-out infinite;
 	}
 	.row.alt {
-		animation:
-			curtain-pulse 3.4s ease-in-out infinite,
-			curtain-drift-rev 30s linear infinite;
+		animation: curtain-pulse 3.4s ease-in-out infinite;
 		opacity: 0.035;
+	}
+
+	/* Dérive UNIQUEMENT ≥ 760 px : sous ce seuil elle est invisible (~1 px/s, mesuré à
+	   360 px) et son calque GPU pèse pour rien sur Android d'entrée de gamme. Sur
+	   desktop le déplacement devient visible et le GPU n'est pas un souci. */
+	@media (min-width: 760px) {
+		.row {
+			will-change: transform, opacity;
+			animation:
+				curtain-pulse 3.4s ease-in-out infinite,
+				curtain-drift 26s linear infinite;
+		}
+		.row.alt {
+			animation:
+				curtain-pulse 3.4s ease-in-out infinite,
+				curtain-drift-rev 30s linear infinite;
+		}
 	}
 	@keyframes curtain-pulse {
 		0%,
