@@ -116,6 +116,8 @@ export interface Selection {
 	 *  - 'commence'        : coup d'envoi passé — gardé, jamais analysé ni facturé.
 	 *  - 'ambigu'          : plusieurs lectures possibles (seuil de buts absent).
 	 *  - 'inconnu'         : on n'a pas su lire (match ou pari) — à corriger.
+	 *  - 'non_cote'        : match interrogé à la demande, mais le fournisseur ne le
+	 *                        price pas (distinct du transitoire « pas encore de données »).
 	 */
 	raison?:
 		| 'non_couvert'
@@ -124,7 +126,8 @@ export interface Selection {
 		| 'hors_fenetre'
 		| 'commence'
 		| 'inconnu'
-		| 'ambigu';
+		| 'ambigu'
+		| 'non_cote';
 	/** Cas ambigu : marchés proposés au choix (jamais deviné). */
 	candidates?: Market[];
 	coteSaisie: number | null;

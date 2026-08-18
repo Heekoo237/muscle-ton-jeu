@@ -60,7 +60,7 @@ const DC_DERIVED: [Market, [Market, Market]][] = [
 function groupeValide(vals: (number | undefined)[]): boolean {
 	if (vals.some((v) => v === undefined || v === null)) return false;
 	if (vals.some((v) => (v as number) <= 1)) return false;
-	const sommeImplicite = vals.reduce((a, v) => a + 1 / (v as number), 0);
+	const sommeImplicite = vals.reduce((a: number, v) => a + 1 / (v as number), 0);
 	return sommeImplicite >= 1 - 1e-9; // marge négative → rejeté (comme le collecteur)
 }
 

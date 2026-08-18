@@ -22,7 +22,8 @@ export type RaisonNonAnalyse =
 	| 'non_couvert'
 	| 'inconnu'
 	| 'ambigu'
-	| 'sans_donnee';
+	| 'sans_donnee'
+	| 'non_cote';
 
 /** Fragment par ligne (« Match par match ») : pourquoi CETTE ligne n'est pas analysée. */
 const RAISON_LIGNE: Record<RaisonNonAnalyse, string> = {
@@ -33,7 +34,8 @@ const RAISON_LIGNE: Record<RaisonNonAnalyse, string> = {
 	non_couvert: 'pari qu’on ne couvre pas (buteur, corners…)',
 	inconnu: 'lecture incertaine',
 	ambigu: 'lecture incertaine',
-	sans_donnee: 'pas encore de données pour ce match'
+	sans_donnee: 'pas encore de données pour ce match',
+	non_cote: 'ce match n’est pas encore coté'
 };
 
 /** Verbe accordé pour le RÉSUMÉ agrégé (« 1 match a déjà commencé »). */
@@ -45,7 +47,8 @@ const RAISON_RESUME: Record<RaisonNonAnalyse, { un: string; plur: string }> = {
 	non_couvert: { un: 'porte sur un pari qu’on ne couvre pas', plur: 'portent sur un pari qu’on ne couvre pas' },
 	inconnu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
 	ambigu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
-	sans_donnee: { un: "n'a pas encore de données", plur: "n'ont pas encore de données" }
+	sans_donnee: { un: "n'a pas encore de données", plur: "n'ont pas encore de données" },
+	non_cote: { un: "n'est pas encore coté", plur: 'ne sont pas encore cotés' }
 };
 
 export interface LigneStatutIn {

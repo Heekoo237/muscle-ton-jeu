@@ -4,6 +4,7 @@ import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { marketLabelFr } from '$lib/server/domain/market-map';
 import { creditCost, isAnalysable } from '$lib/server/domain/ticket';
 import { predictions } from '$lib/server/services';
+import { remplirCotesManquantes } from '$lib/server/odds/ondemand';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
 
@@ -152,11 +153,34 @@ export const actions: Actions = {
 	},
 
 	// Valide la lecture : le ticket passe en « valide », direction le résultat.
+	// AVANT de valider (chemin d'ÉCRITURE), on comble à la demande les cotes
+	// manquantes : une ligne résolue mais sans probabilité déclenche un appel
+	// The Odds API pour son championnat, un dévigeage déterministe et une écriture
+	// dans `predictions`. /resultat LIT ensuite normalement (règle d'archi n°2). La
+	// récupération ne lève jamais et est bornée < 2 s ; en cas d'échec on retombe
+	// simplement sur « pas encore de données ».
 	finaliser: async ({ cookies }) => {
 		const id = cookies.get('ticketId');
 		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
-		await updateTicket(ticket.id, { statut: 'valide' });
+
+		const fixtureIds = [
+			...new Set(ticket.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+		];
+		const journal = await remplirCotesManquantes(fixtureIds);
+
+		// Les matchs INTERROGÉS mais que le fournisseur ne price pas portent le message
+		// honnête « pas encore coté » (distinct du transitoire « pas encore de données »).
+		const selections =
+			journal.nonCotes.size > 0
+				? ticket.selections.map((s) =>
+						s.fixtureId !== null && journal.nonCotes.has(s.fixtureId)
+							? { ...s, raison: 'non_cote' as const }
+							: s
+					)
+				: ticket.selections;
+
+		await updateTicket(ticket.id, { selections, statut: 'valide' });
 		redirect(303, '/resultat');
 	}
 };
