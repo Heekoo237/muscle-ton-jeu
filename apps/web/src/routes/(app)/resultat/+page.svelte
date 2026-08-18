@@ -82,7 +82,7 @@
 		}))
 	);
 
-	// Lecture détaillée du coupon : match par match, repliée par défaut.
+	// Lecture détaillée du ticket : match par match, repliée par défaut.
 	let showDetail = $state(false);
 	const nbFragiles = $derived(vm.lignes.filter((l) => l.fragile).length);
 </script>
@@ -201,7 +201,7 @@
 		<LegalNote />
 	</div>
 
-	<!-- Lecture détaillée du coupon : match par match, repliée par défaut. Les
+	<!-- Lecture détaillée du ticket : match par match, repliée par défaut. Les
 	     probabilités par ligne viennent de la table, les notes sont factuelles. -->
 	<section class="detail">
 		<button
@@ -210,7 +210,7 @@
 			aria-expanded={showDetail}
 			onclick={() => (showDetail = !showDetail)}
 		>
-			<span>Lecture détaillée du coupon</span>
+			<span>Lecture détaillée du ticket</span>
 			<span class="chev" aria-hidden="true">{showDetail ? '▾' : '▸'}</span>
 		</button>
 

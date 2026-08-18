@@ -17,7 +17,7 @@ import type { ExplicationVM, LineVM, TicketResult } from '$lib/types';
 export const load: PageServerLoad = async (event) => {
 	const session = (await getAppSession(event))!;
 
-	// DÉMO (convention) : les coupons fictifs s'ouvrent en lecture seule. Voir demo.ts.
+	// DÉMO (convention) : les tickets fictifs s'ouvrent en lecture seule. Voir demo.ts.
 	if (DEMO_MODE && isDemoId(event.params.id)) {
 		return demoTicketDetail(event.params.id, Date.now());
 	}

@@ -171,6 +171,33 @@ Dans le produit connecté, les cotes des sélections restent affichées : l'util
 
 ---
 
+## Historique public — pas de taux de réussite, on montre la DÉTECTION
+
+**Décision arrêtée. Ne pas la défaire sans relire tout ce qui suit.** L'historique public ne montre **jamais un taux de réussite de pari** (« X % de nos tickets passent », « X % du renforcé serait passé »). Il montre la **capacité de détection** de notre marquage fragile, au niveau MATCH :
+
+> « Sur 100 matchs qu'on a marqués trop justes, X sont tombés. Sur ceux qu'on a laissés, seulement Y. »
+
+Trois raisons, chacune bloquante à elle seule — ce n'est pas une préférence esthétique :
+
+1. **Un taux de réussite du renforcé mesurerait un ARTEFACT, pas notre valeur.** Le ticket renforcé a, par construction, **moins de lignes** que l'original (on retire, on n'ajoute jamais — règle d'or n°3). Un combiné plus court passe mécaniquement plus souvent. Afficher « le renforcé passe à 90 % » revient à afficher « les paris courts passent plus » — un effet de structure, pas une preuve de savoir-faire.
+
+2. **Un taux public sans rendement viole notre propre règle de sobriété — et le rendement est hors de portée.** Sur l'historique public, un taux de réussite est **toujours** accompagné du rendement à mise fixe (PRD §12, `BilanPublic`). Or le rendement suppose une cote, et la **règle d'or n°1 interdit d'utiliser `coteSaisie` dans un calcul** ; on n'a pas non plus la cote de marché par sélection au moment du jeu. Donc on **ne peut pas** produire le rendement qui devrait accompagner le taux. Un « taux de réussite » public conforme est **techniquement impossible** aujourd'hui.
+
+3. **Un taux « suis nos retraits et ça passe » nous déguise en pronostiqueur** (ce que la règle d'or n°3 refuse) et se lit comme une **promesse de gain** (règle d'or n°2). La détection ne promet rien : elle dit « quand on pointe un match faible, il tombe vraiment plus » — du diagnostic, pas du gain.
+
+**Pourquoi la détection est le bon chiffre.** C'est **ce que le backtest a mesuré** (calibration + seuil fragile), pas une statistique de production improvisée. Il est **conditionnel à notre marquage**, donc quasi **invariant au type de tickets** : si les utilisateurs se mettent à jouer des tickets courts et sûrs, un taux de réussite bondit sans qu'on ait changé — la détection, elle, ne bouge que si NOTRE détection change. Il est calculable sans cote, à partir de `selections.fragile` (persisté) et des scores `fixtures` (règlement déterministe, `settleMarket`).
+
+**Garde-fous obligatoires si un jour on l'affiche :**
+- **Rien sous 30 matchs FRAGILES réglés** (c'est le seau rare, la contrainte de précision — pas 30 tickets). En dessous, c'est du bruit présenté comme une preuve.
+- Formulation en **détection**, jamais en taux de réussite de pari.
+- Formule **validée juridiquement** avant mise en ligne (la frontière aide-à-la-décision / pronostic est exactement là).
+
+**Ce qu'on peut afficher en second, sans incitation :** le constat factuel des sauvetages, au passé, sans appel à l'action — « 19 fois, on a retiré le match qui est tombé. » Et on **garde la liste brute visible, ratés compris** : la retirer pour ne montrer que nos réussites serait glisser vers le pronostiqueur par omission.
+
+**Le calcul est préparé mais NON affiché** (`domain/detection.ts` + `fixtures/detectionStore.ts`, endpoint privé `/api/health/detection`). La donnée s'accumule dès maintenant depuis les sélections déjà persistées ; le jour où le volume est atteint, les chiffres existent. La page publique reste **vide** tant que le volume n'y est pas — une page vide est plus honnête qu'un chiffre bruité.
+
+---
+
 ## Conformité
 
 | # | Règle |

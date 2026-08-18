@@ -76,7 +76,7 @@ export const load: PageServerLoad = async (event) => {
 		};
 	});
 
-	// DÉMO (convention) : coupons fictifs pour voir la liste peuplée. Voir demo.ts.
+	// DÉMO (convention) : tickets fictifs pour voir la liste peuplée. Voir demo.ts.
 	const toutes = DEMO_MODE ? [...lignes, ...demoHistoLignes(Date.now())] : lignes;
 	return { lignes: toutes };
 };
