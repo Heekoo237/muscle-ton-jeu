@@ -3,8 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
 import { marketLabelFr } from '$lib/server/domain/market-map';
 import { creditCost, isAnalysable } from '$lib/server/domain/ticket';
-import { predictions } from '$lib/server/services';
-import { remplirCotesManquantes } from '$lib/server/odds/ondemand';
+import { predictions, sports } from '$lib/server/services';
+import { remplirCotesManquantes, remplirMatchsNonResolus } from '$lib/server/odds/ondemand';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
 
@@ -171,7 +171,7 @@ export const actions: Actions = {
 
 		// Les matchs INTERROGÉS mais que le fournisseur ne price pas portent le message
 		// honnête « pas encore coté » (distinct du transitoire « pas encore de données »).
-		const selections =
+		let selections =
 			journal.nonCotes.size > 0
 				? ticket.selections.map((s) =>
 						s.fixtureId !== null && journal.nonCotes.has(s.fixtureId)
@@ -179,6 +179,16 @@ export const actions: Actions = {
 							: s
 					)
 				: ticket.selections;
+
+		// Lignes NON RÉSOLUES (match pas encore en base) : si les deux équipes sont
+		// reconnues et partagent une ligue du catalogue, on interroge la ligue en
+		// direct — le match peut avoir été listé depuis la dernière collecte (trou de
+		// fraîcheur). Trouvé → on crée le fixture et on re-résout ; absent → « pas
+		// encore coté ». Borné < 2 s, jamais bloquant.
+		if (selections.some((s) => s.raison === 'non_resolu' && s.fixtureId === null)) {
+			const [fixtures, teams] = await Promise.all([sports.resolutionFixtures(), sports.teams()]);
+			selections = (await remplirMatchsNonResolus(selections, teams, fixtures)).selections;
+		}
 
 		await updateTicket(ticket.id, { selections, statut: 'valide' });
 		redirect(303, '/resultat');

@@ -78,6 +78,22 @@ function matchTeam(name: string, teams: Team[]): Team | null {
 	return near.length >= 1 && new Set(near.map(clubOf)).size === 1 ? near[0] : null;
 }
 
+/**
+ * Reconnaît les deux équipes d'une ligne « A – B » (réutilise `matchTeam`, le
+ * matching interne, pour une SEULE source de vérité). Utilisé par la récupération à
+ * la demande : décider si on peut interroger la ligue d'un match NON RÉSOLU (les
+ * deux équipes connues mais aucun fixture ne les oppose). Ne devine jamais : un côté
+ * non reconnu ressort `null`.
+ */
+export function reconnaitreEquipes(
+	matchText: string,
+	teams: Team[]
+): { home: Team | null; away: Team | null } {
+	const sides = matchText.split(/\s+[-–]\s+/).map((s) => s.trim());
+	if (sides.length < 2) return { home: null, away: null };
+	return { home: matchTeam(sides[0], teams), away: matchTeam(sides[1], teams) };
+}
+
 /** Équipes en base partageant un mot significatif avec `name` (candidats probables
  *  d'un alias manquant). Sert UNIQUEMENT au diagnostic — jamais à résoudre. */
 function candidatesFor(name: string, teams: Team[]): Team[] {
