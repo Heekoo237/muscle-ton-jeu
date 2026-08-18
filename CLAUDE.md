@@ -136,6 +136,8 @@ Nos utilisateurs sont en Afrique francophone. Ce qu'ils **jouent**, c'est le foo
 
 **Les championnats africains DOMESTIQUES (D1 camerounaise, nigériane…) ne sont pas couverts — parce qu'ils sont ABSENTS du catalogue, pas par décision de notre part.** Aucune source ne les price correctement ; en produire des chiffres violerait la règle d'or n°1. Ce n'est pas une frontière qu'on trace, c'est une frontière que la donnée trace. La CAN, elle, **est** dans le catalogue (hors-saison) : elle est couverte comme toute compétition que le fournisseur price. Il n'y a donc **pas** de règle « pas d'Afrique » — il y a une règle « ce que le fournisseur price », et rien d'autre.
 
+**Sujet CLOS — la couverture n'est PAS le problème (mesuré, ne pas y revenir).** Le fournisseur price ~**44 compétitions football actives** (11 modèle · 7 éligibles · 26 cote seule), + les hors-saison qui se réactivent seules. `catalogue_sync` (toutes les 6 h) les **auto-active TOUTES** — aucune curation, aucun « au catalogue mais pas activé ». Sur un échantillon réel de refus, `hors_couverture` ne pesait que **5,6 %**, et tous légitimes (Danemark, D2 suédoise, Coupe de Grèce). Le budget tient large (~4 620 crédits/mois sur un palier de 20 000). Un **second fournisseur ne se justifie pas** tant que `hors_couverture` reste marginal et niche. La vraie cause des refus est ailleurs : `sans_donnee` (trou transitoire, réduit par l'intérim) et `non_resolu` (reconnaissance des noms d'équipes, NOTRE lacune — pas la couverture). Instrument de suivi : **`/api/health/couverture`**.
+
 **Deux régimes de probabilité, selon ce qu'on sait du championnat :**
 
 | Régime | Quand | Source | Confiance | Ce que le texte a le droit de dire |
