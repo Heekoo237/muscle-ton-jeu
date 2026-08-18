@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import CreditsBar from '$lib/components/CreditsBar.svelte';
+	import LiensConformite from '$lib/components/LiensConformite.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -21,6 +22,11 @@
 	<CreditsBar credits={data.credits} show={data.montreCredits} />
 {/if}
 {@render children()}
+<!-- Conformité n°5 : Jeu responsable + mentions légales joignables depuis chaque
+     page connectée hors dashboard (le dashboard a les siens dans son chrome). -->
+{#if !surDashboard}
+	<LiensConformite />
+{/if}
 
 <style>
 	.demo-banniere {

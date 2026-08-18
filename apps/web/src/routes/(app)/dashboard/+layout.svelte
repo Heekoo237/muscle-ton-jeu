@@ -4,6 +4,7 @@
 	// Tokens DESIGN.md, cibles 48px, aucune ombre. Un seul accent visible (le
 	// bouton d'action du contenu) : le wordmark est en encre, pas en accent.
 	import { page } from '$app/stores';
+	import LiensConformite from '$lib/components/LiensConformite.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -123,6 +124,8 @@
 	<!-- CONTENU -->
 	<main class="content">
 		{@render children()}
+		<!-- Conformité n°5 : joignables depuis toutes les pages du dashboard. -->
+		<LiensConformite />
 	</main>
 
 	<!-- NAVIGATION BASSE (mobile) -->

@@ -6,6 +6,7 @@
 	import { libelleOffertes } from '$lib/offer';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import LoadingCurtain from '$lib/components/LoadingCurtain.svelte';
+	import LegalNote from '$lib/components/LegalNote.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -106,6 +107,8 @@
 	{/if}
 
 	<p class="t-body-lg intro measure">Envoie 1 à 3 captures de ton ticket. Rien d'autre.</p>
+	<!-- Conformité n°4 : mention 18+ dans le hero de l'entrée du parcours. -->
+	<LegalNote variant="hero" />
 
 	{#if erreurMsg || localErreur}
 		<p class="erreur t-body" role="alert">{localErreur ?? erreurMsg}</p>

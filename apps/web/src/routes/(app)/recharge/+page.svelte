@@ -48,7 +48,9 @@
 		<TestBanner />
 	{/if}
 
-	{#if data.besoin > 0 && etape === 1}
+	{#if !data.paiementActif}
+		<h1 class="t-h1">Tes analyses offertes sont épuisées</h1>
+	{:else if data.besoin > 0 && etape === 1}
 		<h1 class="t-h1">Ton ticket est prêt.</h1>
 		<p class="t-body-lg sous">
 			{data.besoin} crédit{data.besoin > 1 ? 's' : ''} nécessaire{data.besoin > 1 ? 's' : ''}. Il te
@@ -74,7 +76,14 @@
 		<p class="t-body message" role="alert">{form.message}</p>
 	{/if}
 
-	{#if etape === 1}
+	{#if !data.paiementActif}
+		<!-- BÊTA : pas de formulaire de recharge (paiement non branché) → on oriente
+		     vers le support WhatsApp, sans cul-de-sac. -->
+		<a class="btn-primary wa" href={data.supportUrl} target="_blank" rel="noopener">
+			Écris-nous sur WhatsApp
+		</a>
+		<p class="t-body garde">Ton ticket est gardé. Tu le retrouveras dans ton historique.</p>
+	{:else if etape === 1}
 		<!-- ÉTAPE 1 — saisie -->
 		<section class="bloc">
 			<span class="lab t-small">Pays</span>

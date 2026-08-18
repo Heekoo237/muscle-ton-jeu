@@ -5,6 +5,7 @@ import { ANALYSES_OFFERTES, libelleOffertes } from '$lib/offer';
 import { getAppSession } from '$lib/server/session';
 import { creerTransaction, rechargeEnCours } from '$lib/server/fixtures/rechargeStore';
 import { paiementActif, paiementModeTest } from '$lib/server/paymentMode';
+import { supportLink } from '$lib/support';
 import { PAYS_DEFAUT, paysDe, validerNumero, operateurDe, msisdnComplet } from '$lib/payments/operators';
 
 function safeReturn(url: URL): string {
@@ -17,12 +18,21 @@ export const load: PageServerLoad = async (event) => {
 	if (!session) redirect(303, '/connexion?retour=/recharge');
 	const { url, cookies } = event;
 	const besoin = Number(url.searchParams.get('besoin')) || 0;
-	// Redirigé pour manque de crédits alors que les analyses offertes sont épuisées :
-	// on le dit clairement (il sait ce qu'il a eu, il sait ce qui suit).
+	const paiement = paiementActif();
+
+	// BÊTA — le paiement n'est pas branché. Plutôt qu'un formulaire de recharge en
+	// cul-de-sac (qui échouerait en « pas disponible »), on affiche un message franc
+	// + un lien support WhatsApp : on crédite les testeurs à la main, et surtout on
+	// apprend QUI veut continuer (information précieuse). Voir +page.svelte.
 	const message =
-		besoin > 0 && session.analysesOffertesRestantes === 0
-			? `Tu as utilisé tes ${libelleOffertes(ANALYSES_OFFERTES)}. Recharge à partir de 500 F pour continuer.`
-			: null;
+		!paiement && session.analysesOffertesRestantes === 0
+			? `Tu as utilisé tes ${libelleOffertes(ANALYSES_OFFERTES)}. Le paiement arrive bientôt — écris-nous si tu veux continuer à tester.`
+			: besoin > 0 && session.analysesOffertesRestantes === 0
+				? `Tu as utilisé tes ${libelleOffertes(ANALYSES_OFFERTES)}. Recharge à partir de 500 F pour continuer.`
+				: null;
+	const supportUrl = supportLink(
+		'Bonjour, j’ai utilisé mes analyses offertes et je veux continuer à tester Muscle Ton Jeu.'
+	);
 
 	// Une recharge déjà en cours ? On le dit et on offre de la reprendre (au lieu d'en
 	// lancer une seconde — cf. garde double-recharge dans l'action).
@@ -35,7 +45,8 @@ export const load: PageServerLoad = async (event) => {
 		packs: PACKS,
 		message,
 		paysDefaut: cookies.get('mtj_pays') || PAYS_DEFAUT, // mémorisé d'une recharge à l'autre
-		paiementActif: paiementActif(),
+		paiementActif: paiement,
+		supportUrl,
 		modeTest: paiementModeTest(),
 		enCours: enCours ? { reference: enCours.reference } : null
 	};
