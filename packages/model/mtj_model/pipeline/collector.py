@@ -28,7 +28,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from .db import connect, window_6h
-from .predictions_io import cote_seule_rows, write_predictions
+from .predictions_io import cote_seule_rows, fixtures_deja_modelisees, write_predictions
 from .version import print_banner
 from .provider import NullProvider, get_provider
 from .quota import assert_quota_ok, planned_monthly_credits
@@ -145,17 +145,30 @@ def run_collector(days: int = 7, now: datetime | None = None, force_all: bool = 
                         total += 1
                     if odds:
                         marges[lg["fd_code"]] = _margins(odds)
-                    # COTE SEULE : on écrit la prédiction TOUT DE SUITE, sans attendre
-                    # le nocturne. Dévigeage déterministe (aucun modèle, aucun
+                    # COTE SEULE EN DIRECT : on écrit la prédiction TOUT DE SUITE, sans
+                    # attendre le nocturne. Dévigeage déterministe (aucun modèle, aucun
                     # historique), lu depuis les snapshots qu'on vient d'écrire, via la
-                    # MÊME fonction que le nocturne (predictions_io.cote_seule_rows) →
-                    # valeur identique, deux écrivains sans divergence. Le modèle, lui,
-                    # reste au nocturne (il a besoin de l'ajustement Dixon-Coles).
-                    if lg["regime"] == "cote_seule" and touched:
-                        rows = cote_seule_rows(con, lg["fd_code"], touched)
-                        write_predictions(con, rows, jour)
-                        preds_par_ligue[lg["fd_code"]] = len(rows)
-                        preds_total += len(rows)
+                    # MÊME fonction que le nocturne (cote_seule_rows) → valeur identique,
+                    # deux écrivains sans divergence. Source cote_seule/cote_derivee →
+                    # l'app la lit en régime « cote » (aucun fait, « d'après les cotes »).
+                    #
+                    #  - Régime COTE SEULE : le collecteur est l'autorité → on rafraîchit
+                    #    TOUS les matchs collectés (odds à jour à chaque tour).
+                    #  - Régime MODÈLE : INTÉRIM pour fermer le trou de 24 h (le nocturne
+                    #    ne passe qu'une fois/jour). On n'écrit QUE les matchs SANS proba
+                    #    modèle — jamais on n'écrase ni ne rétrograde une proba calibrée.
+                    #    Le nocturne écrasera l'intérim ensuite ; dès qu'un match est
+                    #    modélisé, le collecteur ne le réécrit plus.
+                    if touched:
+                        if lg["regime"] == "cote_seule":
+                            cible = touched
+                        else:
+                            cible = touched - fixtures_deja_modelisees(con, touched)
+                        if cible:
+                            rows = cote_seule_rows(con, lg["fd_code"], cible)
+                            write_predictions(con, rows, jour)
+                            preds_par_ligue[lg["fd_code"]] = len(rows)
+                            preds_total += len(rows)
             except Exception as exc:  # noqa: BLE001
                 erreurs[lg["fd_code"]] = str(exc)[:300]
 

@@ -78,6 +78,28 @@ def upcoming_frame(fixture_ids) -> pd.DataFrame:
     return pd.DataFrame({"fixture_id": list(fixture_ids)})
 
 
+def fixtures_deja_modelisees(con, fixture_ids) -> set[int]:
+    """Sous-ensemble de `fixture_ids` ayant DÉJÀ une prédiction de source MODÈLE
+    (odds/model/repli/…), toutes dates confondues — c.-à-d. autre que cote_seule /
+    cote_derivee.
+
+    Sert à l'INTÉRIM cote seule du collecteur en régime modèle : on n'écrit (ou ne
+    rafraîchit) l'intérim QUE pour les matchs sans proba modèle, pour ne JAMAIS
+    écraser ni rétrograder une probabilité calibrée posée par le nocturne. Le
+    nocturne, lui, écrase l'intérim ensuite (upsert par (match, marché, jour)).
+    """
+    fids = [int(f) for f in fixture_ids]
+    if not fids:
+        return set()
+    with con.cursor() as cur:
+        cur.execute(
+            "select distinct fixture_id from predictions "
+            "where fixture_id = any(%s) and source not in ('cote_seule', 'cote_derivee')",
+            (fids,),
+        )
+        return {int(r[0]) for r in cur.fetchall()}
+
+
 def cote_seule_rows(con, fd_code: str, fixture_ids) -> list[PredictionRow]:
     """Prédictions COTE SEULE d'un ensemble de fixtures, lues depuis `odds_snapshots`.
 
