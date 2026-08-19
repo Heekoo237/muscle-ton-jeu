@@ -29,6 +29,19 @@
 	);
 	const dataState = $derived(calme ? 'noncouvert' : etat);
 	const icone = $derived(certainOk ? '✓' : calme ? '–' : etat === 'ambigu' ? '▲' : '✕');
+	// DERNIER REMPART. Sur une ligne NON analysée dont la cause peut être une MAUVAISE
+	// LECTURE (marché non couvert, match non retrouvé, à corriger…), on montre le TEXTE
+	// BRUT lu — la seule protection de l'utilisateur contre ce que le code ne peut pas
+	// attraper (réécriture auto-cohérente de la vision). On l'exclut là où la lecture
+	// était bonne et où c'est un souci de DONNÉE ou de TIMING (déjà commencé, hors
+	// fenêtre, résolu sans prédiction).
+	const montrerLu = $derived(
+		!certainOk &&
+			!sansPrediction &&
+			raison !== 'commence' &&
+			raison !== 'hors_fenetre' &&
+			!!selection.texteBrut
+	);
 </script>
 
 <button class="line" data-state={dataState} type="button" onclick={() => onOpen(selection)}>
@@ -56,6 +69,9 @@
 			<div class="hint">On n'a pas lu ton pari — tape pour corriger</div>
 		{:else}
 			<div class="hint">On n'a pas lu ce match — tape pour retirer</div>
+		{/if}
+		{#if montrerLu}
+			<div class="lu">on a lu : « {selection.texteBrut} »</div>
 		{/if}
 	</div>
 	{#if certainOk && selection.coteSaisie != null}
@@ -168,6 +184,16 @@
 	}
 	.hint.oc {
 		color: var(--c-ocre);
+	}
+	/* « On a lu » : le texte brut de la vision, pour que l'utilisateur repère une
+	   mauvaise lecture. Discret (plus petit, plus pâle), coupé si trop long. */
+	.lu {
+		font-size: 12px;
+		color: var(--c-ink-3);
+		margin-top: 2px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.cote {
 		flex: 0 0 44px;
