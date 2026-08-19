@@ -1,40 +1,37 @@
 import type { PageServerLoad } from './$types';
+import { computePublicHistory } from '$lib/server/fixtures/publicHistoryStore';
+import { libelleDate, type TicketPublic } from '$lib/server/domain/publicHistory';
 
 /**
- * Historique public (PRD §12). Chaque analyse est publiée et horodatée AVANT le
- * coup d'envoi, non modifiable après, ratés inclus. Deux chiffres toujours
- * ensemble : taux de réussite ET rendement à mise fixe.
+ * Historique public — la DÉTECTION et l'EFFET DU RETRAIT, avec les cotes (décision
+ * arrêtée, CLAUDE.md). JAMAIS un taux de réussite. On montre les BASCULES (perdu tel
+ * quel, gagnant après retrait) ET les échecs, cotes transcrites à l'appui.
  *
- * La page démarre « vide et honnête » : on ne remplit pas de contenu de démo.
- * En Session 8, `entrees` viendra d'une requête Supabase (analyses publiées).
+ * Anonyme (aucun identifiant), sous le plancher des 20 tickets réglés tant que le
+ * volume n'y est pas, et CACHÉ AU CDN (page publique, potentiellement très consultée) :
+ * la fonction ne tourne qu'~une fois toutes les 30 min par région, le CDN absorbe le
+ * reste. Aucune table de précalcul — on ne sur-construit pas.
  */
-export interface EntreeHistorique {
-	id: number;
-	dateIso: string;
-	nbMatchs: number;
-	verdict: 'passe' | 'tombe' | 'en_attente';
-	details: string;
+const OFFSET_MS = 3_600_000; // Afrique de l'Ouest/Centrale (UTC+1)
+
+export interface TicketPublicVM extends TicketPublic {
+	dateLabel: string;
 }
 
-export interface BilanPublic {
-	/** Taux de réussite (0..1) — jamais affiché seul. */
-	tauxReussite: number;
-	/** Rendement à mise fixe (ex. 1.08 = +8 %) — toujours à côté du taux. */
-	rendement: number;
-}
-
-export interface HistoriqueData {
-	publieDepuisIso: string | null;
-	entrees: EntreeHistorique[];
-	bilan: BilanPublic | null;
-}
-
-export const load: PageServerLoad = async () => {
-	// Factice : rien de publié encore → état vide et honnête (PRD §12).
-	const data: HistoriqueData = {
-		publieDepuisIso: null,
-		entrees: [],
-		bilan: null
+export const load: PageServerLoad = async ({ setHeaders }) => {
+	const now = Date.now();
+	const data = await computePublicHistory(now);
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=1800, stale-while-revalidate=86400'
+	});
+	const withDate = (t: TicketPublic): TicketPublicVM => ({
+		...t,
+		dateLabel: libelleDate(t.analyseLeMs, now, OFFSET_MS)
+	});
+	return {
+		sousLePlancher: data.sousLePlancher,
+		nbBascules: data.nbBascules,
+		nbDuJour: data.nbDuJour,
+		exemples: data.exemples.map(withDate)
 	};
-	return data;
 };

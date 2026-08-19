@@ -200,6 +200,12 @@ Trois raisons, chacune bloquante à elle seule — ce n'est pas une préférence
 
 **Le calcul est préparé mais NON affiché** (`domain/detection.ts` + `fixtures/detectionStore.ts`, endpoint privé `/api/health/detection`). La donnée s'accumule dès maintenant depuis les sélections déjà persistées ; le jour où le volume est atteint, les chiffres existent. La page publique reste **vide** tant que le volume n'y est pas — une page vide est plus honnête qu'un chiffre bruité.
 
+**Page publique construite : on montre l'EFFET DU RETRAIT avec les cotes (`domain/publicHistory.ts` + `fixtures/publicHistoryStore.ts`, route `(public)/historique`).** Trois disciplines, à ne PAS défaire :
+
+- **L'en-tête est une BASCULE, jamais un ratio.** Formulation figée : *« 3 tickets ont basculé : perdus tels quels, gagnants après retrait des lignes trop justes. »* On donne **le nombre de bascules** (`resultat_originale = tombe` ET `resultat = passe`), **jamais** « 3 sur 12 ». Quelqu'un voudra simplifier en « 3 sur 12 » un jour — **ne le fais pas** : « 3 sur 12 » se lit comme un taux de réussite du renforcé, l'artefact du combiné plus court qu'on refuse (raison n°1 ci-dessus). La bascule dit l'effet de NOTRE marquage, pas un rapport de gains.
+- **La cote combinée = PRODUIT des cotes transcrites, et elle ne viole PAS la règle d'or n°1.** C'est une multiplication de **faits lus** (cotes de la capture), affichée à côté des cotes individuelles — une cote mal lue est donc **visible et contestable**, pas une proba inventée invisible. Ce n'est ni une probabilité ni un gain (aucune mise), et elle n'influence **jamais** quelle ligne est gardée (la fragilité décide, sans cote). Elle vit dans le module d'**affichage** `publicHistory.ts` — **jamais** dans `ticket.ts` ni `settle.ts` (garde `no-cote-in-calc`).
+- **Toujours au moins un échec affiché** (`tombe_malgre`), tiré sur 7 jours si le jour est vide — sinon la page redevient la vitrine qu'on refuse. Anonyme (« Ticket de 21h40 », jamais d'identifiant). Plancher **20 tickets réglés** (avec les DEUX verdicts — les tickets d'avant la migration 0018 n'en ont qu'un et ne comptent pas). Caché au CDN (`s-maxage`), pas de table de précalcul. **Formule validée juridiquement avant ouverture publique.**
+
 ---
 
 ## Conformité
