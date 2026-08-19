@@ -36,8 +36,20 @@ describe('toTicketRead — normalisation et échecs explicites', () => {
 	it('pas un ticket → échec pas_un_ticket', () => {
 		expect(toTicketRead({ estTicket: false, lignes: [] }).echec).toBe('pas_un_ticket');
 	});
-	it('manuscrit → échec manuscrit (priorité sur les lignes)', () => {
-		expect(toTicketRead({ estTicket: true, manuscrit: true, lignes: [{ match: 'A - B' }] }).echec).toBe('manuscrit');
+	it('manuscrit = true mais des lignes lues → on ACCEPTE et on lit (jamais de rejet)', () => {
+		// Décision produit : le jugement « manuscrit » du LLM s'est révélé faux sur de
+		// vraies captures d'app. Asymétrie des coûts → en cas de doute, on tente la
+		// lecture. Le flag n'est plus jamais un motif de refus.
+		const r = toTicketRead({
+			estTicket: true,
+			manuscrit: true,
+			lignes: [{ match: 'Arsenal - Liverpool', marche: '1X', cote: '1.42' }]
+		});
+		expect(r.echec).toBeUndefined();
+		expect(r.lignes).toHaveLength(1);
+	});
+	it('manuscrit = true ET aucune ligne lisible → illisible (jamais « manuscrit »)', () => {
+		expect(toTicketRead({ estTicket: true, manuscrit: true, lignes: [] }).echec).toBe('illisible');
 	});
 	it('illisible ou sans ligne exploitable → échec illisible', () => {
 		expect(toTicketRead({ estTicket: true, lisible: false, lignes: [] }).echec).toBe('illisible');

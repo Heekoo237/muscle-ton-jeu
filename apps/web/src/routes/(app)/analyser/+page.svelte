@@ -178,7 +178,7 @@
 		</div>
 
 		<p class="t-small note">
-			Les tickets manuscrits sur papier ne sont pas acceptés. Envoie une capture d'écran de ton
+			Envoie une capture d'écran de ton
 			application ou site de paris.
 		</p>
 

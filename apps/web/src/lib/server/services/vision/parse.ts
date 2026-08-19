@@ -93,7 +93,14 @@ export function toTicketRead(payload: unknown): RawTicketRead {
 	const p = payload as VisionPayload;
 
 	if (p.estTicket === false) return { lignes: [], echec: 'pas_un_ticket' };
-	if (p.manuscrit === true) return { lignes: [], echec: 'manuscrit' };
+	// On NE REJETTE PLUS sur « manuscrit ». Le jugement du LLM s'est révélé FAUX sur de
+	// vraies captures d'application — et l'asymétrie des coûts est écrasante : un vrai
+	// ticket refusé d'entrée = utilisateur perdu ; un ticket manuscrit qu'on tente de
+	// lire = au pire un résultat qu'on refuse APRÈS (lignes non résolues). En cas de
+	// doute, on ACCEPTE et on tente la lecture. Un manuscrit vraiment illisible retombe
+	// naturellement sur `illisible` plus bas (aucune ligne lue) — message honnête qui
+	// invite à reprendre la photo, jamais l'accusation « tu as envoyé du papier ».
+	// (Le champ `manuscrit` reste lu du payload mais n'agit plus.)
 
 	const lignes: RawLine[] = (Array.isArray(p.lignes) ? p.lignes : [])
 		.map((l): RawLine => {
