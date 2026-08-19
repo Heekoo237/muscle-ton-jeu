@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMarket, marketLabelFr, splitResultMarket } from './market-map';
+import { resolveMarket, marketLabelFr, splitResultMarket, uncoveredFamily } from './market-map';
+
+describe('uncoveredFamily — nommer le refus (le garde-fou sait déjà quelle famille)', () => {
+	it('nomme chaque famille non couverte', () => {
+		expect(uncoveredFamily('1ère mi-temps, Total: (1) Plus de')).toBe('mi_temps');
+		expect(uncoveredFamily('Anytime Goalscorer')).toBe('buteur');
+		expect(uncoveredFamily('Total des corners +9')).toBe('corners');
+		expect(uncoveredFamily('Cartons — plus de 3')).toBe('cartons');
+		expect(uncoveredFamily('Total Shots')).toBe('tirs');
+		expect(uncoveredFamily('Correct Score 2-1')).toBe('score_exact');
+		expect(uncoveredFamily('Handicap -1')).toBe('handicap');
+	});
+
+	it('renvoie null sur un marché COUVERT (piège « both teams to score »)', () => {
+		expect(uncoveredFamily('both teams to score')).toBeNull();
+		expect(uncoveredFamily('+ de 2,5 buts')).toBeNull();
+		expect(uncoveredFamily('Résultat du match')).toBeNull();
+	});
+});
 
 describe('splitResultMarket — « Résultat du match (t. rég) » Betclic', () => {
 	it('avec l’issue : type 1X2 reconnu, bruit « (t. rég) » retiré, CHOIX conservé', () => {

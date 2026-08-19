@@ -25,6 +25,45 @@ export type RaisonNonAnalyse =
 	| 'sans_donnee'
 	| 'non_cote';
 
+/**
+ * Familles de marchés NON couverts qu'on sait NOMMER. Le garde-fou (`uncoveredFamily`,
+ * market-map) sait déjà QUELLE famille a déclenché le refus : on l'utilise pour dire
+ * « on n'analyse pas les paris sur une mi-temps » au lieu du vague « on ne le couvre
+ * pas ». Le TYPE vit ici (partagé) ; les motifs vivent dans market-map (serveur).
+ */
+export type UncoveredFamily =
+	| 'mi_temps'
+	| 'buteur'
+	| 'corners'
+	| 'cartons'
+	| 'tirs'
+	| 'score_exact'
+	| 'handicap';
+
+/** Sujet accordé, inséré dans les phrases (« les paris sur ___ »). */
+const SUJET_FAMILLE: Record<UncoveredFamily, string> = {
+	mi_temps: 'une mi-temps',
+	buteur: 'les buteurs',
+	corners: 'les corners',
+	cartons: 'les cartons',
+	tirs: 'les tirs',
+	score_exact: 'le score exact',
+	handicap: 'un handicap'
+};
+
+/** Phrase autonome (écran de validation, écran de résultat) : famille connue → explicite,
+ *  sinon le générique honnête. « On n'analyse pas les paris sur une mi-temps. » */
+export function phraseNonCouvert(famille?: UncoveredFamily | null): string {
+	return famille
+		? `On n'analyse pas les paris sur ${SUJET_FAMILLE[famille]}.`
+		: 'Ce marché, on ne le couvre pas.';
+}
+
+/** Fragment inséré dans « Non analysé — ___. Non facturé. » (écran de résultat). */
+function fragmentNonCouvert(famille?: UncoveredFamily | null): string {
+	return famille ? `pari sur ${SUJET_FAMILLE[famille]}` : 'pari qu’on ne couvre pas';
+}
+
 /** Fragment par ligne (« Match par match ») : pourquoi CETTE ligne n'est pas analysée. */
 const RAISON_LIGNE: Record<RaisonNonAnalyse, string> = {
 	commence: 'ce match a déjà commencé',
@@ -57,6 +96,8 @@ export interface LigneStatutIn {
 	fragile: boolean;
 	/** Raison précise quand la ligne n'est pas analysée (sinon absente). */
 	raisonNonAnalyse?: RaisonNonAnalyse;
+	/** Si non couvert ET famille connue : la nommer (mi-temps, buteurs…). */
+	familleNonCouverte?: UncoveredFamily | null;
 }
 
 /**
@@ -66,6 +107,12 @@ export interface LigneStatutIn {
  */
 export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }): string {
 	if (!l.analysable) {
+		// Non couvert AVEC famille connue : on NOMME le type de pari (mi-temps, buteurs…)
+		// plutôt que le vague « on ne le couvre pas » — le joueur doit comprendre que
+		// c'est le TYPE de pari, pas le match.
+		if (l.raisonNonAnalyse === 'non_couvert' && l.familleNonCouverte) {
+			return `Non analysé — ${fragmentNonCouvert(l.familleNonCouverte)}. Non facturé.`;
+		}
 		// On connaît la cause exacte : on la dit. Repli sobre si elle manque (vieux ticket).
 		const cause = l.raisonNonAnalyse ? RAISON_LIGNE[l.raisonNonAnalyse] : null;
 		return cause ? `Non analysé — ${cause}. Non facturé.` : 'Non analysé — non facturé.';

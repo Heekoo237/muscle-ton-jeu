@@ -2,7 +2,7 @@
  * types.ts — Types du domaine, partagés serveur/client (affichage).
  * La logique déterministe vit dans lib/server/domain ; ici, seulement les formes.
  */
-import type { RaisonNonAnalyse } from './lineStatus';
+import type { RaisonNonAnalyse, UncoveredFamily } from './lineStatus';
 
 /** Marchés COUVERTS uniquement (CLAUDE.md « Marchés couverts »). */
 export type Market =
@@ -172,6 +172,8 @@ export interface LineVM {
 	probabilitePct: number | null;
 	/** Raison PRÉCISE de non-analyse (déjà commencé, hors catalogue…) ; absente si analysée. */
 	raisonNonAnalyse?: RaisonNonAnalyse;
+	/** Si non couvert : la famille (mi-temps, buteurs…) pour nommer le refus. */
+	familleNonCouverte?: UncoveredFamily | null;
 }
 
 /** Explication d'une sélection retirée (texte deux niveaux, second niveau). */
@@ -209,6 +211,11 @@ export interface ResultVM {
 	conflitMemeMatch: boolean;
 	/** Lignes analysables (résolues ET avec probabilité en base). */
 	nbAnalysables: number;
+	/**
+	 * AUCUNE ligne analysable (0 sur N). Cas à ne JAMAIS confondre avec « tient debout » :
+	 * on n'a rien analysé, on doit dire pourquoi, ce qu'on couvre, et que c'est gratuit.
+	 */
+	aucunAnalysable: boolean;
 	/** Total des lignes du ticket (analysées ou non — toutes restent affichées). */
 	nbTotal: number;
 	/**

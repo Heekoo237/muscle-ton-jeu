@@ -1,8 +1,9 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getTicket, updateTicket } from '$lib/server/fixtures/ticketStore';
-import { marketLabelFr } from '$lib/server/domain/market-map';
+import { marketLabelFr, uncoveredFamily } from '$lib/server/domain/market-map';
 import { creditCost, isAnalysable } from '$lib/server/domain/ticket';
+import type { UncoveredFamily } from '$lib/lineStatus';
 import { predictions, sports } from '$lib/server/services';
 import {
 	remplirCotesManquantes,
@@ -43,6 +44,8 @@ export interface ValidationLineVM extends Selection {
 	options: MarketOption[];
 	/** Résolue ET avec probabilité en base : seule une ligne analysable est comptée. */
 	analysable: boolean;
+	/** Si non couvert : la famille (mi-temps, buteurs…) pour nommer le refus. */
+	familleNonCouverte?: UncoveredFamily | null;
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -68,6 +71,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		return {
 			...s,
 			analysable: flags[i],
+			familleNonCouverte: s.raison === 'non_couvert' ? uncoveredFamily(s.texteBrut) : null,
 			options: COVERED_MARKETS.map((m) => ({ market: m, label: marketLabelFr(m, home, away) }))
 		};
 	});

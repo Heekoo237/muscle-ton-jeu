@@ -23,7 +23,8 @@
 		probaTotalePct,
 		probaRenforceePct,
 		dateLabel = '',
-		single = false
+		single = false,
+		masquerChances = false
 	}: {
 		lines: Line[];
 		probaTotalePct: number;
@@ -33,6 +34,9 @@
 		// à l'original — afficher deux fois la même chose serait un doublon inutile.
 		// On masque alors la colonne de droite et la flèche, on garde « Ton ticket ».
 		single?: boolean;
+		// AUCUNE ligne analysable : le pourcentage vaudrait 0 % — trompeur. On masque
+		// « Tes chances » et on garde le ticket (les lignes « non analysé » restent utiles).
+		masquerChances?: boolean;
 	} = $props();
 
 	function pct(v: number): string {
@@ -46,16 +50,18 @@
 	     côte à côte : l'annonce serait redondante, on la masque. Quand rien n'est
 	     retiré (single), un seul chiffre — sinon l'utilisateur ne comprend pas
 	     l'absence de second ticket. -->
-	<div class="resume">
-		<span class="resume-label">Tes chances</span>
-		<span class="resume-vals" style="font-family:{MONO}">
-			<span class="resume-from">{pct(probaTotalePct)}</span>
-			{#if !single}
-				<span class="resume-fleche" aria-hidden="true">→</span>
-				<span class="resume-to">{pct(probaRenforceePct)}</span>
-			{/if}
-		</span>
-	</div>
+	{#if !masquerChances}
+		<div class="resume">
+			<span class="resume-label">Tes chances</span>
+			<span class="resume-vals" style="font-family:{MONO}">
+				<span class="resume-from">{pct(probaTotalePct)}</span>
+				{#if !single}
+					<span class="resume-fleche" aria-hidden="true">→</span>
+					<span class="resume-to">{pct(probaRenforceePct)}</span>
+				{/if}
+			</span>
+		</div>
+	{/if}
 
 	<!-- Ton ticket -->
 	<div class="col left">
@@ -79,11 +85,13 @@
 						</div>
 					{/each}
 				</div>
-				<div class="dash"></div>
-				<div class="ptotal">
-					<span class="plabel">TES CHANCES</span>
-					<span class="ppct ink">{pct(probaTotalePct)}</span>
-				</div>
+				{#if !masquerChances}
+					<div class="dash"></div>
+					<div class="ptotal">
+						<span class="plabel">TES CHANCES</span>
+						<span class="ppct ink">{pct(probaTotalePct)}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="edge bottom"></div>
 		</div>

@@ -25,6 +25,7 @@ import {
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
 import type { ExplicationVM, LineVM, ResultVM, Selection } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
+import { uncoveredFamily } from '$lib/server/domain/market-map';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
 // (writeSafely, ≤ 20 s d'AbortController) ; sans ce réglage, la valeur par défaut
@@ -317,7 +318,10 @@ export const load: PageServerLoad = async (event) => {
 		probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null,
 		// Raison EXACTE de non-analyse (déjà commencé, hors catalogue…) pour ne jamais
 		// afficher une cause approximative. Absente quand la ligne est analysée.
-		raisonNonAnalyse: raisonNonAnalyseDe(s)
+		raisonNonAnalyse: raisonNonAnalyseDe(s),
+		// Non couvert : on NOMME la famille (mi-temps, buteurs…) depuis le texte lu.
+		familleNonCouverte:
+			raisonNonAnalyseDe(s) === 'non_couvert' ? uncoveredFamily(s.texteBrut) : null
 	}));
 
 	// Explications par sélection retirée, rattachées à leur ligne (ordre, libellés,
@@ -338,12 +342,21 @@ export const load: PageServerLoad = async (event) => {
 		.filter((x): x is ExplicationVM => x !== null)
 		.sort((a, b) => a.ordre - b.ordre);
 
+	// AUCUNE ligne analysable : on ne laisse JAMAIS passer le « tient debout » du
+	// rédacteur (rienARetirer est vrai par vacuité). On dit la vérité, en une phrase ;
+	// le détail (pourquoi chaque ligne, ce qu'on couvre, gratuité) est dans le bloc dédié.
+	const aucunAnalysable = nbAnalysables === 0;
+	const syntheseFinale = aucunAnalysable
+		? "Aucun de tes paris n'entre dans ce qu'on analyse."
+		: analyse.synthese;
+
 	const vm: ResultVM = {
 		lignes,
 		probaTotalePct,
 		probaRenforceePct,
 		nbRetirees,
-		synthese: analyse.synthese,
+		synthese: syntheseFinale,
+		aucunAnalysable,
 		explications,
 		rienARetirer: r.rienARetirer,
 		toutesFragiles: r.toutesFragiles,

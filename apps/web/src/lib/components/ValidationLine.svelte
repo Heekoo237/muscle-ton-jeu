@@ -4,6 +4,7 @@
 	// la feuille de correction pour changer le pari. Aucune saisie au clavier.
 	import type { ValidationLineVM } from '../../routes/(app)/analyser/validation/+page.server';
 	import { formatCote } from '$lib/format';
+	import { phraseNonCouvert } from '$lib/lineStatus';
 
 	let { selection, onOpen }: { selection: ValidationLineVM; onOpen: (s: ValidationLineVM) => void } =
 		$props();
@@ -62,7 +63,7 @@
 		{:else if horsFenetre}
 			<div class="hint">Match pas encore dans la période analysée — gardé, non analysé</div>
 		{:else if nonCouvert}
-			<div class="hint">Ce marché, on ne le couvre pas — gardé, non analysé</div>
+			<div class="hint">{phraseNonCouvert(selection.familleNonCouverte)} Gardé, non analysé.</div>
 		{:else if etat === 'ambigu'}
 			<div class="hint oc">À corriger — plusieurs lectures possibles</div>
 		{:else if selection.fixtureId != null}

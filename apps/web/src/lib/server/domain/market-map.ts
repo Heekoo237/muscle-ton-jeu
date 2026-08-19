@@ -8,6 +8,7 @@
  * la main). Ici, la table de départ du brief §8 sert de source pour le seed.
  */
 import type { Market, ResolutionState } from '$lib/types';
+import type { UncoveredFamily } from '$lib/lineStatus';
 
 export interface MarketResolution {
 	state: ResolutionState;
@@ -83,41 +84,34 @@ const TABLE: Record<string, Market> = {
  * les notations anglaises des bookmakers (Betclic, 1xBet, Betwinner) — pour
  * pouvoir dire « non analysé · non facturé », jamais pour produire une probabilité.
  */
-const UNCOVERED = [
-	// Corners
-	/\bcorner/,
-	// Cartons
-	/\bcarton/,
-	/\bcard/,
-	/\bbooking/,
-	// Tirs
-	/\btir(s)?\b/,
-	/\bshot/,
-	// Buteur (français + anglais)
-	/\bbuteur\b/,
-	/\bgoalscorer\b/,
-	/\bscorer\b/,
-	/\banytime\b/,
-	/\bto score\b/,
-	/\bmarque un but\b/,
-	// Mi-temps / période (1re OU 2e), français + anglais, plusieurs graphies. La vision
-	// peut abréger ou traduire ; on ratisse LARGE — un marché de période n'est JAMAIS
-	// couvert, et rater le signal = analyser un pari plein-match que le joueur n'a pas
-	// joué (mensonge silencieux). Jeu de motifs VÉRIFIÉ : 21 libellés réels attrapés,
-	// 0 faux positif sur les marchés couverts (test `market-map.test.ts`).
-	/\bmi[\s-]?temps\b/, //  mi-temps · mi temps · mitemps
-	/\bperiode\b/, //         1ère/2ème période, première/deuxième période
-	/\bhalf[\s-]?time\b/, //  half-time · half time · halftime
-	/\b(1st|2nd|first|second)\s+half\b/, // 1st/2nd/first/second half
-	/\b[12]mt\b/, //          1MT · 2MT
-	/\b[12]t\b/, //           1T · 2T · (1T)
-	/\bht\b/, //              HT (anglais)
-	/\bht\/ft\b/, //          mi-temps/fin de match
-	// Score exact
-	/\bscore exact\b/,
-	/\bcorrect score\b/,
-	// Handicap
-	/\bhandicap\b/
+// Marchés NON couverts, GROUPÉS PAR FAMILLE — pour pouvoir NOMMER le refus (« paris
+// sur une mi-temps ») au lieu du vague « on ne le couvre pas ». Mi-temps ratissé LARGE
+// (FR+EN, abréviations) : rater le signal = analyser un pari plein-match que le joueur
+// n'a pas joué (mensonge silencieux). VÉRIFIÉ : 21 libellés réels attrapés, 0 faux
+// positif sur les couverts (`market-map.test.ts`).
+const UNCOVERED_FAMILIES: { famille: UncoveredFamily; patterns: RegExp[] }[] = [
+	{ famille: 'corners', patterns: [/\bcorner/] },
+	{ famille: 'cartons', patterns: [/\bcarton/, /\bcard/, /\bbooking/] },
+	{ famille: 'tirs', patterns: [/\btir(s)?\b/, /\bshot/] },
+	{
+		famille: 'buteur',
+		patterns: [/\bbuteur\b/, /\bgoalscorer\b/, /\bscorer\b/, /\banytime\b/, /\bto score\b/, /\bmarque un but\b/]
+	},
+	{
+		famille: 'mi_temps',
+		patterns: [
+			/\bmi[\s-]?temps\b/, //  mi-temps · mi temps · mitemps
+			/\bperiode\b/, //         1ère/2ème période, première/deuxième période
+			/\bhalf[\s-]?time\b/, //  half-time · half time · halftime
+			/\b(1st|2nd|first|second)\s+half\b/, // 1st/2nd/first/second half
+			/\b[12]mt\b/, //          1MT · 2MT
+			/\b[12]t\b/, //           1T · 2T · (1T)
+			/\bht\b/, //              HT (anglais)
+			/\bht\/ft\b/ //           mi-temps/fin de match
+		]
+	},
+	{ famille: 'score_exact', patterns: [/\bscore exact\b/, /\bcorrect score\b/] },
+	{ famille: 'handicap', patterns: [/\bhandicap\b/] }
 ];
 
 /**
@@ -181,9 +175,21 @@ export function splitResultMarket(notation: string): ResultSplit | null {
  * les vrais termes non-couverts.
  */
 export function matchesUncovered(notation: string): boolean {
+	return uncoveredFamily(notation) !== null;
+}
+
+/**
+ * QUELLE famille non couverte a déclenché le refus (mi-temps, buteur, corners…), ou
+ * `null` si couvert / non reconnu. Sert à NOMMER le refus à l'utilisateur. Même retrait
+ * des TYPE couverts que `matchesUncovered` (piège « both teams to score »).
+ */
+export function uncoveredFamily(notation: string): UncoveredFamily | null {
 	let n = normalize(notation);
 	for (const p of [...TYPE_1X2, ...TYPE_DC, ...TYPE_BTTS]) n = n.split(p).join(' ');
-	return UNCOVERED.some((re) => re.test(n));
+	for (const { famille, patterns } of UNCOVERED_FAMILIES) {
+		if (patterns.some((re) => re.test(n))) return famille;
+	}
+	return null;
 }
 
 /**
@@ -244,7 +250,9 @@ export function resolveMarket(notation: string): MarketResolution {
 			return { state: 'ambigu', market: null, raison: 'ambigu', candidates: UNDER_CANDIDATES };
 		}
 	}
-	if (UNCOVERED.some((re) => re.test(n))) {
+	// Filet redondant (le non-couvert est déjà tranché en tête de `resolveMarket`), gardé
+	// par prudence : toute famille non couverte encore visible ici → non_couvert.
+	if (matchesUncovered(notation)) {
 		return { state: 'inconnu', market: null, raison: 'non_couvert' };
 	}
 	return { state: 'inconnu', market: null, raison: 'inconnu' };

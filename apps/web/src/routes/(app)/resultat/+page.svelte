@@ -153,6 +153,7 @@
 			probaTotalePct={vm.probaTotalePct}
 			probaRenforceePct={vm.probaRenforceePct}
 			single={vm.rienARetirer}
+			masquerChances={vm.aucunAnalysable}
 		/>
 		<!-- Le pourcentage ne porte QUE sur les matchs analysés. Quand une partie du
 		     ticket n'est pas couverte, on le dit : sinon le chiffre laisserait croire
@@ -168,9 +169,21 @@
 		{/if}
 	</div>
 
-	<!-- Ligne de verdict — TROIS cas distincts, jamais « tient debout » à tort. -->
+	<!-- Ligne de verdict — jamais « tient debout » à tort. Le cas « aucun analysable »
+	     passe AVANT tout : sinon rienARetirer (vrai par vacuité) afficherait « ton ticket
+	     tient debout » sur un ticket dont RIEN n'a été analysé. -->
 	<div class="verdict" aria-live="polite">
-		{#if !vm.rienARetirer}
+		{#if vm.aucunAnalysable}
+			<!-- (0) Rien d'analysable. On dit POURQUOI, ce qu'on COUVRE, et que c'est GRATUIT. -->
+			{#if resumeAutres}
+				<div class="t-body">{resumeAutres}.</div>
+			{/if}
+			<p class="couvre t-body">
+				On analyse le résultat (1X2), la double chance, le plus/moins de buts et les deux
+				équipes marquent. Renvoie un ticket avec un de ces paris.
+			</p>
+			<p class="gratuit t-small">Ça ne t'a rien coûté.</p>
+		{:else if !vm.rienARetirer}
 			<!-- (a) Retrait effectué : la comparaison des chances. -->
 			<div class="t-body-lg">
 				{vm.nbRetirees} match{vm.nbRetirees > 1 ? 's' : ''} retiré{vm.nbRetirees > 1 ? 's' : ''}.
