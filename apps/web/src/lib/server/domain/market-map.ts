@@ -100,14 +100,19 @@ const UNCOVERED = [
 	/\banytime\b/,
 	/\bto score\b/,
 	/\bmarque un but\b/,
-	// Mi-temps / première période
-	/\bmi-?temps\b/,
-	/\bhalf-?time\b/,
-	/\bhalf time\b/,
-	/\b1st half\b/,
-	/\b1re mi-temps\b/,
-	/\b1mt\b/,
-	/\bht\/ft\b/,
+	// Mi-temps / période (1re OU 2e), français + anglais, plusieurs graphies. La vision
+	// peut abréger ou traduire ; on ratisse LARGE — un marché de période n'est JAMAIS
+	// couvert, et rater le signal = analyser un pari plein-match que le joueur n'a pas
+	// joué (mensonge silencieux). Jeu de motifs VÉRIFIÉ : 21 libellés réels attrapés,
+	// 0 faux positif sur les marchés couverts (test `market-map.test.ts`).
+	/\bmi[\s-]?temps\b/, //  mi-temps · mi temps · mitemps
+	/\bperiode\b/, //         1ère/2ème période, première/deuxième période
+	/\bhalf[\s-]?time\b/, //  half-time · half time · halftime
+	/\b(1st|2nd|first|second)\s+half\b/, // 1st/2nd/first/second half
+	/\b[12]mt\b/, //          1MT · 2MT
+	/\b[12]t\b/, //           1T · 2T · (1T)
+	/\bht\b/, //              HT (anglais)
+	/\bht\/ft\b/, //          mi-temps/fin de match
 	// Score exact
 	/\bscore exact\b/,
 	/\bcorrect score\b/,
@@ -202,6 +207,15 @@ function parseTotals(n: string): Market | null {
 
 export function resolveMarket(notation: string): MarketResolution {
 	const n = normalize(notation);
+	// FILET NON-COUVERT EN PREMIER. Un marché de période / buteur / corner… l'emporte
+	// sur TOUTE lecture couverte : « 1ère mi-temps plus de 2,5 buts » ne doit JAMAIS
+	// ressortir OVER_2_5 (c'est le mensonge silencieux — analyser un pari plein-match
+	// que le joueur n'a pas fait). Placé AVANT `parseTotals` et le branchement ambigu,
+	// sinon un total de mi-temps serait pris pour un total plein-match. `matchesUncovered`
+	// retire d'abord les TYPE couverts (piège « both teams to score »).
+	if (matchesUncovered(notation)) {
+		return { state: 'inconnu', market: null, raison: 'non_couvert' };
+	}
 	if (n in TABLE) {
 		return { state: 'certain', market: TABLE[n] };
 	}

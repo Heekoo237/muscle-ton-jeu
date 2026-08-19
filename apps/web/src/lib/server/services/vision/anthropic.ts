@@ -40,9 +40,11 @@ POUR CHAQUE SÉLECTION, DEUX CHOSES :
    « famille » — EXACTEMENT une de ces valeurs :
      RESULTAT_1X2   victoire d'une équipe ou match nul (1 / N / 2)
      DOUBLE_CHANCE  deux issues à la fois (équipe ou nul)
-     PLUS_MOINS     nombre total de buts, plus ou moins d'un seuil
+     PLUS_MOINS     nombre total de buts sur le MATCH ENTIER, plus ou moins d'un seuil
      BTTS           les deux équipes marquent (oui / non)
-     NON_COUVERT    buteur, corners, cartons, tirs, mi-temps, score exact, handicap…
+     NON_COUVERT    buteur, corners, cartons, tirs, score exact, handicap, ET TOUT marché
+                    de PÉRIODE / MI-TEMPS (« 1ère mi-temps », « 1ère période », « 1st half »,
+                    « HT », « 1T »/« 2T ») — même si c'est un total de buts de mi-temps.
      INCONNU        tu n'es pas sûr de ce qui est parié
 
    Selon la famille, ajoute le CHOIX — TOUJOURS relatif au match, JAMAIS positionnel.
@@ -50,10 +52,16 @@ POUR CHAQUE SÉLECTION, DEUX CHOSES :
    de l'équipe. C'est le code qui décidera du côté ; toi tu lis QUI est choisi.
      RESULTAT_1X2  → « choix » : le NOM de l'équipe gagnante, ou « NUL ».
      DOUBLE_CHANCE → « composantes » : les deux, noms d'équipe et/ou « NUL » (ex. ["FC Porto","NUL"]).
-     PLUS_MOINS    → « direction » : « PLUS » ou « MOINS » ; « seuil » : le nombre (1.5, 2.5 ou 3.5).
+     PLUS_MOINS    → « direction » : « PLUS » ou « MOINS » ; « seuil » : le nombre lu.
+                     Le seuil doit être lu TEL QUEL, jamais arrondi. Si le seuil affiché
+                     n'est PAS exactement 1,5 / 2,5 / 3,5 (ex. 0,5, 1, 2, 4,5, une ligne
+                     « (1) », un total de mi-temps) → famille NON_COUVERT, PAS PLUS_MOINS.
      BTTS          → « btts » : « OUI » ou « NON ».
      NON_COUVERT / INCONNU → pas d'autre champ.
 
+   RÈGLE ABSOLUE : recopie ce qui est AFFICHÉ. Ne réécris pas, ne complète pas, n'arrondis
+   pas un seuil, ne transforme jamais un pari de mi-temps en pari plein-match. Garde dans
+   « marche » toute mention de période (« 1ère mi-temps », « 1T »…).
    Si tu ne peux pas lire l'issue avec certitude (surlignage absent, image coupée) : famille INCONNU.
    Ne devine jamais. Mieux vaut INCONNU qu'un pari inventé.
 
@@ -70,7 +78,9 @@ Schéma :
     { "match": "Lyon - Rennes", "marche": "+ de 2,5 buts (t. rég)", "cote": "1.90",
       "famille": "PLUS_MOINS", "direction": "PLUS", "seuil": 2.5 },
     { "match": "Casa Pia - Benfica", "marche": "Benfica ou Nul Double chance", "cote": "1.05",
-      "famille": "DOUBLE_CHANCE", "composantes": ["Benfica", "NUL"] }
+      "famille": "DOUBLE_CHANCE", "composantes": ["Benfica", "NUL"] },
+    { "match": "Celtic - LASK", "marche": "1ère mi-temps, Total: (1) Plus de", "cote": "1.68",
+      "famille": "NON_COUVERT" }
   ],
   "coteTotale": "cote totale du ticket si visible, sinon chaîne vide"
 }`;

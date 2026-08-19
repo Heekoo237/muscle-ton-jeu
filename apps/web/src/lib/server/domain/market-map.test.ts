@@ -43,6 +43,32 @@ describe('resolveMarket — table stricte (règle d’archi n°3)', () => {
 		expect(resolveMarket('Correct Score')).toMatchObject({ raison: 'non_couvert' });
 	});
 
+	it('MI-TEMPS / période : toutes les graphies FR+EN → non couvert (filet élargi)', () => {
+		// Le cas réel testeur, tel quel, et ses variantes. Un total de PÉRIODE lu comme
+		// couvert = mensonge silencieux : le filet doit ratisser large.
+		for (const notation of [
+			'1ère mi-temps, Total: (1) Plus de', // capture réelle du testeur
+			'mi-temps',
+			'Total mi temps',
+			'1ère période',
+			'2ème période Plus de 0,5',
+			'1T Plus de 0,5 but',
+			'Score (1T)',
+			'HT/FT',
+			'HT Over 0.5',
+			'First Half Total Goals',
+			'2nd Half Over 1.5'
+		]) {
+			expect(resolveMarket(notation)).toMatchObject({ raison: 'non_couvert' });
+		}
+	});
+
+	it('les vrais marchés couverts ne sont PAS pris pour de la mi-temps (zéro faux positif)', () => {
+		expect(resolveMarket('+ de 2,5 buts')).toMatchObject({ state: 'certain', market: 'OVER_2_5' });
+		expect(resolveMarket('nul')).toMatchObject({ state: 'certain', market: 'DRAW' });
+		expect(resolveMarket('1X')).toMatchObject({ state: 'certain', market: 'DC_HOME_DRAW' });
+	});
+
 	it('rend INCONNU tout ce qui n’est pas dans la table — jamais « probable »', () => {
 		const r = resolveMarket('xyz truc bizarre');
 		expect(r.state).toBe('inconnu');

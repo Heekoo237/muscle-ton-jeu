@@ -385,10 +385,17 @@ function resolveConcept(
 		}
 		case 'PLUS_MOINS': {
 			const seuil = concept.seuil;
-			// Contrainte : hors des seuils couverts → INCONNU (jamais un seuil inventé).
-			if (typeof seuil !== 'number' || !SEUILS_COUVERTS.has(seuil)) return INCONNU;
-			// RECOUPEMENT : le seuil annoncé DOIT figurer dans le texte lu. Un seuil mal
-			// lu (2,5 lu 3,5) échoue ici → secours texte, qui relira le VRAI seuil.
+			if (typeof seuil !== 'number') return INCONNU; // aucun seuil lu → incertain
+			// Seuil HORS COUVERTURE (0,5 · 1 · 4,5 · ligne asiatique · total de mi-temps) :
+			// ce n'est PAS un arrondi possible vers 1,5/2,5/3,5 — c'est un pari qu'on ne
+			// couvre pas. On le dit (non_couvert), on ne le traite jamais comme couvert.
+			// C'est le garde-fou contre la réécriture « (1) » → « 1,5 » : un seuil non
+			// couvert ne devient JAMAIS un seuil couvert (règle d'or n°1).
+			if (!SEUILS_COUVERTS.has(seuil)) return { state: 'inconnu', market: null, raison: 'non_couvert' };
+			// RECOUPEMENT : le seuil couvert annoncé DOIT figurer TEL QUEL dans le texte
+			// brut. Un seuil COUVERT mal lu (2,5 lu 3,5) échoue ici → secours texte, qui
+			// relira le VRAI seuil depuis la capture. Un « (1) » réécrit en « 1,5 » par la
+			// vision échoue aussi (le « 1,5 » n'est pas dans le texte) → jamais analysé.
 			const present = new RegExp(`${String(seuil)[0]}[.,]5`).test(rawMarketText);
 			if (!present) return INCONNU;
 			if (concept.direction !== 'PLUS' && concept.direction !== 'MOINS') return INCONNU;
