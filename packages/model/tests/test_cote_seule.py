@@ -6,7 +6,7 @@ déterministe). La double chance est arithmétique (P(1X)=P(1)+P(X)), tracée à
 """
 import pandas as pd
 
-from mtj_model.constants import CONFIDENCE_VALUE, FRAGILE_THRESHOLD_COTE_SEULE
+from mtj_model.constants import CONFIDENCE_VALUE, FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET
 from mtj_model.pipeline.compute import league_predictions_cote_seule
 
 
@@ -27,9 +27,13 @@ def test_devig_1x2_et_ou_plus_dc_derivee():
     assert abs(sum(by[m].probabilite for m in ("WIN_HOME", "DRAW", "WIN_AWAY")) - 1.0) < 1e-3
     assert abs(by["DC_HOME_DRAW"].probabilite - (by["WIN_HOME"].probabilite + by["DRAW"].probabilite)) < 1e-6
 
-    # Confiance BASSE toujours, barre de fragilité FIXE.
+    # Confiance BASSE toujours, barre de retrait DIFFÉRENCIÉE PAR ISSUE (échelle de
+    # la cote, pas une calibration) : un nul et un favori n'ont plus le même seuil.
     assert by["WIN_HOME"].confiance == CONFIDENCE_VALUE["faible"]
-    assert by["WIN_HOME"].seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE
+    assert by["WIN_HOME"].seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET["WIN_HOME"]
+    assert by["DRAW"].seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET["DRAW"]
+    assert by["DRAW"].seuil_fragile < by["WIN_HOME"].seuil_fragile  # le nul, plus bas
+    assert by["DC_HOME_DRAW"].seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET["DC_HOME_DRAW"]
     # Le book porte la cote lue, jamais la dérivée.
     assert by["WIN_HOME"].bookmaker == "pinnacle"
     assert by["DC_HOME_DRAW"].bookmaker is None

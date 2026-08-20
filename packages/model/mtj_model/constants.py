@@ -131,14 +131,32 @@ FRAGILE_THRESHOLDS = {
 }
 FRAGILE_MIN_SELECTIONS = 4  # plancher du ticket renforcé (règle d'or n°3), jamais moins
 
-# ── Régime COTE SEULE : barre de fragilité FIXE et conservatrice ──────────────
-# Sur un championnat non backtesté, on n'a AUCUNE calibration : les seuils par
-# marché ci-dessus (mesurés) n'ont pas de sens ici. On applique donc une barre
-# UNIQUE et fixe, pour le seul classement du retrait — et l'app NE MONTRE PAS de
-# badge rouge en cote seule (précision non mesurée). Conservatrice : elle marque
-# volontiers l'incertain sur les marchés « résultat » (une issue à ~50 % ou moins
-# est signalée), tout en laissant passer la double chance dérivée (proba haute).
-FRAGILE_THRESHOLD_COTE_SEULE = 0.50
+# ── Régime COTE SEULE : barre de RETRAIT différenciée par issue (PROVISOIRE) ──
+# Sur un championnat non backtesté, on n'a AUCUNE calibration — donc AUCUN badge
+# (la précision n'est pas mesurée). MAIS l'ancien bar UNIQUE (0,50) était cassé par
+# famille : un nul (cote dé-vigée ~0,25) n'atteint jamais 0,50 → marqué à 100 %,
+# comme un favori à 0,50. Deux comportements pour une même échelle.
+#
+# CE QU'ON UTILISE, ET CE QU'ON NE PRÉTEND PAS : on ne peut pas mesurer le POINT
+# DE FONCTIONNEMENT ici (quels nuls tombent vraiment plus → backtest requis). Mais
+# l'ÉCHELLE d'une issue se LIT dans la cote elle-même, sans résultat. On transpose
+# donc la distribution de la cote dé-vigée PAR ISSUE, observée sur nos championnats
+# MODÉLISÉS (fragile.py, 30ᵉ centile — le même point de fonctionnement produit) :
+#   dom 0,33 · nul 0,22 · ext 0,20   |   1X 0,62 · X2 0,45 · 12 0,72   |   +2,5 0,48 · −2,5 0,42
+# Pour le 1X2 et le plus/moins 2,5, l'entrée est la MÊME cote dé-vigée dans les deux
+# régimes → ce sont exactement les seuils modélisés. La DC dérivée (somme des cotes)
+# a sa propre échelle, mesurée à part. Reconnaissance d'échelle, PAS une calibration.
+#
+# PROVISOIRE. Condition de sortie : un vrai backtest de ces championnats → on
+# remplace par des q30 MESURÉS et on rallume le badge. D'ici là : mention neutre.
+FRAGILE_THRESHOLD_COTE_SEULE = 0.50  # conservé pour repli/compat ; ne plus utiliser directement
+FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET = {
+    "WIN_HOME": 0.33, "DRAW": 0.22, "WIN_AWAY": 0.20,               # = échelle 1X2 (cote dé-vigée)
+    "DC_HOME_DRAW": 0.62, "DC_DRAW_AWAY": 0.45, "DC_HOME_AWAY": 0.72,  # échelle DC DÉRIVÉE
+    "OVER_2_5": 0.48, "UNDER_2_5": 0.42,                           # = échelle plus/moins 2,5
+    # OVER/UNDER 1,5 et 3,5 : jamais produits en cote seule (modèle only) — repli prudent.
+    "OVER_1_5": 0.72, "UNDER_1_5": 0.18, "OVER_3_5": 0.24, "UNDER_3_5": 0.63,
+}
 
 # Trace des chiffres qui JUSTIFIENT le seuil 1X2, pour qu'ils restent visibles.
 FRAGILE_1X2_PRECISION = 0.60       # au point 30 % : part des marquées qui tombent

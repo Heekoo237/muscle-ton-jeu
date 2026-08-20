@@ -112,10 +112,25 @@ post-recalibrage (relancer la requête « part des nuls dans les retraits »).
   modélisées, le chantier parité touche peu de monde — le vrai levier serait
   ailleurs. À trancher sur les chiffres post-Direction 2.
 
-⚠️ **Le seuil COTE SEULE (`FRAGILE_THRESHOLD_COTE_SEULE = 0,50`) n'a PAS été
-recalibré** — impossible sans backtest de ces championnats. Il garde donc
-l'artefact d'échelle : un nul en cote seule (~0,25) reste sous 0,50, donc retiré.
-Sur la re-mesure post-Direction 2, la part de nuls baissera pour le modélisé mais
-**pas pour la cote seule** (46 % des lignes). Décision ouverte : donner à la cote
-seule des barres fixes conscientes de l'échelle (sans calibration, sans badge), ou
-la laisser conservatrice-plate. À trancher séparément.
+### Cote seule — seuil différencié par issue (PROVISOIRE, sans calibration)
+
+L'ancien bar UNIQUE (`FRAGILE_THRESHOLD_COTE_SEULE = 0,50`) était cassé par
+famille : un nul (~0,25) ne l'atteint jamais → marqué à 100 %, comme un favori.
+Deux comportements pour une même échelle.
+
+`FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET` le remplace par un seuil PAR ISSUE. Ce
+qu'on utilise et ce qu'on ne prétend pas :
+
+- **On ne mesure PAS le point de fonctionnement** (quels nuls tombent plus →
+  backtest requis, absent ici). Donc **AUCUN badge** en cote seule, mention
+  neutre uniquement (garde `showsBadge` : `!isUnmeasured(source)`).
+- **On lit l'ÉCHELLE** dans la cote elle-même (sans résultat) et on transpose la
+  distribution par issue de nos championnats MODÉLISÉS (30ᵉ centile de la cote
+  dé-vigée) : dom 0,33 · nul 0,22 · ext 0,20 · 1X 0,62 · X2 0,45 · 12 0,72 ·
+  ±2,5 0,48/0,42. Pour le 1X2 et le ±2,5, l'entrée est la MÊME cote dé-vigée dans
+  les deux régimes → seuils identiques par construction. La DC dérivée (somme des
+  cotes) a son échelle mesurée à part. **Reconnaissance d'échelle, pas une
+  calibration.**
+
+**Condition de sortie** : un vrai backtest de ces championnats → remplacer par des
+q30 MESURÉS et rallumer le badge. D'ici là, provisoire et sans badge.

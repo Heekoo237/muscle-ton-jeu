@@ -8,7 +8,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
-from mtj_model.constants import CONFIDENCE_VALUE, FRAGILE_THRESHOLD_COTE_SEULE
+from mtj_model.constants import CONFIDENCE_VALUE, FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET
 from mtj_model.pipeline.compute import league_predictions
 
 
@@ -45,7 +45,7 @@ def test_promu_replie_en_cote_seule_meme_en_ligue_modele():
     wh = next(r for r in by_fid[2] if r.marche == "WIN_HOME")
     assert wh.source == "cote_seule"
     assert wh.confiance == CONFIDENCE_VALUE["faible"]
-    assert wh.seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE
+    assert wh.seuil_fragile == FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET["WIN_HOME"]
     # Double chance dérivée présente (cote_derivee), et le repli est compté.
     assert any(r.source == "cote_derivee" for r in by_fid[2])
     assert repli == [2]

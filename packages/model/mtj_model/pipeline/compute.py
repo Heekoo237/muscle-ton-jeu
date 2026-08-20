@@ -20,6 +20,7 @@ import pandas as pd
 from ..backtest.closing_odds import devig_power
 from ..constants import (
     FRAGILE_THRESHOLD_COTE_SEULE,
+    FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET,
     FRAGILE_THRESHOLDS,
     PROBABILITY_SOURCE,
     XI_PER_DAY,
@@ -179,12 +180,16 @@ def league_predictions_cote_seule(
         # rejetés et JOURNALISÉS, jamais dévigés — un match ne fait plus planter le run.
         market_probs, bad = devig_fixture_odds_report(odds_by_fixture.get(fid, {}))
         _log_and_collect_invalid(bad, league_code, fid, books, invalides)
+        # Seuil de RETRAIT différencié PAR ISSUE (échelle de la cote, pas une
+        # calibration) — repli sur le bar unique 0,50 si un marché inattendu apparaît.
+        def seuil_cs(marche: str) -> float:
+            return FRAGILE_THRESHOLD_COTE_SEULE_BY_MARKET.get(marche, FRAGILE_THRESHOLD_COTE_SEULE)
         # 1X2 et plus/moins 2,5 : cote lue et dé-vigée → « cote_seule ».
         for marche, proba in market_probs.items():
             rows.append(PredictionRow(
                 fixture_id=fid, marche=marche, probabilite=round(float(proba), 4),
                 confiance=conf, source="cote_seule",
-                seuil_fragile=FRAGILE_THRESHOLD_COTE_SEULE, bookmaker=books.get(marche),
+                seuil_fragile=seuil_cs(marche), bookmaker=books.get(marche),
             ))
         # Double chance : DÉRIVÉE du 1X2 dé-vigé (seulement si le 1X2 est présent).
         if all(k in market_probs for k in ("WIN_HOME", "DRAW", "WIN_AWAY")):
@@ -193,7 +198,7 @@ def league_predictions_cote_seule(
                     fixture_id=fid, marche=marche,
                     probabilite=round(float(market_probs[a] + market_probs[b]), 4),
                     confiance=conf, source="cote_derivee",
-                    seuil_fragile=FRAGILE_THRESHOLD_COTE_SEULE, bookmaker=None,
+                    seuil_fragile=seuil_cs(marche), bookmaker=None,
                 ))
     return rows
 
