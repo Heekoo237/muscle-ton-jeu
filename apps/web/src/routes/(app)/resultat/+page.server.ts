@@ -23,9 +23,10 @@ import {
 	syntheseDeterministe
 } from '$lib/server/services/writing/enrich';
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
-import type { ExplicationVM, LineVM, ResultVM, Selection } from '$lib/types';
+import type { ExplicationVM, LineVM, Market, ResultVM, Selection } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
-import { uncoveredFamily } from '$lib/server/domain/market-map';
+import { uncoveredFamily, marketLabelFr } from '$lib/server/domain/market-map';
+import { multiplicateurRetrait, autresIssues } from '$lib/server/domain/resultDisplay';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
 // (writeSafely, ≤ 20 s d'AbortController) ; sans ce réglage, la valeur par défaut
@@ -324,6 +325,33 @@ export const load: PageServerLoad = async (event) => {
 			raisonNonAnalyseDe(s) === 'non_couvert' ? uncoveredFamily(s.texteBrut) : null
 	}));
 
+	// FEATURE 2 — autres issues du MÊME match pour chaque ligne RETIRÉE. Lecture SEULE
+	// de la base (predictions.forFixtures), jamais un calcul ni une proba dérivée à la
+	// volée : on MONTRE ce qu'on sait, on ne suggère rien (règles d'or n°1/n°3). Même
+	// source que la ligne jouée → aucune impression d'analyse plus riche. Vaut aussi en
+	// cote seule (1X2 + DC dérivée en base), où le TEXTE reste « d'après les cotes ».
+	const retireesVoisins = r.selections.filter(
+		(s) => s.retireeDuRenforce && isAnalysable(s) && s.fixtureId !== null && s.marche !== null
+	);
+	const voisinFixtureIds = [...new Set(retireesVoisins.map((s) => s.fixtureId as number))];
+	const predsParFixture = voisinFixtureIds.length
+		? await predictions.forFixtures(voisinFixtureIds)
+		: new Map();
+	const autresParOrdre = new Map<number, { libelleFr: string; probabilitePct: number }[]>();
+	for (const s of retireesVoisins) {
+		const preds = predsParFixture.get(s.fixtureId as number) ?? [];
+		// matchLabel = « Home – Away » (resolve.ts) : on en tire les deux équipes pour
+		// libeller « X gagne » / « X ou nul ». Split défensif : sans les deux, on n'affiche
+		// que les issues sans nom d'équipe (nul, plus/moins).
+		const parts = s.matchLabel.split(' – ');
+		const [home, away] = parts.length === 2 ? parts : ['', ''];
+		const issues = autresIssues(s.marche as Market, preds).map((iss) => ({
+			libelleFr: marketLabelFr(iss.marche, home, away),
+			probabilitePct: pct1(iss.probabilite)
+		}));
+		if (issues.length) autresParOrdre.set(s.ordre, issues);
+	}
+
 	// Explications par sélection retirée, rattachées à leur ligne (ordre, libellés,
 	// badge) pour l'affichage — dans l'ordre du ticket.
 	const parLigne = new Map(lignes.map((l) => [l.ordre, l]));
@@ -336,7 +364,8 @@ export const load: PageServerLoad = async (event) => {
 				matchLabel: l.matchLabel,
 				libelleFr: l.libelleFr,
 				avecBadge: l.fragile,
-				texte: p.texte
+				texte: p.texte,
+				autresIssues: autresParOrdre.get(p.ordre) ?? []
 			} satisfies ExplicationVM;
 		})
 		.filter((x): x is ExplicationVM => x !== null)
@@ -355,6 +384,10 @@ export const load: PageServerLoad = async (event) => {
 		probaTotalePct,
 		probaRenforceePct,
 		nbRetirees,
+		// FEATURE 1 — effet du retrait « N fois plus de chances », calcul en code sur les
+		// probabilités BRUTES (jamais le rédacteur). Rien sans retrait, rien si l'effet
+		// est invisible à l'affichage. Le pourcentage reste toujours affiché à côté.
+		multiplicateur: multiplicateurRetrait(r.probaTotale, r.probaRenforcee, !r.rienARetirer),
 		synthese: syntheseFinale,
 		aucunAnalysable,
 		explications,

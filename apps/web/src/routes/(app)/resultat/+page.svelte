@@ -140,6 +140,19 @@
 					</div>
 					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
 					<p class="exp-texte">{e.texte}</p>
+					{#if e.autresIssues.length > 0}
+						<!-- Autres issues du même match : on MONTRE ce qu'on sait, on ne suggère
+						     jamais. Titre neutre, bloc sobre et subordonné (règle d'or n°3). -->
+						<div class="autres">
+							<div class="autres-t">Si tu veux garder ce match</div>
+							{#each e.autresIssues as iss (iss.libelleFr)}
+								<div class="issue">
+									<span>{iss.libelleFr}</span>
+									<span class="issue-n">{pctBig(iss.probabilitePct)}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</article>
 			{/each}
 		</div>
@@ -188,7 +201,8 @@
 			<div class="t-body-lg">
 				{vm.nbRetirees} match{vm.nbRetirees > 1 ? 's' : ''} retiré{vm.nbRetirees > 1 ? 's' : ''}.
 				Tes chances passent de <span class="v">{pctBig(vm.probaTotalePct)}</span> à
-				<span class="v">{pctBig(vm.probaRenforceePct)}</span>.
+				<span class="v">{pctBig(vm.probaRenforceePct)}</span>{#if vm.multiplicateur}
+					— <span class="mult">{vm.multiplicateur}</span> avec le ticket renforcé{/if}.
 			</div>
 			{#if vm.majoriteRetiree}
 				<!-- Plus de la moitié retirée : le renforcé est un ticket très différent.
@@ -422,6 +436,39 @@
 		line-height: 1.45;
 		color: var(--c-ink);
 		max-width: var(--measure);
+	}
+
+	/* Effet du retrait : à CÔTÉ du pourcentage, jamais seul. Ton ocre discret. */
+	.mult {
+		color: var(--c-ocre);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	/* Autres issues du même match : secondaire, sobre, subordonné au reste de la carte. */
+	.autres {
+		margin-top: var(--s-3);
+		padding-top: var(--s-3);
+		border-top: 1px dashed var(--c-line);
+	}
+	.autres-t {
+		font-size: 12px;
+		color: var(--c-ink-mute);
+		margin-bottom: var(--s-2);
+	}
+	.issue {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: var(--s-3);
+		padding: 3px 0;
+		font-size: 13px;
+		color: var(--c-ink-3);
+	}
+	.issue-n {
+		font-family: var(--font-mono);
+		color: var(--c-ink-2);
+		font-feature-settings: 'tnum' 1;
 	}
 
 	.verdict {

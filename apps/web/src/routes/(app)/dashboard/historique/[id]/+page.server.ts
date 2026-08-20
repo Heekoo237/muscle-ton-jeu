@@ -57,7 +57,11 @@ export const load: PageServerLoad = async (event) => {
 				matchLabel: l.matchLabel,
 				libelleFr: l.libelleFr,
 				avecBadge: l.fragile,
-				texte: p.texte
+				texte: p.texte,
+				// Pas d'autres issues sur une re-vue figée : cette page ne LIT jamais
+				// predictions (lecture seule), et sur un ticket réglé les alternatives sont
+				// jouées — l'affordance « si tu veux garder ce match » n'a de sens qu'au résultat.
+				autresIssues: [] as ExplicationVM['autresIssues']
 			} satisfies ExplicationVM;
 		})
 		.filter((x): x is ExplicationVM => x !== null)

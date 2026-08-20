@@ -184,6 +184,12 @@ export interface ExplicationVM {
 	/** Badge rouge (fragile) → ton « risqué » ; sinon mention neutre. */
 	avecBadge: boolean;
 	texte: string;
+	/**
+	 * Autres issues du MÊME match, lues en base (max 3, jamais un calcul nouveau).
+	 * Titrées « Si tu veux garder ce match » — on MONTRE, on ne suggère jamais. Vide
+	 * si aucune issue voisine n'est en base (ex. cote seule sans 1X2).
+	 */
+	autresIssues: { libelleFr: string; probabilitePct: number }[];
 }
 
 export interface ResultVM {
@@ -191,6 +197,12 @@ export interface ResultVM {
 	probaTotalePct: number;
 	probaRenforceePct: number;
 	nbRetirees: number;
+	/**
+	 * Effet du retrait « N fois plus de chances » (calcul en code : renforcé ÷ original,
+	 * arrondi), affiché À CÔTÉ du pourcentage, jamais seul. `null` si pas de retrait ou
+	 * si l'effet est invisible à l'affichage — on ne prétend pas à un effet qu'on n'a pas.
+	 */
+	multiplicateur: string | null;
 	/** Niveau 1 : une phrase sur le ticket entier. */
 	synthese: string;
 	/** Niveau 2 : une explication par sélection retirée (peut être vide en repli). */
