@@ -15,7 +15,7 @@
 	</div>
 	<div class="col">
 		<span class="t-chiffre-md num">{fragilesMarques}</span>
-		<span class="t-small lbl">matchs marqués fragiles</span>
+		<span class="t-small lbl">matchs marqués trop justes</span>
 	</div>
 	<div class="col">
 		<span class="t-chiffre-md num">{tombes}</span>

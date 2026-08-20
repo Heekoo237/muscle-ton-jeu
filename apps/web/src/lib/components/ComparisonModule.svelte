@@ -34,7 +34,7 @@
 					</span>
 					<span class="right">
 						{#if l.cote != null}<span class="cote">{formatCote(l.cote)}</span>{/if}
-						{#if l.fragile}<span class="warn" aria-label="fragile">▲</span>{/if}
+						{#if l.fragile}<span class="warn" aria-label="trop juste">▲</span>{/if}
 					</span>
 				</li>
 			{/each}

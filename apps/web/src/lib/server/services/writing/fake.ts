@@ -47,7 +47,7 @@ export class FakeWriting implements WritingService {
 		}
 		// Ni fait ni cote : aveu honnête, sans meubler.
 		const aveu = r.avecBadge
-			? " On n'a rien de marquant à signaler. C'est la cote qui le rend fragile."
+			? " On n'a rien de marquant à signaler. C'est la cote qui le rend trop juste."
 			: " On n'a rien de marquant à signaler. C'est la cote qui le place en dernier.";
 		const chance = r.chanceSurMot ? ` ${cap(r.chanceSurMot)}, pas plus.` : '';
 		return `${tete}${aveu}${chance}`.trim();

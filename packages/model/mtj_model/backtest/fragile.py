@@ -90,6 +90,80 @@ def _market_selections(df: pd.DataFrame) -> dict:
     }
 
 
+def _all_market_probs(df: pd.DataFrame) -> dict:
+    """Proba AFFICHÉE (selon PROBABILITY_SOURCE) et issue réelle, PAR MARCHÉ ET PAR
+    ISSUE. 1X2 et plus/moins 2,5 = cote dé-vigée ; le reste = modèle. UNDER_1_5 et
+    UNDER_3_5 dérivés du modèle over (P(under) = 1 − P(over)). Sert au critère du badge."""
+    ftr = df["ftr"].to_numpy()
+    tot = (df["fthg"] + df["ftag"]).to_numpy()
+
+    def dv(cols):
+        p = np.full((len(df), len(cols)), np.nan)
+        sub = df[cols]
+        valid = sub.notna().all(axis=1) & (sub > 1.01).all(axis=1)
+        for i in np.where(valid.to_numpy())[0]:
+            p[i] = devig_power(df.loc[i, cols].to_numpy(float))
+        return p
+
+    o3 = dv(["open_ps_h", "open_ps_d", "open_ps_a"])
+    o2 = dv(["open_ps_o25", "open_ps_u25"])
+    m = df
+    return {
+        "WIN_HOME": (o3[:, 0], ftr == "H"),
+        "DRAW": (o3[:, 1], ftr == "D"),
+        "WIN_AWAY": (o3[:, 2], ftr == "A"),
+        "DC_HOME_DRAW": (m["m_dc_hd"].to_numpy(float), np.isin(ftr, ["H", "D"])),
+        "DC_DRAW_AWAY": (m["m_dc_da"].to_numpy(float), np.isin(ftr, ["D", "A"])),
+        "DC_HOME_AWAY": (m["m_dc_ha"].to_numpy(float), np.isin(ftr, ["H", "A"])),
+        "OVER_1_5": (m["m_o15"].to_numpy(float), tot >= 2),
+        "UNDER_1_5": (1 - m["m_o15"].to_numpy(float), tot <= 1),
+        "OVER_2_5": (o2[:, 0], tot >= 3),
+        "UNDER_2_5": (o2[:, 1], tot <= 2),
+        "OVER_3_5": (m["m_o35"].to_numpy(float), tot >= 4),
+        "UNDER_3_5": (1 - m["m_o35"].to_numpy(float), tot <= 3),
+    }
+
+
+def _badge_decision(df: pd.DataFrame) -> None:
+    """SOURCE UNIQUE des deux constantes (seuil de retrait ET visibilité du badge).
+    Régénère `FRAGILE_BADGE_VISIBLE` à chaque (re)calibrage — copier la colonne
+    « badge » dans constants.py / markets-meta.ts. Le badge NE dépend PAS de la
+    précision absolue (l'ancienne erreur : sur le nul, 75 % de précision = 75 % de
+    base, gain nul) mais du GAIN sur la base ET d'un marquage qui reste RARE :
+
+        badge  ⇔  gain ≥ FRAGILE_BADGE_MIN_GAIN (pts)  ET  marquage ≤ FRAGILE_BADGE_MAX_MARKING
+    """
+    from ..constants import (
+        FRAGILE_THRESHOLDS,
+        FRAGILE_BADGE_MIN_GAIN,
+        FRAGILE_BADGE_MAX_MARKING,
+    )
+
+    print("\n" + "=" * 78)
+    print("Décision BADGE par marché — critère GAIN sur la base, JAMAIS précision absolue")
+    print(f"  badge  ⇔  gain ≥ {FRAGILE_BADGE_MIN_GAIN:.0f} pts  ET  marquage ≤ {100*FRAGILE_BADGE_MAX_MARKING:.0f} %")
+    print("=" * 78)
+    print(f"  {'marché':<14}{'seuil':>6}{'%marqué':>9}{'base':>7}{'préc':>7}{'GAIN':>7}{'  badge'}")
+    for name, (p, won) in _all_market_probs(df).items():
+        ok = ~np.isnan(p)
+        p = p[ok]
+        won = np.asarray(won)[ok]
+        lost = ~won
+        seuil = FRAGILE_THRESHOLDS.get(name)
+        if seuil is None:
+            continue
+        flag = p < seuil
+        marquage = flag.mean()
+        base = 100 * lost.mean()
+        prec = 100 * lost[flag].mean() if flag.sum() else 0.0
+        gain = prec - base
+        badge = gain >= FRAGILE_BADGE_MIN_GAIN and marquage <= FRAGILE_BADGE_MAX_MARKING
+        verdict = "OUI" if badge else "non (neutre)"
+        print(f"  {name:<14}{seuil:>6.2f}{100*marquage:>8.0f}%{base:>6.0f}%{prec:>6.0f}%{gain:>+6.1f}   {verdict}")
+    print("  Rappel : 1X2 et double chance sur-marquent (seuil partagé) → neutre EN")
+    print("  ATTENDANT le recalibrage par issue (Direction 2). Le badge revient tout seul.")
+
+
 def _pr_curves(df: pd.DataFrame) -> None:
     """Le point de fonctionnement est une DÉCISION PRODUIT : précision/rappel à
     plusieurs fractions de sélections marquées, par marché."""
@@ -268,6 +342,7 @@ def main():
         print()
 
     _per_market_thresholds(df)
+    _badge_decision(df)
     _ticket_probability(sel)
     _pr_curves(df)
     _mixed_ticket(df)

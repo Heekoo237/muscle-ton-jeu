@@ -163,13 +163,27 @@ describe('badge « fragile » vs mention neutre (seuil PAR MARCHÉ)', () => {
 		expect(removed.fragile).toBe(false); // JAMAIS de badge rouge sur double chance
 	});
 
-	it('porte le badge rouge sur un 1X2 sous son seuil', () => {
+	it('un 1X2 sous son seuil est retiré SANS badge (intérim : seuil partagé, mention neutre)', () => {
 		const s = [
 			sel(1, 0.9),
 			sel(2, 0.85),
 			sel(3, 0.8),
 			sel(4, 0.78),
-			sel(5, 0.4, 5, 'WIN_HOME', 0.44) // sous 0,44 → badge visible
+			sel(5, 0.4, 5, 'WIN_HOME', 0.44) // sous 0,44 → retirable, mais 1X2 en intérim
+		];
+		const r = buildReinforced(s);
+		const removed = r.selections.find((x) => x.ordre === 5)!;
+		expect(r.retirees).toEqual([5]); // gate retrait : elle part (arithmétique honnête)
+		expect(removed.fragile).toBe(false); // gate badge : neutre tant que le seuil est partagé
+	});
+
+	it('porte le badge « trop juste » sur un plus/moins sous son seuil (gain ≥ 5, marquage ≤ 40 %)', () => {
+		const s = [
+			sel(1, 0.9),
+			sel(2, 0.85),
+			sel(3, 0.8),
+			sel(4, 0.78),
+			sel(5, 0.4, 5, 'OVER_2_5', 0.48) // sous 0,48 → badge visible (marché détecteur)
 		];
 		const r = buildReinforced(s);
 		const removed = r.selections.find((x) => x.ordre === 5)!;

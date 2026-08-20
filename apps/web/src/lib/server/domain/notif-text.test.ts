@@ -21,10 +21,10 @@ describe('buildSettleNotification — quatre cas déterministes', () => {
 		expect(n?.corps).toBe('Ton ticket est tombé sur Rio Ave – Porto. Le renforcé serait passé.');
 	});
 
-	it('tombé sur une ligne marquée fragile → on l’avait signalée', () => {
+	it('tombé sur une ligne marquée trop juste → on l’avait signalée', () => {
 		const n = buildSettleNotification({ ...base, premierPerduFragile: true });
 		expect(n?.corps).toBe(
-			"Ton ticket est tombé sur Rio Ave – Porto. C'était la sélection qu'on avait marquée fragile."
+			"Ton ticket est tombé sur Rio Ave – Porto. C'était la sélection qu'on avait marquée trop juste."
 		);
 	});
 

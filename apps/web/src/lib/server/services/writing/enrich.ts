@@ -1,6 +1,6 @@
 /**
  * enrich.ts — Transforme des FAITS bruts (forme, buts, confrontations lus en base)
- * en petites phrases françaises DÉTERMINISTES, et calcule « une chance sur X » à
+ * en petites phrases françaises DÉTERMINISTES, et calcule « une fois sur X » à
  * partir de la probabilité déjà calculée.
  *
  * Pourquoi construire les faits en phrases ici plutôt que passer des moyennes
@@ -37,10 +37,12 @@ export function enMots(n: number): string {
 }
 
 /**
- * « une chance sur X » — arrondi de 1/proba, borné à deux au minimum (on ne
- * présente jamais un fragile comme « une chance sur une »). Renvoie null si la
- * probabilité est absente ou nulle. C'est une APPROXIMATION grand public
- * volontaire (« une chance sur deux, pas 50,3 % ») : le pourcentage exact reste
+ * « une fois sur X » — arrondi de 1/proba, borné à deux au minimum (on ne présente
+ * jamais une ligne trop juste comme « une fois sur une »). Renvoie null si la
+ * probabilité est absente ou nulle. FORMULATION UNIQUE, langage de parieur
+ * (fréquence de passage), la même que la traduction de la cote — jamais « une
+ * chance sur » (langage de statisticien). C'est une APPROXIMATION grand public
+ * volontaire (« une fois sur deux, pas 50,3 % ») : le pourcentage exact reste
  * affiché ailleurs dans la vue.
  */
 export function chanceSur(proba: number | null): number | null {
@@ -50,7 +52,7 @@ export function chanceSur(proba: number | null): number | null {
 
 export function chanceSurMot(proba: number | null): string | null {
 	const x = chanceSur(proba);
-	return x === null ? null : `une chance sur ${enMots(x)}`;
+	return x === null ? null : `une fois sur ${enMots(x)}`;
 }
 
 /**
@@ -109,7 +111,7 @@ function choisir(variantes: string[], input: WritingInput): string {
 function synthFragiles(matchs: string, nbFragiles: number): string[] {
 	const un = nbFragiles === 1;
 	const fMot = enMots(nbFragiles);
-	const sontFragiles = un ? 'Un seul est fragile' : `${cap(fMot)} sont fragiles`;
+	const sontFragiles = un ? 'Un seul est trop juste' : `${cap(fMot)} sont trop justes`;
 	const maillons = un ? 'un maillon faible' : `${fMot} maillons faibles`;
 	const neTiennent = un ? 'une ne tient pas la route' : `${fMot} ne tiennent pas la route`;
 	return [

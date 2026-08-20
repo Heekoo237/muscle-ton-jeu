@@ -42,8 +42,11 @@ export function isAnalysable(s: Selection): boolean {
 }
 
 /**
- * Sous le seuil de SON marché → candidate au retrait (tous marchés confondus).
- * C'est le classement interne du renforcement, distinct du badge visible.
+ * GATE 1 — RETRAIT. Sous le seuil de RETRAIT de son marché → candidate au retrait
+ * (tous marchés confondus, badge ou non). C'est l'ARITHMÉTIQUE du renforcement :
+ * retirer la jambe faible monte la proba combinée, honnête indépendamment du badge.
+ * Distinct du badge (gate 2). La Direction 2 (recalibrage par issue) ne touchera
+ * QUE ce seuil — le badge se re-dérive alors tout seul de son propre critère.
  */
 export function belowThreshold(s: Selection): boolean {
 	if (!isAnalysable(s) || s.marche === null) return false;
@@ -51,10 +54,12 @@ export function belowThreshold(s: Selection): boolean {
 }
 
 /**
- * Badge rouge : sous le seuil, marché où le badge est autorisé (précision mesurée
- * > ~50 %), ET régime MESURE. En cote seule la précision n'est pas mesurée : jamais
- * de badge rouge (ce serait laisser croire qu'on a mesuré) — la sélection reste
- * candidate au retrait, expliquée par une mention neutre « la moins solide ».
+ * GATE 2 — BADGE « trop juste ». Réglage INDÉPENDANT du seuil de retrait : marché
+ * dont le badge est autorisé (`badgeVisible`, critère gain sur la base ≥ 5 pts ET
+ * marquage ≤ 40 % — jamais la précision absolue), ET régime MESURE. En cote seule
+ * la précision n'est pas mesurée : jamais de badge (ce serait laisser croire qu'on
+ * a mesuré). Une sélection sans badge reste candidate au retrait (gate 1), juste
+ * expliquée par une mention neutre « la moins solide » plutôt que « trop juste ».
  */
 function showsBadge(s: Selection): boolean {
 	return belowThreshold(s) && s.marche !== null && badgeVisible(s.marche) && !isUnmeasured(s.source);
@@ -82,7 +87,12 @@ export function productProbability(selections: Selection[]): number {
 		.reduce((acc, s) => acc * (s.probabilite as number), 1);
 }
 
-/** Marque `fragile` (badge rouge) selon le seuil PAR MARCHÉ et la visibilité du badge. */
+/**
+ * Pose le champ `fragile` = BADGE « trop juste » visible (gate 2). ATTENTION à ne
+ * pas confondre avec la candidature au retrait (gate 1, `belowThreshold`) : une
+ * ligne peut être retirée SANS badge (1X2/DC en intérim, ou cote seule). C'est
+ * `belowThreshold` qui décide du retrait, `fragile` ne sert qu'à l'affichage du badge.
+ */
 export function markFragile(selections: Selection[]): Selection[] {
 	return selections.map((s) => ({ ...s, fragile: showsBadge(s) }));
 }

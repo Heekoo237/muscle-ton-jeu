@@ -12,7 +12,7 @@ function retrait(over: Partial<RetraitEnrichi> = {}): RetraitEnrichi {
 		libelleFr: 'Napoli – Roma — Napoli gagne',
 		avecBadge: true,
 		chanceSur: 2,
-		chanceSurMot: 'une chance sur deux',
+		chanceSurMot: 'une fois sur deux',
 		cote: null,
 		faits: ['Napoli a perdu deux fois à domicile.'],
 		...over
@@ -37,7 +37,7 @@ const texteComplet = (a: { synthese: string; parSelection: { texte: string }[] }
 
 describe('rédaction — sortie deux niveaux, sous garde-fous', () => {
 	it('produit une synthèse et une explication par retrait, et passe le garde-fou', async () => {
-		const inp = input([retrait({ ordre: 2 }), retrait({ ordre: 4, avecBadge: false, chanceSur: 3, chanceSurMot: 'une chance sur trois' })]);
+		const inp = input([retrait({ ordre: 2 }), retrait({ ordre: 4, avecBadge: false, chanceSur: 3, chanceSurMot: 'une fois sur trois' })]);
 		const a = await new FakeWriting().writeAnalysis(inp);
 		expect(a.synthese.length).toBeGreaterThan(0);
 		expect(a.parSelection.map((p) => p.ordre)).toEqual([2, 4]);
@@ -66,7 +66,7 @@ describe('règle de causalité (brief §4.4)', () => {
 	});
 
 	it('accepte une description sans causalité (faits côte à côte)', () => {
-		const ok = 'Napoli gagne, c’est risqué. Napoli a perdu deux fois à domicile. Une chance sur deux, pas plus.';
+		const ok = 'Napoli gagne, c’est risqué. Napoli a perdu deux fois à domicile. Une fois sur deux, pas plus.';
 		expect(checkCausality(ok).ok).toBe(true);
 		expect(checkGeneratedText(ok, [2]).causality.ok).toBe(true);
 	});
@@ -140,14 +140,14 @@ describe('badge rouge vs mention neutre', () => {
 	});
 });
 
-describe('« une chance sur X » déterministe', () => {
+describe('« une fois sur X » déterministe', () => {
 	it('arrondit 1/proba, borné à deux, en toutes lettres', () => {
 		expect(chanceSur(0.5)).toBe(2);
 		expect(chanceSur(0.33)).toBe(3);
 		expect(chanceSur(0.28)).toBe(4);
-		expect(chanceSur(0.9)).toBe(2); // jamais « une chance sur une »
+		expect(chanceSur(0.9)).toBe(2); // jamais « une fois sur une »
 		expect(chanceSur(null)).toBeNull();
-		expect(chanceSurMot(0.5)).toBe('une chance sur deux');
+		expect(chanceSurMot(0.5)).toBe('une fois sur deux');
 		expect(enMots(3)).toBe('trois');
 	});
 });
@@ -201,11 +201,11 @@ describe('garde-fou des nombres (règle d’or n°1)', () => {
 		expect(controle.ok).toBe(true);
 	});
 
-	it('les seuils de marché (2,5) et « chance sur X » sont autorisés, pas les autres', () => {
+	it('les seuils de marché (2,5) et « une fois sur X » sont autorisés, pas les autres', () => {
 		const inp = input([retrait({ libelleFr: 'Lens – Nice — Plus de 3,5 buts', chanceSur: 4 })]);
 		const allowed = allowedNumbersFor(inp);
 		expect(allowed).toContain(3.5); // seuil marché
-		expect(allowed).toContain(4); // « une chance sur quatre »
+		expect(allowed).toContain(4); // « une fois sur quatre »
 		expect(allowed).toContain(1.4); // proba totale
 		expect(allowed).not.toContain(87);
 	});

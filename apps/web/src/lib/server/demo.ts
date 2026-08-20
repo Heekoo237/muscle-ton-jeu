@@ -148,7 +148,7 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 		line(1, 'REAL – SEVILLA', 'Real gagne', 1.55, 63),
 		line(2, 'LENS – NICE', 'Plus de 2,5 buts', 1.95, 41, true, true),
 		line(3, 'LYON – RENNES', 'Les deux marquent', 1.72, 55),
-		line(4, 'MILAN – TORINO', 'Milan gagne', 2.1, 38, true, true),
+		line(4, 'MILAN – TORINO', 'Milan gagne', 2.1, 38, false, true), // 1X2 : badge retiré (intérim), mention neutre
 		line(5, 'PORTO – BRAGA', 'Porto ou match nul', 1.28, 74),
 		line(6, 'BENFICA – SPORTING', 'Moins de 3,5 buts', 1.4, 68),
 		line(7, 'MONACO – LILLE', 'Double chance Monaco', 1.33, 71)
@@ -161,7 +161,7 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 		probaTotalePct: 4.2,
 		probaRenforceePct: 12.6,
 		nbRetirees: 2,
-		synthese: 'Ton ticket tient sur sept matchs. Deux sont fragiles, un seul suffit à tout faire tomber.',
+		synthese: 'Ton ticket tient sur sept matchs. Un est trop juste, une autre ligne allégée.',
 		explications: [
 			{
 				ordre: 2,
@@ -169,15 +169,15 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 				libelleFr: 'Plus de 2,5 buts',
 				avecBadge: true,
 				texte:
-					'Plus de 2,5 buts, c’est risqué. Lens marque peu à domicile, et Nice ferme bien le jeu. Une chance sur deux, pas plus.'
+					'Plus de 2,5 buts, c’est risqué. Lens marque peu à domicile, et Nice ferme bien le jeu. Une fois sur deux, pas plus.'
 			},
 			{
 				ordre: 4,
 				matchLabel: 'MILAN – TORINO',
 				libelleFr: 'Milan gagne',
-				avecBadge: true,
+				avecBadge: false,
 				texte:
-					'Milan gagne, c’est ton match le plus risqué. Milan a perdu deux fois à domicile ce mois-ci. Une chance sur trois, pas plus.'
+					'Milan gagne, c’est la moins solide de ton ticket. Milan a perdu deux fois à domicile ce mois-ci. Une fois sur trois, pas plus.'
 			}
 		],
 		// Démo réglée pour montrer le verdict (les deux fragiles retirés tombent → le

@@ -6,7 +6,7 @@
  * Ce qui est autorisé, et RIEN d'autre :
  *   - les pourcentages calculés : proba totale, proba renforcée ;
  *   - les compteurs du ticket : retirées, matchs analysables, fragiles ;
- *   - « une chance sur X » : l'entier X de chaque retrait (arrondi de 1/proba) ;
+ *   - « une fois sur X » : l'entier X de chaque retrait (arrondi de 1/proba) ;
  *   - les seuls seuils de marché des libellés (1,5 · 2,5 · 3,5).
  *
  * Jeu élargi au STRICT NÉCESSAIRE. On ne prend PAS les autres nombres d'un

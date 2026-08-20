@@ -60,16 +60,16 @@ export function buildSettleNotification(
 		};
 	}
 
-	// Tombé sur une ligne qu'on avait marquée fragile (le « on t'avait prévenu »).
+	// Tombé sur une ligne qu'on avait marquée trop juste (le « on t'avait prévenu »).
 	if (v.premierPerduFragile) {
 		return {
 			titre: 'Ton ticket est tombé',
-			corps: `Ton ticket est tombé${surMatch}. C'était la sélection qu'on avait marquée fragile.`,
+			corps: `Ton ticket est tombé${surMatch}. C'était la sélection qu'on avait marquée trop juste.`,
 			url
 		};
 	}
 
-	// Tombé sur une ligne gardée, non fragile : on le dit simplement, sans rien inventer.
+	// Tombé sur une ligne gardée, non marquée : on le dit simplement, sans rien inventer.
 	return { titre: 'Ton ticket est tombé', corps: `Ton ticket est tombé${surMatch}.`, url };
 }
 

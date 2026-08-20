@@ -28,7 +28,7 @@
 
 					<span class="dit t-small">
 						{#if l.nbFragiles > 0}
-							{l.nbFragiles} marqué{l.nbFragiles > 1 ? 's' : ''} fragile{l.nbFragiles > 1 ? 's' : ''}
+							{l.nbFragiles} marqué{l.nbFragiles > 1 ? 's' : ''} trop juste{l.nbFragiles > 1 ? 's' : ''}
 						{:else}
 							Rien à retirer
 						{/if}

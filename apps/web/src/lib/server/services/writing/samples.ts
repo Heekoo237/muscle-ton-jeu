@@ -14,7 +14,7 @@ function r(o: Partial<RetraitEnrichi> & Pick<RetraitEnrichi, 'ordre' | 'libelleF
 	return {
 		avecBadge: true,
 		chanceSur: 2,
-		chanceSurMot: 'une chance sur deux',
+		chanceSurMot: 'une fois sur deux',
 		cote: null,
 		faits: [],
 		...o
@@ -41,21 +41,21 @@ export const ECHANTILLONS: Echantillon[] = [
 					ordre: 2,
 					libelleFr: 'Napoli – Roma — Napoli gagne',
 					chanceSur: 2,
-					chanceSurMot: 'une chance sur deux',
+					chanceSurMot: 'une fois sur deux',
 					faits: ['Napoli a perdu deux fois à domicile.', 'Roma encaisse peu à l’extérieur.']
 				}),
 				r({
 					ordre: 5,
 					libelleFr: 'Lens – Nice — Plus de 2,5 buts',
 					chanceSur: 2,
-					chanceSurMot: 'une chance sur deux',
+					chanceSurMot: 'une fois sur deux',
 					faits: ['Lens marque peu à domicile.', 'Nice encaisse peu à l’extérieur.']
 				}),
 				r({
 					ordre: 7,
 					libelleFr: 'Milan – Torino — Milan gagne',
 					chanceSur: 3,
-					chanceSurMot: 'une chance sur trois',
+					chanceSurMot: 'une fois sur trois',
 					faits: ['Milan reste sur trois matchs sans victoire.']
 				})
 			]
@@ -76,7 +76,7 @@ export const ECHANTILLONS: Echantillon[] = [
 					libelleFr: 'Monaco – Lille — Monaco ou match nul',
 					avecBadge: false,
 					chanceSur: 2,
-					chanceSurMot: 'une chance sur deux',
+					chanceSurMot: 'une fois sur deux',
 					faits: ['Monaco encaisse souvent à domicile.', 'Lille marque beaucoup à l’extérieur.']
 				})
 			]
@@ -96,7 +96,7 @@ export const ECHANTILLONS: Echantillon[] = [
 					ordre: 3,
 					libelleFr: 'Porto – Braga — Les deux équipes marquent',
 					chanceSur: 2,
-					chanceSurMot: 'une chance sur deux',
+					chanceSurMot: 'une fois sur deux',
 					faits: ['Braga marque peu à l’extérieur.']
 				})
 			]
@@ -116,14 +116,14 @@ export const ECHANTILLONS: Echantillon[] = [
 					ordre: 1,
 					libelleFr: 'Real – Sevilla — Plus de 3,5 buts',
 					chanceSur: 3,
-					chanceSurMot: 'une chance sur trois',
+					chanceSurMot: 'une fois sur trois',
 					faits: ['Sevilla encaisse peu à l’extérieur.']
 				}),
 				r({
 					ordre: 6,
 					libelleFr: 'Lyon – Rennes — Rennes gagne',
 					chanceSur: 4,
-					chanceSurMot: 'une chance sur quatre',
+					chanceSurMot: 'une fois sur quatre',
 					faits: ['Rennes a perdu trois de ses cinq derniers matchs.', 'Lyon marque beaucoup à domicile.']
 				})
 			]
@@ -143,7 +143,7 @@ export const ECHANTILLONS: Echantillon[] = [
 					ordre: 2,
 					libelleFr: 'Benfica – Sporting — Benfica gagne',
 					chanceSur: 2,
-					chanceSurMot: 'une chance sur deux',
+					chanceSurMot: 'une fois sur deux',
 					faits: []
 				})
 			]

@@ -19,7 +19,7 @@
 	</div>
 	<span class="l2 t-small">
 		{#if nbFragiles > 0}
-			{nbFragiles} marqué{nbFragiles > 1 ? 's' : ''} fragile{nbFragiles > 1 ? 's' : ''}
+			{nbFragiles} marqué{nbFragiles > 1 ? 's' : ''} trop juste{nbFragiles > 1 ? 's' : ''}
 		{:else}
 			Rien à retirer
 		{/if}

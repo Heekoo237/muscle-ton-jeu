@@ -92,33 +92,40 @@ ALT_TOTALS_MIN_LEAGUES = 3
 ALT_TOTALS_MIN_NIGHTS = 3
 
 
-# ── Seuil de fragilité PAR MARCHÉ ────────────────────────────────────────────
-# Une sélection est « fragile » si sa probabilité est SOUS le seuil de son marché.
-# Définition retenue (étape 4.5) : PROBABILITÉ SEULE. Le désaccord modèle/marché
-# et le mouvement de cote ont été testés et ÉCARTÉS — ils baissent la précision
-# (étape 4.1/4.2) et le mouvement est inconnu au calcul nocturne.
+# ── Seuil de RETRAIT par marché (≠ badge, voir plus bas) ─────────────────────
+# DEUX NOTIONS DISTINCTES, DEUX RÉGLAGES DISTINCTS (ne jamais les recoupler) :
+#   1. le SEUIL DE RETRAIT (ci-dessous) — qui devient candidat au retrait ;
+#   2. la VISIBILITÉ DU BADGE (FRAGILE_BADGE_VISIBLE, plus bas) — qui reçoit le
+#      badge rouge « trop juste ».
+# Le seuil gouverne l'ARITHMÉTIQUE (retirer la jambe faible monte la proba
+# combinée — honnête quel que soit le badge). Le badge gouverne la PRÉTENTION
+# de détection. La Direction 2 (recalibrage par issue) ne touchera QUE le seuil ;
+# le badge se re-dérive alors tout seul de son critère (gain + marquage).
 #
-# POINT DE FONCTIONNEMENT = DÉCISION PRODUIT (30 %), pas une convention. Les
-# courbes précision/rappel (fragile.py, _pr_curves) montrent que sur les marchés
-# « cote » la précision monte quand on marque moins ; l'elbow est à ~30 % de
-# sélections marquées (1X2 : précision 60 % vs 56 % à 60 %). En dessous (20 %) on
-# ne gagne que +2 pt de précision pour −12 pt de rappel. On marque donc PEU et
-# JUSTE. Chaque seuil = 30ᵉ centile de la proba affichée du marché.
+# Une sélection est candidate au retrait si sa probabilité est SOUS le seuil de
+# son marché. Définition retenue (étape 4.5) : PROBABILITÉ SEULE. Le désaccord
+# modèle/marché et le mouvement de cote ont été testés et ÉCARTÉS.
 #
-# HONNÊTETÉ SUR LE SIGNAL (1X2, au point 30 %) :
-#   précision 60 %  ·  taux d'échec de base 45,6 %  →  ~14 pt au-dessus du hasard.
-#   Réel mais modéré. Le plancher de 4 sélections (règle d'or n°3) empêche de
-#   vider le ticket même quand plusieurs sélections sont marquées.
+# POINT DE FONCTIONNEMENT = DÉCISION PRODUIT (30 %). Chaque seuil DEVRAIT être le
+# 30ᵉ centile de la proba affichée de SON marché. Les marchés à issue unique
+# (plus/moins) le sont ; les deux marchés à TROIS issues (1X2, double chance)
+# PARTAGENT un seuil calé sur une seule issue (le favori / le « 12 ») — d'où un
+# sur-marquage sur les deux autres issues. Mesuré (fragile.py, 3 459 matchs) :
+#   1X2 partagé 0,44 → marque 51 % (dom.) · 100 % (nul) · 78 % (ext.)
+#   DC  partagé 0,74 → marque 58 % (1X)   · 80 %  (X2)  · 43 % (12)
+# La Direction 2 donnera à chaque issue son propre 30ᵉ centile (voir README).
 FRAGILE_OPERATING_POINT = 0.30  # fraction de sélections marquées (décision produit)
 FRAGILE_THRESHOLDS = {
+    # ⚠ 1X2 et DC : UN seuil partagé par trois issues (hérité du favori / du 12).
+    #    Correct pour une issue, trop haut pour les deux autres. Recalibrage = Dir. 2.
     "WIN_HOME": 0.44, "DRAW": 0.44, "WIN_AWAY": 0.44,        # 1X2  (base échec 45,7 %)
     "DC_HOME_DRAW": 0.74, "DC_DRAW_AWAY": 0.74, "DC_HOME_AWAY": 0.74,  # double chance (base 22,3 %)
-    "OVER_1_5": 0.72,     # plus de 1,5 (base 23,0 %)
-    "UNDER_1_5": 0.18,    # moins de 1,5 (base 77 %)
-    "OVER_2_5": 0.48,     # plus de 2,5 (base ~43 %)
-    "UNDER_2_5": 0.42,    # moins de 2,5
-    "OVER_3_5": 0.24,     # plus de 3,5 (base 69,2 %)
-    "UNDER_3_5": 0.63,    # moins de 3,5 (base 31 %)
+    "OVER_1_5": 0.72,     # plus de 1,5 (base 23,0 %)  — calé sur son marché
+    "UNDER_1_5": 0.18,    # moins de 1,5 (base 77 %)   — calé sur son marché
+    "OVER_2_5": 0.48,     # plus de 2,5 (base ~43 %)   — calé sur son marché
+    "UNDER_2_5": 0.42,    # moins de 2,5               — calé sur son marché
+    "OVER_3_5": 0.24,     # plus de 3,5 (base 69,2 %)  — calé sur son marché
+    "UNDER_3_5": 0.63,    # moins de 3,5 (base 31 %)   — calé sur son marché
 }
 FRAGILE_MIN_SELECTIONS = 4  # plancher du ticket renforcé (règle d'or n°3), jamais moins
 
@@ -135,23 +142,51 @@ FRAGILE_THRESHOLD_COTE_SEULE = 0.50
 FRAGILE_1X2_PRECISION = 0.60       # au point 30 % : part des marquées qui tombent
 FRAGILE_1X2_BASE_FAILURE = 0.457   # taux d'échec des favoris d'ouverture sans filtre
 
-# ── Badge « fragile » visible vs retrait silencieux mais jamais muet ──────────
-# Sur les marchés « modèle sûr » (double chance, plus de 1,5), la précision est
-# PLATE ~28 % quel que soit le seuil (fragile.py) : le modèle ne sait pas classer
-# les échecs. Y afficher un badge « fragile » rouge crierait au loup (on marquerait
-# des sélections qui passent 3 fois sur 4). Décision produit :
-#   - Badge « fragile » VISIBLE seulement là où la précision dépasse ~50 %.
-#   - Sur les autres marchés, la sélection sert au classement interne du retrait ;
-#     si le renforcement la retire, on l'explique par une MENTION NEUTRE (voir
-#     FRAGILE_NEUTRAL_MENTION) — « on retire sans crier au loup, jamais en silence ».
+# ── Badge « trop juste » — critère OBJECTIF : GAIN sur la base, jamais précision ─
+# ERREUR DE FOND CORRIGÉE : l'ancien critère « précision absolue > ~50 % »
+# allumait le badge sur le NUL (précision 75 %) — or 75 % est le TAUX DE BASE du
+# nul, pas de la détection : on marquait 100 % des nuls pour un GAIN de +0,0 pt.
+# Un badge sur 100 % (ou 51 %) des lignes ne se lit plus. Le bon critère mesure ce
+# que le marquage AJOUTE, et exige qu'il reste RARE :
+#
+#   Badge affiché  ⇔  gain sur la base ≥ 5 pts  ET  taux de marquage ≤ 40 %.
+#
+# Les DEUX conditions. Le gain écarte le drap (nul). Le marquage écarte les seuils
+# partagés qui sur-marquent (1X2, DC) même quand leur gain est réel — un badge
+# doit rester rare pour être crédible. Règle générale : un seuil se valide par son
+# GAIN sur la base, jamais par sa précision absolue (README).
+#
+# Chiffres mesurés (fragile.py, seuils ACTUELS, 3 459 matchs) — gain · marquage :
+#   WIN_HOME +16,0 · 51 %   DRAW +0,0 · 100 %   WIN_AWAY +8,1 · 78 %
+#   DC_HOME_DRAW +10,9 · 58 %   DC_DRAW_AWAY +6,0 · 80 %   DC_HOME_AWAY +3,6 · 43 %
+#   OVER_1_5 +6,1 · 31 %   OVER_2_5 +10,0 · 31 %   OVER_3_5 +9,3 · 30 %
+#   UNDER_1_5 +6,7 · 29 %   UNDER_2_5 +12,2 · 31 %   UNDER_3_5 +10,4 · 29 %
+#
+# INTÉRIM ASSUMÉ : tout le 1X2 et toute la double chance passent en MENTION NEUTRE
+# (aucun badge rouge) tant que leur seuil partagé sur-marque. Ce n'est PAS
+# définitif : la Direction 2 ramène chaque issue à ~30 % de marquage, et le badge
+# revient MÉRITÉ, tout seul, dès que (gain ≥ 5 ET marquage ≤ 40 %) est vrai.
+# Ne PAS rallumer un badge à la main en voyant « le gain est positif » sans
+# regarder le marquage — c'est exactement le raccourci qui a produit le seuil partagé.
+FRAGILE_BADGE_MIN_GAIN = 5.0       # gain sur la base minimal (points) pour un badge
+FRAGILE_BADGE_MAX_MARKING = 0.40   # marquage maximal — un badge doit rester rare
 FRAGILE_BADGE_VISIBLE = {
-    "WIN_HOME": True, "DRAW": True, "WIN_AWAY": True,   # 1X2 — précision ~60 %
-    "OVER_2_5": True, "UNDER_2_5": True,                # plus/moins 2,5 — ~50 %
-    "OVER_3_5": True, "UNDER_1_5": True,                # échec fréquent → précision ~80 %
-    "DC_HOME_DRAW": False, "DC_DRAW_AWAY": False, "DC_HOME_AWAY": False,  # double chance
-    "OVER_1_5": False, "UNDER_3_5": False,             # marchés « sûrs » — précision plate
+    # Dérivé du critère ci-dessus sur les chiffres mesurés. Régénérer via fragile.py
+    # (routine _badge_decision) à chaque recalibrage — ne pas éditer à la main isolément.
+    "WIN_HOME": False,      # +16,0 mais 51 % marqué (>40) → neutre jusqu'à Dir. 2
+    "DRAW": False,          # +0,0 · 100 % — le drap, aucune détection
+    "WIN_AWAY": False,      # +8,1 mais 78 % marqué → neutre jusqu'à Dir. 2
+    "DC_HOME_DRAW": False,  # +10,9 mais 58 % marqué → neutre jusqu'à Dir. 2
+    "DC_DRAW_AWAY": False,  # +6,0 mais 80 % marqué → neutre jusqu'à Dir. 2
+    "DC_HOME_AWAY": False,  # +3,6 ET 43 % — échoue les deux conditions
+    "OVER_1_5": True,       # +6,1 · 31 % ✓
+    "OVER_2_5": True,       # +10,0 · 31 % ✓
+    "OVER_3_5": True,       # +9,3 · 30 % ✓
+    "UNDER_1_5": True,      # +6,7 · 29 % ✓
+    "UNDER_2_5": True,      # +12,2 · 31 % ✓
+    "UNDER_3_5": True,      # +10,4 · 29 % ✓
 }
-FRAGILE_NEUTRAL_MENTION = "la moins solide de ton ticket"  # retrait sans badge « fragile »
+FRAGILE_NEUTRAL_MENTION = "la moins solide de ton ticket"  # retrait sans badge « trop juste »
 
 
 # ── Confiance affichée PAR CHAMPIONNAT ───────────────────────────────────────

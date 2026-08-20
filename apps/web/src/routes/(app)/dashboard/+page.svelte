@@ -61,7 +61,7 @@
 				<span class="num t-chiffre-md">
 					{data.stats.fragilesTombes} <span class="sur">sur {data.stats.fragilesMarques}</span>
 				</span>
-				<span class="lbl t-small">fragiles effectivement tombés</span>
+				<span class="lbl t-small">trop justes effectivement tombés</span>
 			</div>
 		{/if}
 	</section>

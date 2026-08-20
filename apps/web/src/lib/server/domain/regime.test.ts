@@ -12,7 +12,10 @@ function mk(ordre: number, source: PredictionSource, prob: number): Selection {
 		texteBrut: '',
 		fixtureId: ordre,
 		matchLabel: 'A – B',
-		marche: 'WIN_HOME',
+		// Marché à BADGE VISIBLE (plus/moins 2,5) pour tester le contraste badge/mention :
+		// en régime mesure il porte le badge, en cote seule non. Un 1X2 serait neutre en
+		// intérim (seuil partagé) et masquerait le contraste régime qu'on veut mesurer.
+		marche: 'OVER_2_5',
 		etatResolution: 'certain',
 		coteSaisie: null,
 		probabilite: prob,
@@ -20,7 +23,7 @@ function mk(ordre: number, source: PredictionSource, prob: number): Selection {
 		source,
 		fragile: false,
 		retireeDuRenforce: false,
-		libelleFr: 'A gagne'
+		libelleFr: 'Plus de 2,5 buts'
 	};
 }
 
@@ -73,7 +76,7 @@ describe('rédacteur en régime cote — aveu honnête, aucun fait inventé (pr�
 					libelleFr: 'Grenoble – Metz — Metz gagne',
 					avecBadge: true,
 					chanceSur: 3,
-					chanceSurMot: 'une chance sur trois',
+					chanceSurMot: 'une fois sur trois',
 					cote: null,
 					faits: []
 				}
@@ -88,7 +91,7 @@ describe('rédacteur en régime cote — aveu honnête, aucun fait inventé (pr�
 });
 
 describe('cote seule — jamais de badge rouge, mais bien retirable (précision non mesurée)', () => {
-	it('WIN_HOME sous le seuil en cote seule → pas de badge, mais retirée (mention neutre)', () => {
+	it('marché à badge sous le seuil en cote seule → pas de badge, mais retirée (mention neutre)', () => {
 		const input = [
 			mk(1, 'cote_seule', 0.4), // sous 0,5 → candidate au retrait, SANS badge
 			mk(2, 'model', 0.8),

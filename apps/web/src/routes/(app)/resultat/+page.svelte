@@ -245,7 +245,7 @@
 				<div class="mpm-head">
 					<span class="mpm-titre">Match par match</span>
 					{#if nbFragiles > 0}
-						<span class="mpm-badge">{nbFragiles} fragile{nbFragiles > 1 ? 's' : ''}</span>
+						<span class="mpm-badge">{nbFragiles} trop juste{nbFragiles > 1 ? 's' : ''}</span>
 					{/if}
 				</div>
 				{#each vm.lignes as l, i (l.ordre)}

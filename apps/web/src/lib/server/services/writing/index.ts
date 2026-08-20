@@ -16,12 +16,13 @@ export interface RetraitEnrichi {
 	/** Libellé complet « Home – Away — Marché en français ». */
 	libelleFr: string;
 	/**
-	 * Badge rouge visible (1X2, plus/moins 2,5, plus de 3,5) → ton « risqué » ;
-	 * sans badge (double chance, plus de 1,5) → mention neutre « la moins solide »,
-	 * jamais « fragile » (précision plus basse, on ne crie pas au loup).
+	 * Badge « trop juste » visible → ton « risqué ». Sans badge → mention neutre
+	 * « la moins solide », jamais « trop juste ». Le badge suit le critère gain sur
+	 * la base ≥ 5 pts ET marquage ≤ 40 % (markets-meta) : en intérim, 1X2 et double
+	 * chance sont sans badge (seuil partagé qui sur-marque) — mention neutre.
 	 */
 	avecBadge: boolean;
-	/** « une chance sur deux » — arrondi déterministe de 1/proba. null si non chiffrable. */
+	/** « une fois sur deux » — arrondi déterministe de 1/proba. null si non chiffrable. */
 	chanceSurMot: string | null;
 	/** Entier correspondant (2 pour « sur deux ») — autorisé au garde-fou des nombres. */
 	chanceSur: number | null;
