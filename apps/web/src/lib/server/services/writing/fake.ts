@@ -33,9 +33,12 @@ export class FakeWriting implements WritingService {
 		const tete = r.avecBadge ? `${nom}, c'est risqué.` : `${nom}, la moins solide de ton ticket.`;
 		// Traduction pédagogique de la cote (nombres FOURNIS : cote lue + « une fois sur X »
 		// tiré de notre proba, jamais un calcul sur la cote). Uniquement sur la cible.
+		// UNE phrase, la fréquence, rien d'autre : pas de commentaire sur la rareté de la
+		// cote (« c'est rare qu'un nul sorte à cette cote ») — ça n'apprend rien et répète
+		// le chiffre. La place gagnée revient aux FAITS du match.
 		const traduction =
 			traduitLaCote && r.cote != null && r.chanceSur != null
-				? ` Une cote à ${formatCote(r.cote)}, c'est rare : ça passe environ une fois sur ${enMots(r.chanceSur)}.`
+				? ` Le bookmaker paye ${formatCote(r.cote)} : pour lui, ça arrive environ une fois sur ${enMots(r.chanceSur)}.`
 				: '';
 		if (r.faits.length) {
 			// Faits d'abord ; la traduction S'AJOUTE (elle ne remplace pas les faits).
