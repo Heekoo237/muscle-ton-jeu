@@ -44,9 +44,20 @@ calibré sur une seule issue :
 - **La double chance (0,74)** a le même défaut, moins visible : calé sur le « 12 »
   (marque 43 %), trop haut pour 1X (58 %) et X2 (80 %).
 
-Le seuil 0,44 n'est donc pas un détecteur de fragilité : c'est un **détecteur de
-favori déguisé**. La Direction 2 (recalibrage par issue) est mesurée dans le code
-et attend son tour.
+Le seuil 0,44 n'était donc pas un détecteur de fragilité : c'était un **détecteur
+de favori déguisé**. **Direction 2 — FAIT** : chaque issue a désormais son propre
+30ᵉ centile (`FRAGILE_THRESHOLDS`, `constants.py`) :
+
+| Issue | ancien (partagé) | recalibré | marque | gain |
+|---|---|---|---|---|
+| Victoire domicile | 0,44 | **0,33** | 29 % | +24,0 |
+| **Match nul** | 0,44 | **0,22** | 29 % | +6,1 |
+| Victoire extérieur | 0,44 | **0,20** | 30 % | +19,6 |
+| Double chance 1X | 0,74 | **0,61** | 31 % | +19,9 |
+| Double chance X2 | 0,74 | **0,47** | 30 % | +23,2 |
+| L'un ou l'autre (12) | 0,74 | **0,73** | 34 % | +2,6 |
+
+Le nul n'est plus marqué à 100 % mais à ~30 % (les plus justes), gain +6,1.
 
 ### Règle 2 — un seuil se valide par son GAIN sur la base, jamais par sa précision absolue
 
@@ -66,20 +77,45 @@ recalibrage — copier sa colonne « badge ». Ne **jamais** rallumer un badge �
 main en voyant « le gain est positif » sans regarder le marquage : c'est le
 raccourci qui a produit le seuil partagé.
 
-### Intérim en cours (seuils partagés actuels)
+### État du badge après Direction 2
 
-| Marché | gain · marquage | badge |
-|---|---|---|
-| WIN_HOME | +16,0 · 51 % | neutre (marque trop) |
-| DRAW | +0,0 · 100 % | neutre (aucune détection) |
-| WIN_AWAY | +8,1 · 78 % | neutre (marque trop) |
-| DC_HOME_DRAW / DRAW_AWAY / HOME_AWAY | +10,9·58 % / +6,0·80 % / +3,6·43 % | neutre |
-| OVER_1_5 / 2_5 / 3_5 | +6,1 / +10,0 / +9,3 · ~30 % | **badge** |
-| UNDER_1_5 / 2_5 / 3_5 | +6,7 / +12,2 / +10,4 · ~30 % | **badge** |
+Chaque issue marque ~30 % → le badge revient **mérité** partout **sauf « l'un ou
+l'autre » (12)**, dont le gain (+2,6) reste sous le plancher de 5 pts. Le nul
+badge à nouveau, mais sur les 30 % les plus justes seulement (+6,1), plus le drap
+à 100 %. Retrait et badge restent **deux réglages distincts** : on retire toujours
+la jambe faible (arithmétique honnête), le badge ne s'affiche que là où le gain le
+mérite. Régénérer les deux constantes via `fragile.py:_badge_decision`.
 
-Tout le 1X2 et toute la double chance sont en **mention neutre** tant que leur
-seuil partagé sur-marque. Ce n'est **pas définitif** : la Direction 2 ramène chaque
-issue à ~30 % de marquage, et le badge revient **mérité, tout seul**, dès que le
-critère (gain ≥ 5 ET marquage ≤ 40 %) est rempli. Retrait et badge sont **deux
-réglages distincts** : on retire toujours la jambe faible (l'arithmétique est
-honnête), on arrête seulement de **prétendre l'avoir détectée** là où le gain est nul.
+---
+
+## Faits de l'explication — le trou du NUL (à rouvrir après re-mesure)
+
+Sujet **mesuré, mis en attente** après Direction 2. À rouvrir avec les chiffres
+post-recalibrage (relancer la requête « part des nuls dans les retraits »).
+
+- **59 % des retraits étaient des nuls** avant recalibrage (n=22, tickets de test
+  internes — ordre de grandeur). C'était l'artefact du seuil partagé, pas une
+  faiblesse réelle : Direction 2 doit faire retomber ce chiffre.
+- **Le nul (et le « 12 ») n'a JAMAIS de fait** : `estDefavorable` (enrich.ts)
+  renvoie `false` par construction. Un fait de nos faits est *directionnel*
+  (« X en mauvaise forme ») ; un nul n'a pas de direction. D'où l'aveu « c'est la
+  cote » sans fait de match.
+- **Faits de PARITÉ disponibles** (mesuré, saison 24-25, sur les nuls) : « une
+  équipe fait souvent match nul » **45 %** (taux calculable à 83 %) et « match
+  serré entre égaux » **28 %**. **Pas le H2H** (« pas de nul depuis N ») : **6 %**
+  seulement — il faut un historique multi-saison qu'on n'a pas encore. Un chantier
+  parité s'appuierait sur les deux premiers, jamais sur le H2H tant que la donnée
+  n'a pas mûri.
+- **46 % des analyses sont en régime COTE SEULE** (mesuré : `cote_seule` +
+  `cote_derivee`, tickets de test) → **muettes en faits quel que soit le marché**
+  (aucun historique lu). Si les joueurs jouent surtout des compétitions non
+  modélisées, le chantier parité touche peu de monde — le vrai levier serait
+  ailleurs. À trancher sur les chiffres post-Direction 2.
+
+⚠️ **Le seuil COTE SEULE (`FRAGILE_THRESHOLD_COTE_SEULE = 0,50`) n'a PAS été
+recalibré** — impossible sans backtest de ces championnats. Il garde donc
+l'artefact d'échelle : un nul en cote seule (~0,25) reste sous 0,50, donc retiré.
+Sur la re-mesure post-Direction 2, la part de nuls baissera pour le modélisé mais
+**pas pour la cote seule** (46 % des lignes). Décision ouverte : donner à la cote
+seule des barres fixes conscientes de l'échelle (sans calibration, sans badge), ou
+la laisser conservatrice-plate. À trancher séparément.

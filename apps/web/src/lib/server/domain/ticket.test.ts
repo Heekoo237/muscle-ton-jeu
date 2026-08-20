@@ -148,33 +148,33 @@ describe('petits tickets sous le plancher 1 — le renforcé garde du sens', () 
 });
 
 describe('badge « fragile » vs mention neutre (seuil PAR MARCHÉ)', () => {
-	it('retire une double chance faible SANS badge rouge (mention neutre)', () => {
+	it('retire « l\'un ou l\'autre » (12) SANS badge rouge (gain +2,6 < 5 → mention neutre)', () => {
 		const s = [
 			sel(1, 0.9),
 			sel(2, 0.85),
 			sel(3, 0.8),
 			sel(4, 0.78),
-			sel(5, 0.6, 5, 'DC_HOME_DRAW', 0.74) // sous 0,74 → retirable, mais marché « sûr »
+			sel(5, 0.6, 5, 'DC_HOME_AWAY', 0.73) // sous 0,73 → retirable, mais gain trop faible
 		];
 		const r = buildReinforced(s);
 		expect(r.retirees).toEqual([5]); // classement interne : elle part
 		const removed = r.selections.find((x) => x.ordre === 5)!;
 		expect(removed.retireeDuRenforce).toBe(true);
-		expect(removed.fragile).toBe(false); // JAMAIS de badge rouge sur double chance
+		expect(removed.fragile).toBe(false); // 12 : jamais de badge (gain sous le plancher)
 	});
 
-	it('un 1X2 sous son seuil est retiré SANS badge (intérim : seuil partagé, mention neutre)', () => {
+	it('porte le badge « trop juste » sur un 1X2 sous son seuil (recalibré par issue, Direction 2)', () => {
 		const s = [
 			sel(1, 0.9),
 			sel(2, 0.85),
 			sel(3, 0.8),
 			sel(4, 0.78),
-			sel(5, 0.4, 5, 'WIN_HOME', 0.44) // sous 0,44 → retirable, mais 1X2 en intérim
+			sel(5, 0.3, 5, 'WIN_HOME', 0.33) // sous 0,33 → badge de nouveau mérité (marque ~30 %)
 		];
 		const r = buildReinforced(s);
 		const removed = r.selections.find((x) => x.ordre === 5)!;
-		expect(r.retirees).toEqual([5]); // gate retrait : elle part (arithmétique honnête)
-		expect(removed.fragile).toBe(false); // gate badge : neutre tant que le seuil est partagé
+		expect(r.retirees).toEqual([5]);
+		expect(removed.fragile).toBe(true); // le badge 1X2 revient après recalibrage
 	});
 
 	it('porte le badge « trop juste » sur un plus/moins sous son seuil (gain ≥ 5, marquage ≤ 40 %)', () => {

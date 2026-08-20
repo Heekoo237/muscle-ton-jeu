@@ -48,14 +48,15 @@ describe('regimeOf — la source décide le régime', () => {
 	});
 });
 
-describe('mention neutre double chance — indépendante du régime (précision 3.2)', () => {
-	it('le badge de la double chance est OFF, quel que soit le régime', () => {
-		// La visibilité du badge est PAR MARCHÉ, jamais par régime : une double chance
-		// DÉRIVÉE d'une cote n'est pas plus prédictible qu'une double chance modélisée.
-		// La mention neutre « la moins solide » s'applique donc dans les deux régimes.
-		for (const m of ['DC_HOME_DRAW', 'DC_DRAW_AWAY', 'DC_HOME_AWAY'] as const) {
-			expect(badgeVisible(m)).toBe(false);
-		}
+describe('badge double chance — recalibré par issue (Direction 2)', () => {
+	it('1X et X2 badgent (gain mesuré) ; « l\'un ou l\'autre » (12) reste neutre', () => {
+		// Après recalibrage par issue, les deux DC directionnelles marquent ~30 % avec
+		// un gain fort (+20 / +23) → badge mérité. Seul le 12 reste sous le plancher de
+		// gain (+2,6 < 5). La visibilité est PAR MARCHÉ ; le régime cote seule coupe le
+		// badge séparément (voir le test cote seule ci-dessous).
+		expect(badgeVisible('DC_HOME_DRAW')).toBe(true);
+		expect(badgeVisible('DC_DRAW_AWAY')).toBe(true);
+		expect(badgeVisible('DC_HOME_AWAY')).toBe(false);
 	});
 });
 

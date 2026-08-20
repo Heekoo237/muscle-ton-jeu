@@ -99,27 +99,29 @@ ALT_TOTALS_MIN_NIGHTS = 3
 #      badge rouge « trop juste ».
 # Le seuil gouverne l'ARITHMÉTIQUE (retirer la jambe faible monte la proba
 # combinée — honnête quel que soit le badge). Le badge gouverne la PRÉTENTION
-# de détection. La Direction 2 (recalibrage par issue) ne touchera QUE le seuil ;
-# le badge se re-dérive alors tout seul de son critère (gain + marquage).
+# de détection, dérivée du gain + marquage.
 #
 # Une sélection est candidate au retrait si sa probabilité est SOUS le seuil de
-# son marché. Définition retenue (étape 4.5) : PROBABILITÉ SEULE. Le désaccord
-# modèle/marché et le mouvement de cote ont été testés et ÉCARTÉS.
+# son marché. Définition retenue (étape 4.5) : PROBABILITÉ SEULE.
 #
-# POINT DE FONCTIONNEMENT = DÉCISION PRODUIT (30 %). Chaque seuil DEVRAIT être le
-# 30ᵉ centile de la proba affichée de SON marché. Les marchés à issue unique
-# (plus/moins) le sont ; les deux marchés à TROIS issues (1X2, double chance)
-# PARTAGENT un seuil calé sur une seule issue (le favori / le « 12 ») — d'où un
-# sur-marquage sur les deux autres issues. Mesuré (fragile.py, 3 459 matchs) :
-#   1X2 partagé 0,44 → marque 51 % (dom.) · 100 % (nul) · 78 % (ext.)
-#   DC  partagé 0,74 → marque 58 % (1X)   · 80 %  (X2)  · 43 % (12)
-# La Direction 2 donnera à chaque issue son propre 30ᵉ centile (voir README).
+# POINT DE FONCTIONNEMENT = DÉCISION PRODUIT (30 %). Chaque seuil est le 30ᵉ
+# centile de la proba affichée de SON marché — Y COMPRIS chaque issue du 1X2 et
+# de la double chance (Direction 2, recalibrage PAR ISSUE). L'ancien seuil PARTAGÉ
+# (1X2 à 0,44 hérité du favori, DC à 0,74 hérité du « 12 ») sur-marquait les deux
+# autres issues : le nul, jamais au-dessus de 0,31, était marqué à 100 % pour un
+# gain nul. Mesuré sur les tickets de test : 59 % des retraits étaient des nuls.
+# Après recalibrage (fragile.py, 3 459 matchs) chaque issue marque ~30 %, gain
+# positif partout (nul +6,1 · dom +24 · ext +20 · 1X +20 · X2 +23) — voir README.
 FRAGILE_OPERATING_POINT = 0.30  # fraction de sélections marquées (décision produit)
 FRAGILE_THRESHOLDS = {
-    # ⚠ 1X2 et DC : UN seuil partagé par trois issues (hérité du favori / du 12).
-    #    Correct pour une issue, trop haut pour les deux autres. Recalibrage = Dir. 2.
-    "WIN_HOME": 0.44, "DRAW": 0.44, "WIN_AWAY": 0.44,        # 1X2  (base échec 45,7 %)
-    "DC_HOME_DRAW": 0.74, "DC_DRAW_AWAY": 0.74, "DC_HOME_AWAY": 0.74,  # double chance (base 22,3 %)
+    # 1X2 — recalibré PAR ISSUE (30ᵉ centile de la cote dé-vigée de chaque issue).
+    "WIN_HOME": 0.33,  # dom. — marque 29 %, gain +24,0
+    "DRAW": 0.22,      # nul  — marque 29 %, gain +6,1  (n'est plus le drap à 100 %)
+    "WIN_AWAY": 0.20,  # ext. — marque 30 %, gain +19,6
+    # Double chance — recalibrée PAR ISSUE (30ᵉ centile de la proba modèle de chacune).
+    "DC_HOME_DRAW": 0.61,  # 1X — marque 31 %, gain +19,9
+    "DC_DRAW_AWAY": 0.47,  # X2 — marque 30 %, gain +23,2
+    "DC_HOME_AWAY": 0.73,  # 12 — marque 34 %, gain +2,6 (déjà bien calé, ~inchangé)
     "OVER_1_5": 0.72,     # plus de 1,5 (base 23,0 %)  — calé sur son marché
     "UNDER_1_5": 0.18,    # moins de 1,5 (base 77 %)   — calé sur son marché
     "OVER_2_5": 0.48,     # plus de 2,5 (base ~43 %)   — calé sur son marché
@@ -156,29 +158,29 @@ FRAGILE_1X2_BASE_FAILURE = 0.457   # taux d'échec des favoris d'ouverture sans 
 # doit rester rare pour être crédible. Règle générale : un seuil se valide par son
 # GAIN sur la base, jamais par sa précision absolue (README).
 #
-# Chiffres mesurés (fragile.py, seuils ACTUELS, 3 459 matchs) — gain · marquage :
-#   WIN_HOME +16,0 · 51 %   DRAW +0,0 · 100 %   WIN_AWAY +8,1 · 78 %
-#   DC_HOME_DRAW +10,9 · 58 %   DC_DRAW_AWAY +6,0 · 80 %   DC_HOME_AWAY +3,6 · 43 %
+# Chiffres mesurés APRÈS recalibrage par issue (fragile.py, 3 459 matchs) — gain · marquage :
+#   WIN_HOME +24,0 · 29 %   DRAW +6,1 · 29 %   WIN_AWAY +19,6 · 30 %
+#   DC_HOME_DRAW +19,9 · 31 %   DC_DRAW_AWAY +23,2 · 30 %   DC_HOME_AWAY +2,6 · 34 %
 #   OVER_1_5 +6,1 · 31 %   OVER_2_5 +10,0 · 31 %   OVER_3_5 +9,3 · 30 %
 #   UNDER_1_5 +6,7 · 29 %   UNDER_2_5 +12,2 · 31 %   UNDER_3_5 +10,4 · 29 %
 #
-# INTÉRIM ASSUMÉ : tout le 1X2 et toute la double chance passent en MENTION NEUTRE
-# (aucun badge rouge) tant que leur seuil partagé sur-marque. Ce n'est PAS
-# définitif : la Direction 2 ramène chaque issue à ~30 % de marquage, et le badge
-# revient MÉRITÉ, tout seul, dès que (gain ≥ 5 ET marquage ≤ 40 %) est vrai.
+# INTÉRIM LEVÉ (Direction 2) : chaque issue marque ~30 %, donc TOUS les marchés
+# sauf « l'un ou l'autre » (12) remplissent (gain ≥ 5 ET marquage ≤ 40 %) → le
+# badge revient MÉRITÉ. Le nul badge à nouveau, mais sur les 30 % les plus justes
+# seulement (+6,1 de gain), plus le drap à 100 %. Seul le 12 reste neutre (+2,6).
 # Ne PAS rallumer un badge à la main en voyant « le gain est positif » sans
-# regarder le marquage — c'est exactement le raccourci qui a produit le seuil partagé.
+# regarder le marquage — c'est le raccourci qui avait produit le seuil partagé.
 FRAGILE_BADGE_MIN_GAIN = 5.0       # gain sur la base minimal (points) pour un badge
 FRAGILE_BADGE_MAX_MARKING = 0.40   # marquage maximal — un badge doit rester rare
 FRAGILE_BADGE_VISIBLE = {
     # Dérivé du critère ci-dessus sur les chiffres mesurés. Régénérer via fragile.py
     # (routine _badge_decision) à chaque recalibrage — ne pas éditer à la main isolément.
-    "WIN_HOME": False,      # +16,0 mais 51 % marqué (>40) → neutre jusqu'à Dir. 2
-    "DRAW": False,          # +0,0 · 100 % — le drap, aucune détection
-    "WIN_AWAY": False,      # +8,1 mais 78 % marqué → neutre jusqu'à Dir. 2
-    "DC_HOME_DRAW": False,  # +10,9 mais 58 % marqué → neutre jusqu'à Dir. 2
-    "DC_DRAW_AWAY": False,  # +6,0 mais 80 % marqué → neutre jusqu'à Dir. 2
-    "DC_HOME_AWAY": False,  # +3,6 ET 43 % — échoue les deux conditions
+    "WIN_HOME": True,       # +24,0 · 29 % ✓
+    "DRAW": True,           # +6,1 · 29 % ✓  (recalibré : marque les 30 % les plus justes)
+    "WIN_AWAY": True,       # +19,6 · 30 % ✓
+    "DC_HOME_DRAW": True,   # +19,9 · 31 % ✓
+    "DC_DRAW_AWAY": True,   # +23,2 · 30 % ✓
+    "DC_HOME_AWAY": False,  # +2,6 · 34 % — gain trop faible (< 5), reste neutre
     "OVER_1_5": True,       # +6,1 · 31 % ✓
     "OVER_2_5": True,       # +10,0 · 31 % ✓
     "OVER_3_5": True,       # +9,3 · 30 % ✓

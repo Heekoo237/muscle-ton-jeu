@@ -12,23 +12,25 @@
  * CRITÈRE DU BADGE — le GAIN sur la base, jamais la précision absolue :
  *     badge  ⇔  gain sur la base ≥ 5 pts  ET  taux de marquage ≤ 40 %.
  * L'ancien critère (précision absolue) allumait le badge sur le nul, où la
- * précision 75 % n'est que le taux de base (gain réel +0,0). INTÉRIM : 1X2 et
- * double chance (seuil partagé qui sur-marque) sont en mention neutre jusqu'à la
- * Direction 2 ; le badge revient tout seul dès que le critère est rempli.
+ * précision 75 % n'est que le taux de base (gain réel +0,0). Depuis le recalibrage
+ * par issue (Direction 2), chaque issue marque ~30 % → le badge revient MÉRITÉ
+ * partout sauf « l'un ou l'autre » (12, gain +2,6 < 5).
  *
  * La source de vérité du seuil de retrait est `predictions.seuil_fragile` (remplie
  * par le pipeline). Les valeurs ici servent de REPLI si la table ne l'a pas.
  */
 import type { Market } from '$lib/types';
 
-/** Seuil de RETRAIT par marché (repli ; la table `predictions` fait foi). */
+/** Seuil de RETRAIT par marché (repli ; la table `predictions` fait foi). Recalibré
+ *  PAR ISSUE (Direction 2) : chaque issue du 1X2 et de la double chance a son propre
+ *  30ᵉ centile, plus le seuil partagé qui sur-marquait le nul. Miroir de constants.py. */
 export const FRAGILE_THRESHOLD_BY_MARKET: Record<Market, number> = {
-	WIN_HOME: 0.44,
-	DRAW: 0.44,
-	WIN_AWAY: 0.44,
-	DC_HOME_DRAW: 0.74,
-	DC_DRAW_AWAY: 0.74,
-	DC_HOME_AWAY: 0.74,
+	WIN_HOME: 0.33,
+	DRAW: 0.22,
+	WIN_AWAY: 0.2,
+	DC_HOME_DRAW: 0.61,
+	DC_DRAW_AWAY: 0.47,
+	DC_HOME_AWAY: 0.73,
 	OVER_1_5: 0.72,
 	UNDER_1_5: 0.18,
 	OVER_2_5: 0.48,
@@ -42,26 +44,25 @@ export const FRAGILE_THRESHOLD_BY_MARKET: Record<Market, number> = {
 
 /**
  * Badge rouge « trop juste » : gain sur la base ≥ 5 pts ET marquage ≤ 40 %.
- * Chiffres mesurés (fragile.py, seuils actuels) en commentaire — gain · marquage.
- * 1X2 + double chance en `false` (INTÉRIM) : seuil partagé qui sur-marque, badge
- * retiré jusqu'au recalibrage par issue (Direction 2). Miroir de constants.py.
+ * Chiffres mesurés APRÈS recalibrage par issue (fragile.py) — gain · marquage.
+ * Miroir de constants.py. Seul « l'un ou l'autre » (12) reste neutre (gain +2,6).
  */
 export const BADGE_VISIBLE: Record<Market, boolean> = {
-	// Détectent ET restent rares → badge.
+	// 1X2 — recalibré par issue, marque ~30 % : badge mérité.
+	WIN_HOME: true, // +24,0 · 29 %
+	DRAW: true, // +6,1 · 29 % (les 30 % les plus justes seulement, plus le drap)
+	WIN_AWAY: true, // +19,6 · 30 %
+	// Double chance — recalibrée par issue.
+	DC_HOME_DRAW: true, // +19,9 · 31 %
+	DC_DRAW_AWAY: true, // +23,2 · 30 %
+	DC_HOME_AWAY: false, // +2,6 · 34 % — gain trop faible (< 5), reste neutre
+	// Plus/moins — déjà calés.
 	OVER_1_5: true, // +6,1 · 31 %
 	OVER_2_5: true, // +10,0 · 31 %
 	OVER_3_5: true, // +9,3 · 30 %
 	UNDER_1_5: true, // +6,7 · 29 %
 	UNDER_2_5: true, // +12,2 · 31 %
 	UNDER_3_5: true, // +10,4 · 29 %
-	// 1X2 : seuil 0,44 partagé → sur-marque. Neutre jusqu'à Direction 2.
-	WIN_HOME: false, // +16,0 mais 51 % marqué
-	DRAW: false, // +0,0 · 100 % — le drap
-	WIN_AWAY: false, // +8,1 mais 78 % marqué
-	// Double chance : seuil 0,74 partagé → sur-marque. Neutre jusqu'à Direction 2.
-	DC_HOME_DRAW: false, // +10,9 mais 58 %
-	DC_DRAW_AWAY: false, // +6,0 mais 80 %
-	DC_HOME_AWAY: false, // +3,6 · 43 %
 	// BTTS suspendu : aucune probabilité produite.
 	BTTS_YES: false,
 	BTTS_NO: false

@@ -160,8 +160,8 @@ def _badge_decision(df: pd.DataFrame) -> None:
         badge = gain >= FRAGILE_BADGE_MIN_GAIN and marquage <= FRAGILE_BADGE_MAX_MARKING
         verdict = "OUI" if badge else "non (neutre)"
         print(f"  {name:<14}{seuil:>6.2f}{100*marquage:>8.0f}%{base:>6.0f}%{prec:>6.0f}%{gain:>+6.1f}   {verdict}")
-    print("  Rappel : 1X2 et double chance sur-marquent (seuil partagé) → neutre EN")
-    print("  ATTENDANT le recalibrage par issue (Direction 2). Le badge revient tout seul.")
+    print("  Rappel : seuils recalibrés PAR ISSUE (Direction 2). Chaque issue marque")
+    print("  ~30 % → badge mérité partout sauf « l'un ou l'autre » (12, gain +2,6 < 5).")
 
 
 def _pr_curves(df: pd.DataFrame) -> None:
