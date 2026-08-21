@@ -49,6 +49,17 @@ export interface ReglementDiag {
 		statut: string;
 		joursDepuisCoupEnvoi: number | null;
 	}[];
+	/**
+	 * AMPLEUR système (indépendant des tickets) : matchs `scheduled` dont le coup
+	 * d'envoi est passé depuis > 3 h → presque sûrement terminés mais jamais scorés.
+	 * `horsFenetre3j` : au-delà de la fenêtre `/scores` du fournisseur → irrécupérables.
+	 */
+	matchsBloquesGlobal: {
+		total: number;
+		parRegime: { modele: number; cote_seule: number; inconnu: number };
+		horsFenetre3j: number;
+		dansFenetre3j: number;
+	};
 }
 
 function selFrom(r: Record<string, unknown>): Selection {
@@ -212,6 +223,46 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 		matchNonTermineDetail.sort((a, b) => (b.joursDepuisCoupEnvoi ?? 0) - (a.joursDepuisCoupEnvoi ?? 0));
 	}
 
+	// AMPLEUR système : tous les matchs `scheduled` dont le coup d'envoi est passé
+	// depuis > 3 h — un score qui n'est jamais arrivé. Indépendant des tickets.
+	const matchsBloquesGlobal = { total: 0, parRegime: { modele: 0, cote_seule: 0, inconnu: 0 }, horsFenetre3j: 0, dansFenetre3j: 0 };
+	const seuil3h = nowMs - 3 * 3_600_000;
+	const seuil3j = nowMs - 3 * 86_400_000;
+	const { data: bloq } = await db
+		.from('fixtures')
+		.select('id, league_id, date_utc')
+		.eq('statut', 'scheduled')
+		.lt('date_utc', new Date(seuil3h).toISOString())
+		.limit(10000);
+	const bloqRows = (bloq ?? []) as { id: number; league_id: number | null; date_utc: string | null }[];
+	if (bloqRows.length > 0) {
+		// Régime par ligue : fixtures.league_id → leagues.provider_ref → league_catalog.regime.
+		const lIds = [...new Set(bloqRows.map((r) => r.league_id).filter((x): x is number => x != null))];
+		const refByLeague = new Map<number, string>();
+		if (lIds.length > 0) {
+			const { data: lg } = await db.from('leagues').select('id, provider_ref').in('id', lIds);
+			for (const l of (lg ?? []) as { id: number; provider_ref: string | null }[])
+				if (l.provider_ref) refByLeague.set(Number(l.id), l.provider_ref);
+		}
+		const regimeByRef = new Map<string, string>();
+		const refs = [...new Set([...refByLeague.values()])];
+		if (refs.length > 0) {
+			const { data: cat } = await db.from('league_catalog').select('fd_code, regime').in('fd_code', refs);
+			for (const c of (cat ?? []) as { fd_code: string; regime: string }[]) regimeByRef.set(c.fd_code, c.regime);
+		}
+		for (const r of bloqRows) {
+			matchsBloquesGlobal.total += 1;
+			const ref = r.league_id != null ? refByLeague.get(Number(r.league_id)) : undefined;
+			const regime = ref ? regimeByRef.get(ref) : undefined;
+			if (regime === 'modele') matchsBloquesGlobal.parRegime.modele += 1;
+			else if (regime === 'cote_seule') matchsBloquesGlobal.parRegime.cote_seule += 1;
+			else matchsBloquesGlobal.parRegime.inconnu += 1;
+			const d = r.date_utc ? Date.parse(r.date_utc) : null;
+			if (d != null && d < seuil3j) matchsBloquesGlobal.horsFenetre3j += 1;
+			else matchsBloquesGlobal.dansFenetre3j += 1;
+		}
+	}
+
 	return {
 		now: now.toISOString(),
 		tickets: { total: tickets.length, regles, enAttente: enAttenteTickets.length },
@@ -221,6 +272,7 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 			plusVieux: plusVieux == null ? null : Math.round((nowMs - plusVieux) / 86_400_000),
 			plusRecent: plusRecent == null ? null : Math.round((nowMs - plusRecent) / 86_400_000)
 		},
-		matchNonTermineDetail
+		matchNonTermineDetail,
+		matchsBloquesGlobal
 	};
 }
