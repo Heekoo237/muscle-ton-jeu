@@ -73,6 +73,28 @@ template) : on **mesure**, on ne se fie pas à la vigilance.
   tout le reste, oui. Le `handleError` global reste le dernier filet (message
   lisible + lien support, jamais la stack à l'écran).
 
+### RÈGLE — toute boucle sur un service externe isole ET journalise ses échecs
+
+Non négociable. **Toute boucle qui appelle un service externe (fournisseur, base,
+stockage) DOIT (1) isoler l'erreur de chaque itération — une itération qui lève ne
+prive jamais les autres — ET (2) journaliser explicitement ce qui a échoué.** Les deux,
+toujours : isoler sans journaliser transforme une panne en silence.
+
+Pourquoi cette règle existe. Le rafraîchissement des scores (`refresh_scores`) bouclait
+sur toutes les ligues **sans aucun garde** : une seule ligue qui levait (clé de sport
+morte, collision d'alias, hoquet réseau) **avortait toute la boucle**, et les ligues
+suivantes ne recevaient jamais leurs scores cette nuit-là. Un match terminé restait
+`scheduled`, sortait de la fenêtre `/scores` (3 j), et son score était **perdu pour
+toujours**. Le défaut a vécu **depuis le début, invisible** : il a fallu qu'un testeur
+remarque « tous mes tickets restent en attente » pour qu'on le trouve. **Le silence est
+ce qui lui a permis de durer.** Le correctif : savepoint + `try/except` par ligue, plus
+un compteur d'échecs persisté (`scores_echecs`) qu'une surveillance lit pour **alerter
+sur récurrence** (une ligue qui échoue ≥ 2 des 3 dernières nuits).
+
+Modèles de référence dans le code : le **collecteur** (`collector.py`, savepoint par
+ligue), `settle_scores.py` (`try/except` par ligue), et le fit **nocturne** (per-league
+`try/except`) suivent déjà la règle. Toute nouvelle boucle externe s'y conforme.
+
 ## Durcissement sécurité (audit)
 
 Corrections issues de l'audit, dans l'ordre appliqué.
@@ -96,6 +118,33 @@ Corrections issues de l'audit, dans l'ordre appliqué.
   Le premier **écrivait** en base (user + ticket + grand livre) sans authentification ;
   les deux passent désormais par `cronAutorise` (secret cron partagé) → `403` sinon.
   `whoami` reste ouvert : il ne renvoie que la session de l'appelant, rien d'autrui.
+
+## Suppression d'une analyse — anonymisation, pas hard-delete
+
+L'utilisateur peut supprimer une analyse de son historique. On le fait par
+**anonymisation sur place**, jamais par suppression de la ligne (`ticketDeletion.ts`,
+migration `0024`). Trois effets : (1) purge immédiate de la **capture** (seule vraie
+donnée personnelle : objets du bucket + `ticket_images`) ; (2) `user_id → NULL` ;
+(3) `supprime_le = now()` (marqueur d'audit). Confirmation **à deux temps** côté UI (un
+tap accidentel n'efface pas une analyse payée) ; propriété **revérifiée côté serveur**
+avant d'agir. **Les crédits ne sont jamais remboursés** (geste d'affichage).
+
+Pourquoi ainsi. L'historique **public** s'alimente des tickets réglés, de façon
+totalement **anonyme** (il ne lit jamais `user_id`). Supprimer la ligne effacerait cette
+preuve ; la garder telle quelle avec `user_id` ne serait pas un vrai effacement. On rompt
+donc le lien personnel (`user_id → NULL`) tout en conservant les faits **anonymes**
+(sélections, verdicts, cotes) qui nourrissent le public et les agrégats. La ligne quitte
+l'historique **privé** sans condition nouvelle : `listAnalysedTickets` filtre `user_id =
+moi`, désormais `NULL`.
+
+**Nuance juridique — À FAIRE VALIDER PAR UN JURISTE avant la bêta publique.** Ce choix
+traite la suppression comme un **effacement-par-anonymisation** (RGPD art. 17) : le lien
+personnel est réellement rompu, donc défendable, et cohérent avec un historique public
+déjà anonyme. **Si le conseil exige un hard-delete total**, on perdra la ligne réglée du
+public — c'est le seul arbitrage, et il revient au métier. Point à confirmer avant
+ouverture : la donnée résiduelle (verdicts, cotes transcrites) est-elle jugée
+non-identifiante ? Notre position : oui (aucun identifiant, libellés de marché et cotes
+publiques). À acter par écrit.
 
 ## Dette de bêta (à revoir à la fin de la bêta)
 

@@ -81,6 +81,23 @@ export async function storeCaptures(
 }
 
 /**
+ * Purge IMMÉDIATE des captures d'UN ticket (objets du bucket + lignes). Utilisée à la
+ * suppression d'une analyse par l'utilisateur : la capture est la seule vraie donnée
+ * personnelle, on l'efface tout de suite (on n'attend pas la purge à 30 jours). Best-
+ * effort : ne lève jamais (un objet déjà absent n'est pas une erreur).
+ */
+export async function purgeTicketCaptures(ticketId: string): Promise<number> {
+	if (!isSupabaseConfigured()) return 0;
+	const sb = supabaseAdmin();
+	const { data } = await sb.from('ticket_images').select('id, url').eq('ticket_id', Number(ticketId));
+	if (!data || data.length === 0) return 0;
+	const paths = data.map((r) => String(r.url));
+	await sb.storage.from(BUCKET).remove(paths);
+	await sb.from('ticket_images').delete().in('id', data.map((r) => r.id));
+	return data.length;
+}
+
+/**
  * Purge les captures dont la date de purge est passée : supprime les objets du
  * bucket puis les lignes. Renvoie le nombre de captures purgées. À planifier
  * (cron) — voir README de l'app.

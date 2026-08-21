@@ -1,7 +1,8 @@
-import { error, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, fail, redirect } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
+import { supprimerTicket } from '$lib/server/fixtures/ticketDeletion';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
 import { isAnalysable } from '$lib/server/domain/ticket';
@@ -131,4 +132,20 @@ export const load: PageServerLoad = async (event) => {
 				: ticket.resultatOriginale == null && v.originale === 'tombe' && v.renforce === 'passe',
 		issues
 	};
+};
+
+export const actions: Actions = {
+	/**
+	 * Suppression de CETTE analyse par son propriétaire. Anonymisation sur place (le
+	 * ticket quitte l'historique privé, reste anonyme dans l'historique public). La
+	 * confirmation à deux temps est portée par l'UI ; ici on refait la vérif de propriété
+	 * côté serveur (jamais confiance au client) avant d'agir.
+	 */
+	supprimer: async (event) => {
+		const session = await getAppSession(event);
+		if (!session) return fail(401, { erreur: 'non_connecte' });
+		const res = await supprimerTicket(event.params.id, session.userId);
+		if (!res.ok) return fail(res.raison === 'introuvable' ? 404 : 403, { erreur: res.raison });
+		redirect(303, '/dashboard/historique?supprime=1');
+	}
 };

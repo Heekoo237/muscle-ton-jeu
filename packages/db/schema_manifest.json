@@ -11,7 +11,8 @@
     { "table": "transactions", "column": "reference", "migration": "0013" },
     { "table": "ondemand_calls", "column": "raison", "migration": "0021" },
     { "table": "vision_stats", "column": "uploads_essai2", "migration": "0023" },
-    { "table": "vision_stats", "column": "uploads_essai2_echec", "migration": "0023" }
+    { "table": "vision_stats", "column": "uploads_essai2_echec", "migration": "0023" },
+    { "table": "tickets", "column": "supprime_le", "migration": "0024" }
   ],
   "tables": [
     { "table": "rate_limits", "migration": "0015" },

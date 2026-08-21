@@ -1,10 +1,16 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
 	import LegalNote from '$lib/components/LegalNote.svelte';
 	import PaperTicketCompare from '$lib/components/PaperTicketCompare.svelte';
 	import { ligneNote } from '$lib/lineStatus';
 
 	let { data }: { data: PageData } = $props();
+
+	// Suppression à DEUX temps : un tap révèle la confirmation, il n'efface jamais
+	// directement (un geste accidentel ne doit pas supprimer une analyse payée).
+	let confirmSuppr = $state(false);
+	let suppression = $state(false);
 
 	const dateFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 	const courtFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' });
@@ -154,6 +160,40 @@
 	</section>
 
 	<a class="btn-primary" href="/analyser">Analyser un nouveau ticket</a>
+
+	<!-- Suppression : discrète (pas une action mise en avant), à DEUX temps. -->
+	<section class="suppr">
+		{#if !confirmSuppr}
+			<button type="button" class="suppr-lien" onclick={() => (confirmSuppr = true)}>
+				Supprimer cette analyse
+			</button>
+		{:else}
+			<div class="suppr-panel">
+				<p class="t-small">
+					Retirer cette analyse de ton historique&nbsp;? C'est définitif. Les crédits déjà
+					utilisés ne sont pas remboursés.
+				</p>
+				<div class="suppr-actions">
+					<button type="button" class="annuler" onclick={() => (confirmSuppr = false)}>Annuler</button>
+					<form
+						method="POST"
+						action="?/supprimer"
+						use:enhance={() => {
+							suppression = true;
+							return async ({ update }) => {
+								await update();
+								suppression = false;
+							};
+						}}
+					>
+						<button type="submit" class="confirmer" disabled={suppression}>
+							{suppression ? 'Suppression…' : 'Oui, supprimer'}
+						</button>
+					</form>
+				</div>
+			</div>
+		{/if}
+	</section>
 </div>
 
 <style>
@@ -173,6 +213,63 @@
 	}
 	.bilan.neutre {
 		background: var(--c-canvas-sunk);
+	}
+	/* Suppression : volontairement discrète — jamais un accent, jamais un piège. */
+	.suppr {
+		margin-top: var(--s-2);
+		display: flex;
+		justify-content: center;
+	}
+	.suppr-lien {
+		background: none;
+		border: none;
+		color: var(--c-ink-3);
+		font-size: 14px;
+		text-decoration: underline;
+		cursor: pointer;
+		padding: var(--s-2);
+	}
+	.suppr-panel {
+		width: 100%;
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-md);
+		padding: var(--s-4);
+		background: var(--c-surface);
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+	}
+	.suppr-panel p {
+		margin: 0;
+		color: var(--c-ink-2);
+	}
+	.suppr-actions {
+		display: flex;
+		gap: var(--s-3);
+		align-items: center;
+	}
+	.suppr-actions form {
+		margin: 0;
+	}
+	.annuler {
+		background: none;
+		border: 1px solid var(--c-line);
+		border-radius: var(--r-sm);
+		padding: var(--s-2) var(--s-4);
+		color: var(--c-ink);
+		cursor: pointer;
+	}
+	.confirmer {
+		background: var(--c-rouge);
+		border: none;
+		border-radius: var(--r-sm);
+		padding: var(--s-2) var(--s-4);
+		color: #fff;
+		cursor: pointer;
+	}
+	.confirmer:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	.bilan.passe {
 		background: var(--c-vert-wash);
