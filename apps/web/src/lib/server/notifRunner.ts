@@ -12,6 +12,7 @@ import type { Selection, TicketResult } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
 import { notifications } from '$lib/server/services';
 import { runSettlement, type SettlePorts, type TicketARegler, type SettleStats } from '$lib/server/domain/notif-settle';
+import { settleTicket } from '$lib/server/domain/settle';
 import { buildMorningNotification } from '$lib/server/domain/notif-text';
 import { ANALYSES_OFFERTES } from '$lib/offer';
 import { enHeuresCalmes } from '$lib/server/domain/notif-schedule';
@@ -129,6 +130,71 @@ function supabaseSettlePorts(origin: string): SettlePorts {
 export async function runSettleJob(origin: string, nowMs: number): Promise<SettleStats> {
 	const tickets = await pendingSettleTickets(nowMs);
 	return runSettlement(tickets, supabaseSettlePorts(origin), nowMs);
+}
+
+export interface BackfillStats {
+	candidats: number;
+	regles: number;
+	enAttente: number;
+	sansReglable: number;
+}
+
+/**
+ * BACKFILL de règlement — rattrapage UNIQUE de la dette. Le job régulier ne regarde
+ * que les tickets de moins de 7 jours (borne de charge) : les tickets plus vieux dont
+ * les matchs sont terminés ne se règlent jamais tout seuls. Ici on pose le verdict pour
+ * TOUS les tickets analysés non réglés, SANS borne d'âge.
+ *
+ * SILENCIEUX : on ne notifie PAS (un push « ton ticket est tombé » pour un match d'il y
+ * a huit jours n'a aucun sens). Les tickets récents encore dans la fenêtre seront, eux,
+ * notifiés normalement par le job régulier — on ne réserve donc pas leur clé ici.
+ * IDEMPOTENT : `poserResultat` est gardé par `resultat IS NULL` ; relancer ne réécrit rien.
+ */
+export async function runBackfillJob(nowMs: number): Promise<BackfillStats> {
+	const db = supabaseAdmin();
+	const { data: tks, error } = await db
+		.from('tickets')
+		.select('id, user_id')
+		.eq('statut', 'analyse')
+		.is('resultat', null)
+		.limit(5000);
+	if (error) throw new Error(`runBackfillJob: ${error.message}`);
+	const rows = (tks ?? []) as { id: number; user_id: number | null }[];
+	if (rows.length === 0) return { candidats: 0, regles: 0, enAttente: 0, sansReglable: 0 };
+
+	const ids = rows.map((t) => t.id);
+	const { data: sels } = await db
+		.from('selections')
+		.select('ticket_id, ordre, fixture_id, match_label, marche, etat_resolution, fragile, retiree_du_renforce')
+		.in('ticket_id', ids)
+		.limit(30000);
+	const parTicket = new Map<number, Selection[]>();
+	for (const r of (sels ?? []) as Record<string, unknown>[]) {
+		const tid = Number(r.ticket_id);
+		if (!parTicket.has(tid)) parTicket.set(tid, []);
+		parTicket.get(tid)!.push(rowToSel(r));
+	}
+
+	const ports = supabaseSettlePorts(''); // seuls scoresFor + poserResultat servent ici
+	const stats: BackfillStats = { candidats: rows.length, regles: 0, enAttente: 0, sansReglable: 0 };
+	for (const t of rows) {
+		const selections = parTicket.get(t.id) ?? [];
+		const fixtureIds = [
+			...new Set(selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+		];
+		const scores = await ports.scoresFor(fixtureIds);
+		const v = settleTicket(selections, scores);
+		if (v.originale === 'en_attente') {
+			// Distingue « un score manque encore » de « rien de réglable ici ».
+			if (selections.some((s) => s.etatResolution === 'certain' && s.marche !== null && s.fixtureId !== null))
+				stats.enAttente++;
+			else stats.sansReglable++;
+			continue;
+		}
+		await ports.poserResultat(t.id, v.renforce, v.originale);
+		stats.regles++;
+	}
+	return stats;
 }
 
 export interface MorningStats {

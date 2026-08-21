@@ -40,6 +40,15 @@ export interface ReglementDiag {
 		sansProviderRef: number;
 	};
 	ageJoursEnAttente: { plusVieux: number | null; plusRecent: number | null };
+	/** Les matchs « coup d'envoi passé, sans score » — pour dire LESQUELS et depuis quand. */
+	matchNonTermineDetail: {
+		fixtureId: number;
+		ligue: string | null;
+		match: string;
+		dateUtc: string | null;
+		statut: string;
+		joursDepuisCoupEnvoi: number | null;
+	}[];
 }
 
 function selFrom(r: Record<string, unknown>): Selection {
@@ -119,6 +128,7 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 
 	// Détail par ticket en attente : ne regarde QUE les sélections réglables (comme le job).
 	const detail = { tousTerminesNonRegles: 0, matchNonTermine: 0, matchAVenir: 0, sansSelectionReglable: 0, horsFenetre7j: 0 };
+	const stuckIds = new Set<number>(); // coup d'envoi passé, sans score
 	let plusVieux: number | null = null;
 	let plusRecent: number | null = null;
 	for (const t of enAttenteTickets) {
@@ -149,13 +159,57 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 			if (!termine) {
 				tousFinished = false;
 				const d = fxDate.get(id);
-				if (d != null && d <= now.getTime()) unPasseNonTermine = true;
-				else unAVenir = true;
+				if (d != null && d <= now.getTime()) {
+					unPasseNonTermine = true;
+					stuckIds.add(id);
+				} else unAVenir = true;
 			}
 		}
 		if (tousFinished) detail.tousTerminesNonRegles += 1;
 		else if (unPasseNonTermine) detail.matchNonTermine += 1;
 		else if (unAVenir) detail.matchAVenir += 1;
+	}
+
+	// Nomme les matchs bloqués (coup d'envoi passé, sans score) : équipes + ligue.
+	const matchNonTermineDetail: ReglementDiag['matchNonTermineDetail'] = [];
+	if (stuckIds.size > 0) {
+		const echantillon = [...stuckIds].slice(0, 25);
+		const { data: fx } = await db
+			.from('fixtures')
+			.select('id, team_home_id, team_away_id, league_id, date_utc, statut')
+			.in('id', echantillon);
+		const rows = (fx ?? []) as Record<string, unknown>[];
+		const teamIds = new Set<number>();
+		const leagueIds = new Set<number>();
+		for (const r of rows) {
+			if (r.team_home_id != null) teamIds.add(Number(r.team_home_id));
+			if (r.team_away_id != null) teamIds.add(Number(r.team_away_id));
+			if (r.league_id != null) leagueIds.add(Number(r.league_id));
+		}
+		const teamNom = new Map<number, string>();
+		const ligueNom = new Map<number, string | null>();
+		if (teamIds.size > 0) {
+			const { data: tm } = await db.from('teams').select('id, nom').in('id', [...teamIds]);
+			for (const t of (tm ?? []) as { id: number; nom: string }[]) teamNom.set(Number(t.id), t.nom);
+		}
+		if (leagueIds.size > 0) {
+			const { data: lg } = await db.from('leagues').select('id, provider_ref').in('id', [...leagueIds]);
+			for (const l of (lg ?? []) as { id: number; provider_ref: string | null }[])
+				ligueNom.set(Number(l.id), l.provider_ref ?? null);
+		}
+		for (const r of rows) {
+			const id = Number(r.id);
+			const d = r.date_utc ? Date.parse(r.date_utc as string) : null;
+			matchNonTermineDetail.push({
+				fixtureId: id,
+				ligue: r.league_id != null ? (ligueNom.get(Number(r.league_id)) ?? null) : null,
+				match: `${teamNom.get(Number(r.team_home_id)) ?? '?'} – ${teamNom.get(Number(r.team_away_id)) ?? '?'}`,
+				dateUtc: (r.date_utc as string) ?? null,
+				statut: String(r.statut),
+				joursDepuisCoupEnvoi: d == null ? null : Math.round((nowMs - d) / 86_400_000)
+			});
+		}
+		matchNonTermineDetail.sort((a, b) => (b.joursDepuisCoupEnvoi ?? 0) - (a.joursDepuisCoupEnvoi ?? 0));
 	}
 
 	return {
@@ -166,6 +220,7 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 		ageJoursEnAttente: {
 			plusVieux: plusVieux == null ? null : Math.round((nowMs - plusVieux) / 86_400_000),
 			plusRecent: plusRecent == null ? null : Math.round((nowMs - plusRecent) / 86_400_000)
-		}
+		},
+		matchNonTermineDetail
 	};
 }

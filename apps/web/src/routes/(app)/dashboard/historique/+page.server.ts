@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { listAnalysedTickets } from '$lib/server/fixtures/ticketStore';
-import { settleTicket, verdictAffiche, type FinalScore } from '$lib/server/domain/settle';
+import { settleTicket, verdictAffiche, isSettleable, type FinalScore } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import { DEMO_MODE, demoHistoLignes } from '$lib/server/demo';
 
@@ -10,7 +10,8 @@ export interface HistoLine {
 	dateMs: number;
 	nbMatchs: number;
 	nbFragiles: number;
-	statut: 'attente' | 'passe' | 'tombe';
+	/** `sans_reglement` : aucune sélection réglable — rien qu'un score puisse décider. */
+	statut: 'attente' | 'passe' | 'tombe' | 'sans_reglement';
 	/** Premier coup d'envoi (état « en attente »). */
 	kickoffMs: number | null;
 	/** Date à laquelle le ticket a été réglé (dernier match terminé), état passé/tombé. */
@@ -53,6 +54,23 @@ export const load: PageServerLoad = async (event) => {
 		// jamais sur lui (règle d'archi n°2 : le temps réel lit). Il ne fait que combler
 		// le trou avant que le cron n'ait posé le résultat.
 		const statutV = verdictAffiche(t.resultatOriginale, v.originale);
+
+		// Aucune sélection réglable → un score ne décidera JAMAIS ce ticket. On le sort
+		// de la file « en attente » avec un statut honnête plutôt que de le faire patienter
+		// pour un résultat qui ne viendra pas.
+		if (statutV === 'en_attente' && t.selections.filter(isSettleable).length === 0) {
+			return {
+				id: t.id,
+				dateMs: t.creeLeMs,
+				nbMatchs,
+				nbFragiles,
+				statut: 'sans_reglement',
+				kickoffMs: null,
+				verdictDateMs: null,
+				tombeSur: null,
+				verdictRenforce: false
+			};
+		}
 
 		if (statutV === 'en_attente') {
 			const horaires = analysables

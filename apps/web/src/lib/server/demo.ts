@@ -92,7 +92,7 @@ export interface DemoHistoLine {
 	dateMs: number;
 	nbMatchs: number;
 	nbFragiles: number;
-	statut: 'attente' | 'passe' | 'tombe';
+	statut: 'attente' | 'passe' | 'tombe' | 'sans_reglement';
 	kickoffMs: number | null;
 	verdictDateMs: number | null;
 	tombeSur: string | null;
