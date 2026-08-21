@@ -43,6 +43,10 @@ export const load: PageServerLoad = async (event) => {
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
 		mentionNeutre: s.retireeDuRenforce && !s.fragile,
+		// « Serré » n'est pas recalculé en re-vue : le seuil cote seule par ligne n'est
+		// pas persisté (seuilFragile null) — on ne devine pas plutôt que d'afficher un
+		// « serré » faux. La nuance vit à l'écran de résultat, sur données fraîches.
+		serree: false,
 		// Règle unique : analysable = résolu ET pourvu d'une probabilité (figée au moment
 		// de l'analyse). Un match résolu sans proba reste « non analysé », jamais compté.
 		analysable: isAnalysable(s),

@@ -11,7 +11,7 @@ import { getOrCreateShareCode } from '$lib/server/fixtures/shareStore';
 import { consommerAnalyseOfferte, debiterCredits } from '$lib/server/fixtures/userStore';
 import { getAppSession, hasRechargedCached } from '$lib/server/session';
 import { predictions, writing, stats } from '$lib/server/services';
-import { buildReinforced, isAnalysable } from '$lib/server/domain/ticket';
+import { buildReinforced, isAnalysable, estSerree } from '$lib/server/domain/ticket';
 import { regimeOf } from '$lib/server/domain/regime';
 import { computeCharge } from '$lib/server/domain/billing';
 import { checkGeneratedText } from '$lib/server/domain/guards';
@@ -198,6 +198,9 @@ export const load: PageServerLoad = async (event) => {
 	const probaRenforceePct = pct1(r.probaRenforcee);
 	const nbRetirees = r.retirees.length;
 	const nbFragiles = r.selections.filter((s) => s.fragile).length;
+	// Lignes GARDÉES « serrées » (juste au-dessus de la barre) : « pas retiré » ≠ « solide ».
+	// Calculé sur les sélections (pas la VM) pour servir AUSSI la synthèse, construite avant.
+	const nbSerrees = r.selections.filter((s) => !s.retireeDuRenforce && estSerree(s)).length;
 
 	// 3. Texte deux niveaux. RÈGLE de stabilité : on ne rappelle JAMAIS l'IA pour un
 	//    ticket DÉJÀ analysé. Le texte est FIGÉ à la première analyse et relu à
@@ -246,7 +249,7 @@ export const load: PageServerLoad = async (event) => {
 		const writingInput: WritingInput = {
 			probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
 			nbFragiles, retraits, rienARetirer: r.rienARetirer,
-			toutesFragiles: r.toutesFragiles
+			toutesFragiles: r.toutesFragiles, nbSerrees
 		};
 		analyse = await writeSafely(writingInput, ticketNames(r.selections));
 	}
@@ -312,6 +315,9 @@ export const load: PageServerLoad = async (event) => {
 		retiree: s.retireeDuRenforce,
 		// Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre.
 		mentionNeutre: s.retireeDuRenforce && !s.fragile,
+		// GARDÉE mais serrée (juste au-dessus de la barre) → « pas retiré » ≠ « solide ».
+		// Jamais sur une ligne retirée : le retrait prime sur la nuance de la ligne gardée.
+		serree: !s.retireeDuRenforce && estSerree(s),
 		// Booléen calculé UNE fois par la règle unique : le client ne re-dérive jamais.
 		analysable: isAnalysable(s),
 		// Probabilité par ligne : lue en table (jamais calculée ici), affichée dans
@@ -375,9 +381,19 @@ export const load: PageServerLoad = async (event) => {
 	// rédacteur (rienARetirer est vrai par vacuité). On dit la vérité, en une phrase ;
 	// le détail (pourquoi chaque ligne, ce qu'on couvre, gratuité) est dans le bloc dédié.
 	const aucunAnalysable = nbAnalysables === 0;
+	// Synthèse d'affichage. Quand RIEN n'est retiré, on la fixe DÉTERMINISTIQUEMENT
+	// (jamais l'IA) : c'est un fait de structure — « tient / serré / solide » —, et le
+	// rédacteur ne doit pas pouvoir dire « tient debout » au-dessus d'une ligne serrée.
+	// Vaut aussi en re-vue : plus honnête, et déterministe (aucun LLM, règle d'or n°1).
 	const syntheseFinale = aucunAnalysable
 		? "Aucun de tes paris n'entre dans ce qu'on analyse."
-		: analyse.synthese;
+		: r.rienARetirer
+			? syntheseDeterministe({
+					probaTotalePct, probaRenforceePct, nbRetirees, nbMatchs: nbAnalysables,
+					nbFragiles, retraits: [], rienARetirer: true,
+					toutesFragiles: r.toutesFragiles, nbSerrees
+				})
+			: analyse.synthese;
 
 	const vm: ResultVM = {
 		lignes,
@@ -397,6 +413,7 @@ export const load: PageServerLoad = async (event) => {
 		majoriteRetiree: nbRetirees * 2 > nbAnalysables,
 		conflitMemeMatch: r.conflitMemeMatch,
 		nbAnalysables,
+		nbSerrees,
 		nbTotal,
 		laPlusSerree: laPlusSerree
 			? {

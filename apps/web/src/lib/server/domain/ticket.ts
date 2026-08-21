@@ -54,6 +54,39 @@ export function belowThreshold(s: Selection): boolean {
 }
 
 /**
+ * Marge « serré » AU-DESSUS du seuil de retrait. MESURÉE sur le backtest 2024-25
+ * (3 463 matchs) : parmi les lignes GARDÉES, le taux d'échec reste ~52 % du seuil à
+ * seuil+0,10 — aussi souvent qu'une ligne marquée fragile — puis décroche (43 % à
+ * +0,10-0,15, plancher ~28 % à +0,25). En deçà de +0,10, une ligne gardée n'est PAS
+ * fiable : on la dit « serrée », jamais « solide ». Marge UNIQUE (explicable en une
+ * phrase) ; les chiffres PAR MARCHÉ et la condition de réouverture sont au README.
+ * Le curseur penche vers « serré » à dessein : mieux vaut le dire un peu trop que dire
+ * « solide » à tort (produit d'honnêteté). Ne touche JAMAIS le seuil de retrait.
+ */
+export const SERRE_MARGE = 0.1;
+
+/**
+ * GATE 3 — SERRÉ (affichage seul). Une ligne GARDÉE « juste au-dessus de la barre » :
+ * analysable et proba < seuil de retrait + `SERRE_MARGE`. Inclut, par prudence, une
+ * fragile gardée par plancher (proba < seuil < seuil+marge). Ne décide RIEN du retrait
+ * (gate 1) ni du badge (gate 2) : sert uniquement à distinguer « pas retiré » de
+ * « solide » à l'écran. « On la garde, mais c'est serré » plutôt que de la dire solide.
+ */
+export function estSerree(s: Selection): boolean {
+	if (!isAnalysable(s) || s.marche === null) return false;
+	return (s.probabilite as number) < fragileThreshold(s.marche, s.seuilFragile) + SERRE_MARGE;
+}
+
+/**
+ * Ligne GARDÉE « solide » : confortablement au-dessus de la barre (≥ seuil + marge).
+ * « Solide » = au-dessus de la barre, JAMAIS « sûr » : même à +0,25 une ligne tombe
+ * ~28 % du temps (pari unique). Le mot ne promet rien — il situe, il ne garantit pas.
+ */
+export function estSolide(s: Selection): boolean {
+	return isAnalysable(s) && !estSerree(s);
+}
+
+/**
  * GATE 2 — BADGE « trop juste ». Réglage INDÉPENDANT du seuil de retrait : marché
  * dont le badge est autorisé (`badgeVisible`, critère gain sur la base ≥ 5 pts ET
  * marquage ≤ 40 % — jamais la précision absolue), ET régime MESURE. En cote seule
@@ -104,7 +137,8 @@ export interface ReinforcedResult {
 	retirees: number[];
 	probaTotale: number;
 	probaRenforcee: number;
-	/** Vrai si rien n'a été retiré → « Rien à retirer. Ton ticket tient debout. » */
+	/** Vrai si rien n'a été retiré. Selon les lignes gardées : « Ton ticket tient. Rien
+	 *  à retirer. » (tout solide) ou « … serrée(s), juste au-dessus de la barre » (serré). */
 	rienARetirer: boolean;
 	/**
 	 * Vrai si rien n'a été retiré ALORS QUE TOUTES les sélections analysables sont

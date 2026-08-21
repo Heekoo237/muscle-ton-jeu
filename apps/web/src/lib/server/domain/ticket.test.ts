@@ -5,6 +5,9 @@ import {
 	productProbability,
 	hasSameFixtureConflict,
 	isAnalysable,
+	estSerree,
+	estSolide,
+	SERRE_MARGE,
 	REINFORCED_FLOOR
 } from './ticket';
 import type { Selection } from '$lib/types';
@@ -208,5 +211,61 @@ describe('creditCost — paliers PRD §8.1', () => {
 		expect(creditCost(13)).toBe(3);
 		expect(creditCost(20)).toBe(3);
 		expect(creditCost(21)).toBeNull(); // blocage dur
+	});
+});
+
+describe('estSerree / estSolide — « pas retiré » ≠ « solide » (marge mesurée 0,10)', () => {
+	// sel() : seuil 0,55 par défaut. Serré = proba < 0,55 + 0,10 = 0,65 ; solide au-delà.
+	it('la marge mesurée est 0,10', () => {
+		expect(SERRE_MARGE).toBe(0.1);
+	});
+
+	it('une ligne juste au-dessus du seuil (+0,05) est SERRÉE, pas solide', () => {
+		const s = sel(1, 0.6); // seuil 0,55 → écart +0,05
+		expect(estSerree(s)).toBe(true);
+		expect(estSolide(s)).toBe(false);
+	});
+
+	it('une ligne confortablement au-dessus (+0,15) est SOLIDE', () => {
+		const s = sel(1, 0.7); // seuil 0,55 → écart +0,15
+		expect(estSerree(s)).toBe(false);
+		expect(estSolide(s)).toBe(true);
+	});
+
+	it('une ligne sous le seuil compte comme serrée (prudence), jamais solide', () => {
+		const s = sel(1, 0.5); // sous 0,55
+		expect(estSerree(s)).toBe(true);
+		expect(estSolide(s)).toBe(false);
+	});
+
+	it('une ligne non analysable n’est ni serrée ni solide', () => {
+		const s = { ...sel(1, 0.6), probabilite: null };
+		expect(estSerree(s)).toBe(false);
+		expect(estSolide(s)).toBe(false);
+	});
+});
+
+describe('INVARIANTS de l’écran de résultat (ne doivent plus jamais tomber)', () => {
+	it('quand une ligne est retirée, le renforcé a du contenu', () => {
+		// Une ligne fragile (0,30 < seuil 0,55) parmi des solides → retrait effectif.
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.8), sel(3, 0.3)]);
+		expect(r.rienARetirer).toBe(false);
+		expect(r.retirees.length).toBeGreaterThan(0);
+		expect(r.selections.some((s) => s.retireeDuRenforce)).toBe(true);
+	});
+
+	it('quand rien n’est retiré mais une ligne est serrée, elle est détectable (on développe)', () => {
+		// Toutes au-dessus du seuil (rien à retirer), mais une serrée (0,60 < 0,65).
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.6)]);
+		expect(r.rienARetirer).toBe(true);
+		const gardeesSerrees = r.selections.filter((s) => !s.retireeDuRenforce && estSerree(s));
+		expect(gardeesSerrees.length).toBe(1);
+	});
+
+	it('quand tout est solide, aucune serrée : l’écran dit « tient », sans en inventer', () => {
+		const r = buildReinforced([sel(1, 0.8), sel(2, 0.75)]);
+		expect(r.rienARetirer).toBe(true);
+		const gardeesSerrees = r.selections.filter((s) => !s.retireeDuRenforce && estSerree(s));
+		expect(gardeesSerrees.length).toBe(0);
 	});
 });

@@ -146,6 +146,52 @@ ouverture : la donnée résiduelle (verdicts, cotes transcrites) est-elle jugée
 non-identifiante ? Notre position : oui (aucun identifiant, libellés de marché et cotes
 publiques). À acter par écrit.
 
+## Marge « serré » — « pas retiré » n'est pas « solide »
+
+Une ligne qu'on ne retire pas n'est pas fiable pour autant : elle peut être **juste
+au-dessus de la barre**. Trois états à l'écran (`domain/ticket.ts`) : **trop juste /
+retirée** (proba < seuil de retrait) · **serrée / gardée** (seuil ≤ proba < seuil +
+`SERRE_MARGE`) · **solide** (≥ seuil + marge). La marge ne touche JAMAIS le seuil de
+retrait — c'est une couche d'AFFICHAGE (`estSerree`/`estSolide`).
+
+**`SERRE_MARGE = 0,10`, MESURÉE** sur le backtest 2024-25 (`data/predictions_2425.csv`,
+3 463 matchs). Taux d'échec des lignes **gardées** (proba ≥ seuil), par écart au seuil,
+agrégé tous marchés :
+
+| écart | +0,00-0,05 | +0,05-0,10 | +0,10-0,15 | +0,15-0,25 | +0,25+ |
+|---|---|---|---|---|---|
+| taux d'échec | 53 % | 51 % | 43 % | 39 % | 28 % |
+
+De 0 à +0,10 le taux d'échec **ne bouge pas** (~52 %) : une ligne gardée y tombe aussi
+souvent qu'une marquée fragile. Il décroche à +0,10, plancher ~28 % à +0,25. La frontière
+« fiable » est donc à **+0,10**. Le curseur penche vers « serré » à dessein : mieux vaut
+le dire un peu trop que dire « solide » à tort (produit d'honnêteté). « Solide » = *au-
+dessus de la barre*, jamais *sûr* — même à +0,25 une ligne tombe ~28 % (pari unique).
+
+**Chiffres PAR MARCHÉ** (taux d'échec des gardées, seuil → +0,05 / +0,10 / +0,15 / +0,25) —
+gardés sous la main pour la condition de réouverture :
+
+| marché | seuil | base | +0,05 | +0,10 | +0,15 | +0,25 |
+|---|---|---|---|---|---|---|
+| WIN_HOME | 0,33 | 56 % | 65 % | 60 % | 56 % | 29 % |
+| DRAW | 0,22 | 75 % | 76 % | 69 % | 74 % | — |
+| WIN_AWAY | 0,20 | 68 % | 78 % | 73 % | 66 % | 39 % |
+| DC_HOME_DRAW | 0,61 | 32 % | 38 % | 32 % | 26 % | 10 % |
+| DC_DRAW_AWAY | 0,47 | 44 % | 49 % | 43 % | 41 % | 21 % |
+| DC_HOME_AWAY | 0,73 | 25 % | 27 % | 20 % | 16 % | 0 % |
+| OVER_1_5 | 0,72 | 23 % | 23 % | 23 % | 18 % | 0 % |
+| OVER_2_5 | 0,48 | 47 % | 51 % | 46 % | 41 % | 18 % |
+| OVER_3_5 | 0,24 | 69 % | 72 % | 68 % | 67 % | 49 % |
+| UNDER_3_5 | 0,63 | 31 % | 33 % | 29 % | 25 % | 22 % |
+
+**Condition de réouverture (marge PAR MARCHÉ).** On garde la marge **unique** tant qu'elle
+reste explicable en une phrase et défendable partout. On rouvre pour une marge par marché
+SI la donnée montre un marché mal servi par 0,10 : un marché **rapide** (DC_HOME_AWAY,
+plus de 1,5 — décrochent dès +0,05) où l'on classe « serré » des lignes déjà fiables, OU
+un marché **lent** (victoire domicile, nul — base d'échec haute) où +0,10 ne suffit pas et
+l'on dirait « solide » trop tôt. La mesure est **reproductible** (relancer l'analyse par
+bandes sur `data/predictions_2425.csv`) — on tranche sur les chiffres, jamais à l'œil.
+
 ## Dette de bêta (à revoir à la fin de la bêta)
 
 - **Offre à 7 analyses** : `ANALYSES_OFFERTES` (`src/lib/offer.ts`) vaut 7 pendant la

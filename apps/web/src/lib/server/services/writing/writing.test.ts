@@ -107,9 +107,9 @@ describe('synthèse neutre — un retrait sans badge ne se contredit pas', () =>
 		expect(s).not.toContain('tient debout');
 	});
 
-	it('(b) rien de fragile : synthèse « tient debout » / « solide »', () => {
-		const s = syntheseDeterministe(input([], { rienARetirer: true, nbMatchs: 4 }));
-		expect(s.toLowerCase()).toMatch(/tient debout|solide/);
+	it('(b) rien de fragile et rien de serré : « Ton ticket tient. Rien à retirer. »', () => {
+		const s = syntheseDeterministe(input([], { rienARetirer: true, nbMatchs: 4, nbSerrees: 0 }));
+		expect(s).toBe('Ton ticket tient. Rien à retirer.');
 	});
 });
 
@@ -287,5 +287,36 @@ describe('orientation des faits (brief §3 — pas de contresens de lecture)', (
 		const phrases = faitsDescriptifs(fait, 'UNDER_2_5');
 		expect(phrases).toContain('Real marque beaucoup à domicile.'); // va vers plus de buts
 		expect(phrases.join(' ')).not.toContain('encaisse peu');
+	});
+});
+
+describe('synthèse « rien à retirer » — solide vs serré (« pas retiré » ≠ « solide »)', () => {
+	const base: WritingInput = {
+		probaTotalePct: 30, probaRenforceePct: 30, nbRetirees: 0, nbMatchs: 3,
+		nbFragiles: 0, retraits: [], rienARetirer: true
+	};
+
+	it('tout solide → « Ton ticket tient. Rien à retirer. » (jamais « ça passe »)', () => {
+		const s = syntheseDeterministe({ ...base, nbSerrees: 0 });
+		expect(s).toBe('Ton ticket tient. Rien à retirer.');
+		expect(s).not.toMatch(/tient debout|solide|sûr|passe/i);
+	});
+
+	it('une serrée → on le DIT, sans « tient debout »', () => {
+		const s = syntheseDeterministe({ ...base, nbSerrees: 1 });
+		expect(s).toMatch(/serrée/i);
+		expect(s).not.toMatch(/tient debout/i);
+	});
+
+	it('plusieurs serrées → pluriel, sans « tient debout »', () => {
+		const s = syntheseDeterministe({ ...base, nbSerrees: 2 });
+		expect(s).toMatch(/serrées/i);
+		expect(s).not.toMatch(/tient debout/i);
+	});
+
+	it('toutes fragiles prime : jamais « tient » ni « serré »', () => {
+		const s = syntheseDeterministe({ ...base, toutesFragiles: true, nbSerrees: 0 });
+		expect(s).toMatch(/trop justes/i);
+		expect(s).not.toMatch(/tient|serré/i);
 	});
 });

@@ -167,6 +167,12 @@ export interface LineVM {
 	retiree: boolean;
 	/** Retirée sans badge rouge (double chance, plus de 1,5) → mention neutre, jamais « fragile ». */
 	mentionNeutre: boolean;
+	/**
+	 * GARDÉE mais « serrée » : juste au-dessus de la barre (< seuil + marge mesurée),
+	 * donc PAS solide pour autant. Distinct de `retiree`. Vaut false pour une ligne
+	 * retirée ou non analysable. Sert à dire « on la garde, mais c'est serré ».
+	 */
+	serree: boolean;
 	analysable: boolean;
 	/** Probabilité de la sélection (table predictions), en % ; null si non analysée. */
 	probabilitePct: number | null;
@@ -223,6 +229,12 @@ export interface ResultVM {
 	conflitMemeMatch: boolean;
 	/** Lignes analysables (résolues ET avec probabilité en base). */
 	nbAnalysables: number;
+	/**
+	 * Lignes GARDÉES « serrées » (juste au-dessus de la barre). > 0 → on développe
+	 * (« on la garde, mais c'est serré »), même sans retrait. 0 avec `rienARetirer` →
+	 * le ticket tient vraiment. Une ligne non retirée n'est pas solide pour autant.
+	 */
+	nbSerrees: number;
 	/**
 	 * AUCUNE ligne analysable (0 sur N). Cas à ne JAMAIS confondre avec « tient debout » :
 	 * on n'a rien analysé, on doit dire pourquoi, ce qu'on couvre, et que c'est gratuit.

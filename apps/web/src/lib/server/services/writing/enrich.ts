@@ -147,9 +147,18 @@ function synthRienARetirer(input: WritingInput): string {
 	// (ticket faible, message rassurant). On le dit honnêtement.
 	if (input.toutesFragiles)
 		return 'Toutes tes sélections sont trop justes. On ne peut pas alléger ce ticket sans le vider.';
-	// Cas (b) : rien de fragile — le ticket tient vraiment.
-	const variantes = ['Rien à retirer. Ton ticket tient debout.', 'Rien à retirer. Ton ticket est solide.'];
-	return variantes[input.nbMatchs % variantes.length];
+	// Cas (b-serré) : rien à RETIRER, mais des lignes GARDÉES restent serrées (juste
+	// au-dessus de la barre). « Pas retiré » n'est pas « solide » : on le dit, sans
+	// dramatiser — le détail « on la garde, mais c'est serré » suit ligne par ligne.
+	const nbSerrees = input.nbSerrees ?? 0;
+	if (nbSerrees > 0) {
+		const un = nbSerrees === 1;
+		return un
+			? 'Rien à retirer. Une sélection reste serrée, juste au-dessus de la barre.'
+			: `Rien à retirer. ${cap(enMots(nbSerrees))} sélections restent serrées, juste au-dessus de la barre.`;
+	}
+	// Cas (b-solide) : rien de serré non plus — le ticket tient vraiment.
+	return 'Ton ticket tient. Rien à retirer.';
 }
 
 /* ------------------------------------------------------------------------ */

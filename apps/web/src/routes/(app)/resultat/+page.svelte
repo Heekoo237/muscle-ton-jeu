@@ -226,10 +226,26 @@
 					)})
 				</div>
 			{/if}
+		{:else if vm.nbSerrees > 0}
+			<!-- (b-serré) Rien à RETIRER, mais des lignes gardées restent serrées (juste
+			     au-dessus de la barre). On développe, sans dramatiser : « pas retiré » ≠
+			     « solide ». La synthèse (au-dessus) l'annonce ; ici, ligne par ligne. -->
+			<div class="serrees">
+				{#each vm.lignes.filter((l) => l.serree) as l (l.ordre)}
+					<div class="serre-line">
+						<div class="serre-match">
+							{l.matchLabel} — {l.libelleFr}{#if l.probabilitePct != null}&nbsp;<span class="serre-pct"
+									>{pctBig(l.probabilitePct)}</span
+								>{/if}
+						</div>
+						<div class="serre-note">On la garde, mais c'est serré.</div>
+					</div>
+				{/each}
+			</div>
 		{:else}
-			<!-- (b) Rien de fragile : le ticket tient vraiment. Info NEUTRE (la plus
-			     serrée) seulement avec ≥ 2 lignes analysables — sinon elle n'a pas de sens. -->
-			<div class="t-body-lg">Rien à retirer. Ton ticket tient debout.</div>
+			<!-- (b-solide) Rien de serré non plus : le ticket tient vraiment. Sans drame.
+			     Info NEUTRE (la plus serrée) seulement avec ≥ 2 lignes analysables. -->
+			<div class="t-body-lg">Ton ticket tient. Rien à retirer.</div>
 			{#if vm.laPlusSerree && vm.nbAnalysables >= 2}
 				<div class="serree t-body">
 					Ta sélection la plus serrée : {vm.laPlusSerree.matchLabel}, {vm.laPlusSerree.libelleFr} ({pctBig(
@@ -267,11 +283,14 @@
 						class="mpm-card rvl-fade"
 						class:fragile={l.fragile}
 						class:removed={l.retiree}
+						class:serree={l.serree}
 						style="animation-delay:{i * 40}ms"
 					>
 						<div class="mpm-top">
 							<span class="mpm-match">
-								{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}
+								{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}{#if l.serree}&nbsp;<span
+										class="serre-tag">serré</span
+									>{/if}
 							</span>
 							{#if l.analysable && l.probabilitePct != null}
 								<span class="mpm-pct">{pctBig(l.probabilitePct)}</span>
@@ -384,6 +403,43 @@
 	.conflit {
 		color: var(--c-ocre);
 		margin: 0;
+	}
+	/* Lignes serrées (gardées, juste au-dessus de la barre) : ton sobre, jamais rouge —
+	   ce n'est pas un retrait, c'est une nuance honnête. On développe sans dramatiser. */
+	.serrees {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		margin-top: var(--s-2);
+	}
+	.serre-line {
+		padding: var(--s-3) var(--s-4);
+		border: 1px solid var(--c-line);
+		border-left: 3px solid var(--c-ocre);
+		border-radius: var(--r-sm);
+		background: var(--c-surface);
+	}
+	.serre-match {
+		font-weight: 600;
+	}
+	.serre-pct {
+		font-variant-numeric: tabular-nums;
+		color: var(--c-ink-2);
+	}
+	.serre-note {
+		color: var(--c-ink-2);
+		font-size: 0.9em;
+		margin-top: 2px;
+	}
+	.serre-tag {
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--c-ocre);
+		vertical-align: middle;
+	}
+	.mpm-card.serree {
+		border-left: 3px solid var(--c-ocre);
 	}
 	.analyse {
 		color: var(--c-ink-2);

@@ -59,6 +59,13 @@ export interface WritingInput {
 	 * ticket. La synthèse ne doit PAS dire « tient debout » dans ce cas — on le dit.
 	 */
 	toutesFragiles?: boolean;
+	/**
+	 * Lignes GARDÉES « serrées » (juste au-dessus de la barre, < seuil + marge mesurée).
+	 * Quand rien n'est retiré : > 0 → la synthèse le DIT (« serré ») au lieu de « tient
+	 * debout » ; 0 → le ticket tient vraiment. Une ligne non retirée n'est pas solide
+	 * pour autant — c'est la distinction « pas retiré » ≠ « solide ».
+	 */
+	nbSerrees?: number;
 }
 
 /** Sortie deux niveaux : une synthèse, puis une explication par sélection retirée. */

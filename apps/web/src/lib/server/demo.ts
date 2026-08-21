@@ -144,6 +144,7 @@ function line(
 		fragile,
 		retiree,
 		mentionNeutre: retiree && !fragile,
+		serree: false,
 		analysable: true,
 		probabilitePct
 	};
