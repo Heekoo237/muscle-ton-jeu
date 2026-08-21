@@ -24,6 +24,8 @@ from ..constants import (
     REPLI_PROMU_ALERT,
     REPLI_PROMU_MIN_MATCHS,
     REPLI_PROMU_MIN_RUNS,
+    REFUS_ALERT,
+    REFUS_MIN_TENTATIVES,
     VISION_INCOMPLETE_ALERT,
     VISION_INCOMPLETE_MIN_LIGNES,
 )
@@ -290,6 +292,44 @@ def _vision_incomplete_rate(cur, alerts: list[str]) -> None:
         print(f"vision      OK — {incompletes}/{lignes} lectures incomplètes aujourd'hui")
 
 
+def vision_refus_alert(tentatives: int, refus_contenu: int) -> str | None:
+    """Message d'alerte si le taux de REFUS de lecture dépasse le seuil sur la
+    journée, ou None. Fonction PURE (testable). Sous garde-fou d'échantillon.
+    Refus « à la porte » = un utilisateur qui n'entre pas et ne se plaint pas."""
+    if tentatives < REFUS_MIN_TENTATIVES:
+        return None
+    taux = refus_contenu / tentatives
+    if taux > REFUS_ALERT:
+        return (
+            f"vision : {taux:.0%} de refus de lecture aujourd'hui "
+            f"({refus_contenu}/{tentatives} tentatives, > {REFUS_ALERT:.0%}) — des tickets "
+            f"refusés À LA PORTE ; vérifie la compression client, l'intégrité des envois "
+            f"ou le fournisseur vision."
+        )
+    return None
+
+
+def _vision_refus_rate(cur, alerts: list[str]) -> None:
+    """Alerte si le taux de refus « contenu » (pas_un_ticket / illisible / incomplete)
+    du jour dépasse le seuil. Lit `vision_refus` (par raison) et `vision_stats`
+    (lectures réussies) — les deux seaux quotidiens alimentés par l'app."""
+    try:
+        cur.execute("select raison, n from vision_refus where jour = current_date")
+        refus = {str(r[0]): int(r[1]) for r in cur.fetchall()}
+        cur.execute("select coalesce(tickets, 0) from vision_stats where jour = current_date")
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001 — table absente (migration non appliquée) : on saute
+        return
+    lus = int(row[0]) if row else 0
+    contenu = refus.get("pas_un_ticket", 0) + refus.get("illisible", 0) + refus.get("incomplete", 0)
+    tentatives = lus + contenu
+    msg = vision_refus_alert(tentatives, contenu)
+    if msg:
+        alerts.append(msg)
+    elif tentatives >= REFUS_MIN_TENTATIVES:
+        print(f"refus vision OK — {contenu}/{tentatives} tickets refusés à la porte aujourd'hui")
+
+
 def _schema_manifest_path() -> Path:
     """packages/model/mtj_model/pipeline/health.py → packages/db/schema_manifest.json."""
     return Path(__file__).resolve().parents[3] / "db" / "schema_manifest.json"
@@ -335,6 +375,7 @@ def check() -> list[str]:
         _nightly_coverage(cur, alerts)
         _repli_promu_rate(cur, alerts)
         _vision_incomplete_rate(cur, alerts)
+        _vision_refus_rate(cur, alerts)
     # Contrôle de schéma en DERNIER, connexion isolée (moteur potentiellement absent).
     _schema_drift(alerts)
     return alerts

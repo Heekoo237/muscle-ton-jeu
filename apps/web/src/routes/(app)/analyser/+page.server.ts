@@ -4,7 +4,7 @@ import { vision, sports } from '$lib/server/services';
 import type { ImageInput } from '$lib/server/services/vision';
 import { resolveTicket, incompleteReads } from '$lib/server/domain/resolve';
 import { createTicket } from '$lib/server/fixtures/ticketStore';
-import { recordVisionRead } from '$lib/server/fixtures/visionStatsStore';
+import { recordVisionRead, recordVisionRefus } from '$lib/server/fixtures/visionStatsStore';
 import {
 	sha256Hex,
 	combinedEmpreinte,
@@ -70,9 +70,15 @@ export const actions: Actions = {
 		const files = SLOTS.map((k) => form.get(k)).filter(
 			(v): v is File => v instanceof File && v.size > 0
 		);
-		if (files.length === 0) return fail(400, { erreur: 'aucune' });
+		if (files.length === 0) {
+			await recordVisionRefus('aucune').catch(() => {});
+			return fail(400, { erreur: 'aucune' });
+		}
 		for (const f of files) {
-			if (!f.type.startsWith('image/')) return fail(400, { erreur: 'pas_une_image' });
+			if (!f.type.startsWith('image/')) {
+				await recordVisionRefus('pas_une_image').catch(() => {});
+				return fail(400, { erreur: 'pas_une_image' });
+			}
 		}
 
 		// 2. Empreintes + dédoublonnage (deux fois la même capture = une seule).
@@ -80,6 +86,7 @@ export const actions: Actions = {
 		const hashes: string[] = [];
 		const seen = new Set<string>();
 		const diagImages: string[] = []; // trace de diagnostic : taille + intégrité par image
+		let imageDouteuse = false; // au moins une capture arrivée tronquée / en-tête cassé
 		for (const f of files.slice(0, 3)) {
 			const bytes = new Uint8Array(await f.arrayBuffer());
 			const h = await sha256Hex(bytes);
@@ -88,7 +95,9 @@ export const actions: Actions = {
 			hashes.push(h);
 			const mime = ALLOWED_MIME.has(f.type) ? f.type : 'image/jpeg';
 			images.push({ mime, data: toBase64(bytes) });
-			diagImages.push(`${f.type || '?'} ${bytes.length}o ${imageIntegrite(bytes, f.type)}`);
+			const integrite = imageIntegrite(bytes, f.type);
+			if (integrite !== 'ok') imageDouteuse = true;
+			diagImages.push(`${f.type || '?'} ${bytes.length}o ${integrite}`);
 		}
 		const empreinte = await combinedEmpreinte(hashes);
 		// Trace de diagnostic (Vercel logs) : ce que le SERVEUR a réellement reçu — taille,
@@ -119,7 +128,10 @@ export const actions: Actions = {
 					RATE_LIMITS.analyserCompte.max
 				)
 			: true;
-		if (!okIp || !okCompte) return fail(429, { erreur: 'trop_de_tentatives' });
+		if (!okIp || !okCompte) {
+			await recordVisionRefus('trop_de_tentatives').catch(() => {});
+			return fail(429, { erreur: 'trop_de_tentatives' });
+		}
 
 		// 4. Lecture réelle. Échec explicite = message clair, aucun crédit débité.
 		//    Un service indisponible (ex. clé vision absente en production) ne doit
@@ -129,15 +141,20 @@ export const actions: Actions = {
 			raw = await vision.readTicket(images);
 		} catch (e) {
 			console.error('[analyse] lecture indisponible:', e);
+			await recordVisionRefus('indisponible').catch(() => {});
 			return fail(503, { erreur: 'indisponible' });
 		}
 		if (raw.echec) {
-			// REFUS de lecture : on journalise la raison AVEC les tailles/intégrité reçues.
-			// Un « pas_un_ticket » sur une image minuscule ou tronquée = corruption à
-			// l'envoi (pas le contenu) ; un refus sur une image saine et lourde = vrai
-			// jugement du modèle. Sans cette ligne, un refus est invisible dans les logs.
-			console.warn(`[analyse] REFUS ${raw.echec} — images: ${diagImages.join(' | ')}`);
-			return fail(422, { erreur: raw.echec });
+			// L'intégrité n'INFLUENCE QUE LE MESSAGE, jamais le passage à la vision : une
+			// image saine n'est donc jamais bloquée par cette heuristique. Mais si la
+			// vision refuse (pas_un_ticket / illisible) ET qu'une capture est arrivée
+			// TRONQUÉE, la cause est l'envoi, pas le contenu — on le dit honnêtement et de
+			// façon ACTIONNABLE plutôt que d'accuser « ce n'est pas un ticket ».
+			const contenuRefuse = raw.echec === 'pas_un_ticket' || raw.echec === 'illisible';
+			const erreur = contenuRefuse && imageDouteuse ? 'incomplete' : raw.echec;
+			console.warn(`[analyse] REFUS ${erreur} (vision:${raw.echec}) — images: ${diagImages.join(' | ')}`);
+			await recordVisionRefus(erreur).catch(() => {});
+			return fail(422, { erreur });
 		}
 
 		// Trace de diagnostic : ce que la VISION a réellement extrait (texte brut),

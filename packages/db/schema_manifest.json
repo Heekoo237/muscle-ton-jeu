@@ -13,7 +13,8 @@
   ],
   "tables": [
     { "table": "rate_limits", "migration": "0015" },
-    { "table": "ondemand_calls", "migration": "0020" }
+    { "table": "ondemand_calls", "migration": "0020" },
+    { "table": "vision_refus", "migration": "0022" }
   ],
   "functions": [
     { "name": "confirmer_recharge", "migration": "0013" },
@@ -21,6 +22,7 @@
     { "name": "hit_rate_limit", "migration": "0015" },
     { "name": "debiter_credits", "migration": "0017" },
     { "name": "record_vision_read", "migration": "0011" },
+    { "name": "record_vision_refus", "migration": "0022" },
     { "name": "reserver_notification", "migration": "0012" },
     { "name": "ondemand_circuit_ouvert", "migration": "0020" }
   ]

@@ -79,6 +79,16 @@ REPLI_PROMU_MIN_MATCHS = 30  # au moins 30 matchs-fenêtre cumulés (anti-bruit)
 VISION_INCOMPLETE_ALERT = 0.20
 VISION_INCOMPLETE_MIN_LIGNES = 20
 
+# REFUS d'analyse « à la porte » (pas_un_ticket / illisible / incomplete) : le seul
+# échec qu'on ne voit jamais — un utilisateur refusé ne se plaint pas, il disparaît.
+# Taux de refus de contenu = refus / (lectures réussies + refus de contenu). Seuil à
+# 30 % : quelques refus légitimes existent toujours (une vraie photo qui n'est pas un
+# ticket), donc un taux bas est NORMAL ; mais si 1 tentative sur 3 échoue à lire, c'est
+# SYSTÉMIQUE (une classe d'appareils, une régression de déploiement, une panne
+# fournisseur) — on agit. Garde-fou d'échantillon 20 tentatives, comme l'incomplet.
+REFUS_ALERT = 0.30
+REFUS_MIN_TENTATIVES = 20
+
 # ── Escalade vers alternate_totals (Pinnacle 2,5 garanti) — critère CHIFFRÉ ───
 # Le plus/moins 2,5 est pris chez le book EU le plus serré qui le poste (gratuit).
 # On n'escalade vers `alternate_totals` (+50 % de crédits sur l'appel cotes) que
