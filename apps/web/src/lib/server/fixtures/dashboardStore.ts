@@ -7,7 +7,7 @@
  * gagné », aucun taux de réussite personnel, aucun gain.
  */
 import { listAnalysedTickets, type StoredTicket } from './ticketStore';
-import { settleMarket } from '$lib/server/domain/settle';
+import { settleMarket, isSettleable } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { Fixture, Market } from '$lib/types';
 
@@ -16,6 +16,9 @@ export interface DashboardStats {
 	fragilesMarques: number;
 	/** Fragiles dont le match est terminé ET qui sont tombés. */
 	fragilesTombes: number;
+	/** Répartition des tickets analysés : réglés (verdict connu) vs en attente. */
+	ticketsRegles: number;
+	ticketsEnAttente: number;
 }
 
 export interface TicketEnCours {
@@ -75,7 +78,23 @@ export function dashboardStats(data: DashboardData): DashboardStats {
 		}
 	}
 
-	return { ticketsAnalyses, fragilesMarques, fragilesTombes };
+	// Répartition réglés / en attente. Un ticket est RÉGLÉ dès que le cron a posé son
+	// verdict (source de vérité) ; à défaut, si tous ses matchs réglables sont terminés
+	// (repli avant le passage du cron). On ne compte que les tickets qui PEUVENT être
+	// réglés (au moins un match réglable) — sinon ni réglé ni en attente.
+	const finishedIds = new Set(finished.map((f) => f.id));
+	let ticketsRegles = 0;
+	let ticketsEnAttente = 0;
+	for (const t of analysed) {
+		const regleStocke = t.resultatOriginale === 'passe' || t.resultatOriginale === 'tombe';
+		const reglables = t.selections.filter(isSettleable);
+		if (reglables.length === 0 && !regleStocke) continue;
+		const tousTermines = reglables.length > 0 && reglables.every((s) => finishedIds.has(s.fixtureId as number));
+		if (regleStocke || tousTermines) ticketsRegles += 1;
+		else ticketsEnAttente += 1;
+	}
+
+	return { ticketsAnalyses, fragilesMarques, fragilesTombes, ticketsRegles, ticketsEnAttente };
 }
 
 /**

@@ -5,7 +5,7 @@ import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
 import { isAnalysable } from '$lib/server/domain/ticket';
-import { settleTicket, type FinalScore } from '$lib/server/domain/settle';
+import { settleTicket, verdictAffiche, type FinalScore } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { ExplicationVM, LineVM, TicketResult } from '$lib/types';
 
@@ -78,9 +78,12 @@ export const load: PageServerLoad = async (event) => {
 		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
 	}
 	const v = settleTicket(ticket.selections, scores);
-	const verdict: 'attente' | TicketResult = v.originale;
+	// SOURCE DE VÉRITÉ : le verdict persisté par le règlement prime ; le recalcul ne
+	// sert qu'à la fenêtre ≤ 6 h avant le cron, et à situer « tombé sur ce match ».
+	const verdictOriginale = verdictAffiche(ticket.resultatOriginale, v.originale);
+	const verdict: 'attente' | TicketResult = verdictOriginale;
 	const tombeSur =
-		v.originale === 'tombe' && v.premierPerduOrdre != null
+		verdictOriginale === 'tombe' && v.premierPerduOrdre != null
 			? (ticket.selections.find((s) => s.ordre === v.premierPerduOrdre)?.matchLabel ?? null)
 			: null;
 	// Issue par ligne (ordre → passé / tombé / en attente), pour marquer le détail.
@@ -99,8 +102,12 @@ export const load: PageServerLoad = async (event) => {
 		// Verdict du règlement (null d'affichage = « en attente »).
 		verdict,
 		tombeSur,
-		// L'original tombe mais le renforcé aurait tenu : l'argument du produit.
-		verdictRenforce: v.originale === 'tombe' && v.renforce === 'passe',
+		// L'original tombe mais le renforcé aurait tenu : l'argument du produit. Verdict
+		// persisté prioritaire ; repli sur le recalcul tant que le cron n'a rien posé.
+		verdictRenforce:
+			ticket.resultatOriginale === 'tombe' && ticket.resultat === 'passe'
+				? true
+				: ticket.resultatOriginale == null && v.originale === 'tombe' && v.renforce === 'passe',
 		issues
 	};
 };

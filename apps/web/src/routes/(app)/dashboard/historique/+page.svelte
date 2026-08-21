@@ -40,10 +40,16 @@
 						{/if}
 					{:else if l.statut === 'passe'}
 						<span class="passe t-body">Ton ticket est passé</span>
+						{#if l.verdictDateMs != null}
+							<span class="dit t-small">Réglé le {jour.format(new Date(l.verdictDateMs))}</span>
+						{/if}
 					{:else}
-						<span class="passe t-body">Tombé sur {l.tombeSur}</span>
+						<span class="passe t-body">Tombé{l.tombeSur ? ` sur ${l.tombeSur}` : ''}</span>
 						{#if l.verdictRenforce}
 							<span class="verdict t-small">La version renforcée serait passée</span>
+						{/if}
+						{#if l.verdictDateMs != null}
+							<span class="dit t-small">Réglé le {jour.format(new Date(l.verdictDateMs))}</span>
 						{/if}
 					{/if}
 				</a>

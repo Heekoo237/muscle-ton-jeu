@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { marketOutcome, settleMarket, settleReinforced, settleTicket, type FinalScore } from './settle';
+import {
+	marketOutcome,
+	settleMarket,
+	settleReinforced,
+	settleTicket,
+	verdictAffiche,
+	type FinalScore
+} from './settle';
 import type { Market, Selection } from '$lib/types';
 
 describe('marketOutcome — marché × score final', () => {
@@ -108,5 +115,22 @@ describe('settleTicket — verdicts original ET renforcé', () => {
 		const v = settleTicket(s, scores({ 10: { home: 2, away: 0 }, 11: null }));
 		expect(v.originale).toBe('en_attente');
 		expect(v.renforce).toBe('en_attente');
+	});
+});
+
+describe('verdictAffiche — le verdict persisté prime sur le recalcul', () => {
+	it('un verdict stocké (passe/tombe) prime toujours sur le recalcul', () => {
+		expect(verdictAffiche('passe', 'en_attente')).toBe('passe');
+		expect(verdictAffiche('tombe', 'en_attente')).toBe('tombe');
+		// Ne rétrograde jamais un ticket réglé parce qu'un fetch de scores est vide.
+		expect(verdictAffiche('passe', 'tombe')).toBe('passe');
+	});
+
+	it('sans verdict stocké, on retombe sur le recalcul (fenêtre ≤ 6 h avant le cron)', () => {
+		expect(verdictAffiche(null, 'passe')).toBe('passe');
+		expect(verdictAffiche(undefined, 'tombe')).toBe('tombe');
+		expect(verdictAffiche(null, 'en_attente')).toBe('en_attente');
+		// 'en_attente' stocké n'est pas une valeur posée par le cron : traité comme absent.
+		expect(verdictAffiche('en_attente', 'passe')).toBe('passe');
 	});
 });

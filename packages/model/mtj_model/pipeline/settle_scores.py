@@ -21,8 +21,12 @@ from .sync import resolve_fixture
 from .version import print_banner
 
 # /scores ne renvoie les matchs TERMINÉS que si daysFrom est fourni (coût 2 crédits
-# par ligue). On reste sur une fenêtre courte : on ne règle que du récent.
-DAYS_FROM = 2
+# par ligue, IDENTIQUE quel que soit daysFrom de 1 à 3). On prend donc le MAXIMUM
+# autorisé par le fournisseur (3) : à coût égal, on rattrape un match terminé il y a
+# jusqu'à 3 jours. En deçà, un match manqué (creux de collecte, résolution tardive)
+# tombait hors fenêtre et restait « non terminé » pour toujours. Limite dure : au-delà
+# de 3 jours, /scores ne renvoie plus le match — il est alors irrécupérable côté fournisseur.
+DAYS_FROM = 3
 
 # Championnats à sonder : un fixture non terminé, coup d'envoi passé, porté par un
 # ticket analysé récent PAS ENCORE notifié (le suivi de résultat n'est pas parti).

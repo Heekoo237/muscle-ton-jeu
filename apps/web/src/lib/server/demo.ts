@@ -62,7 +62,13 @@ export function demoHistoryItems(): HistoryItem[] {
 
 /* ---- Statistiques d'accueil ---- */
 export function demoStats() {
-	return { ticketsAnalyses: 18, fragilesMarques: 47, fragilesTombes: 31 };
+	return {
+		ticketsAnalyses: 18,
+		fragilesMarques: 47,
+		fragilesTombes: 31,
+		ticketsRegles: 12,
+		ticketsEnAttente: 6
+	};
 }
 
 /* ---- Tickets en cours (matchs à venir) ---- */
@@ -88,18 +94,19 @@ export interface DemoHistoLine {
 	nbFragiles: number;
 	statut: 'attente' | 'passe' | 'tombe';
 	kickoffMs: number | null;
+	verdictDateMs: number | null;
 	tombeSur: string | null;
 	verdictRenforce: boolean;
 }
 export function demoHistoLignes(nowMs: number): DemoHistoLine[] {
 	const d = 24 * 3600 * 1000;
 	return [
-		{ id: 'demo-a', dateMs: nowMs - 2 * 3600 * 1000, nbMatchs: 6, nbFragiles: 2, statut: 'attente', kickoffMs: nowMs + 5 * 3600 * 1000, tombeSur: null, verdictRenforce: false },
-		{ id: 'demo-b', dateMs: nowMs - 26 * 3600 * 1000, nbMatchs: 9, nbFragiles: 3, statut: 'attente', kickoffMs: nowMs + 20 * 3600 * 1000, tombeSur: null, verdictRenforce: false },
-		{ id: 'demo-1', dateMs: nowMs - 2 * d, nbMatchs: 7, nbFragiles: 2, statut: 'tombe', kickoffMs: null, tombeSur: 'LENS – NICE', verdictRenforce: true },
-		{ id: 'demo-2', dateMs: nowMs - 4 * d, nbMatchs: 5, nbFragiles: 1, statut: 'passe', kickoffMs: null, tombeSur: null, verdictRenforce: false },
-		{ id: 'demo-3', dateMs: nowMs - 6 * d, nbMatchs: 9, nbFragiles: 3, statut: 'tombe', kickoffMs: null, tombeSur: 'AJAX – FEYENOORD', verdictRenforce: false },
-		{ id: 'demo-4', dateMs: nowMs - 9 * d, nbMatchs: 4, nbFragiles: 0, statut: 'passe', kickoffMs: null, tombeSur: null, verdictRenforce: false }
+		{ id: 'demo-a', dateMs: nowMs - 2 * 3600 * 1000, nbMatchs: 6, nbFragiles: 2, statut: 'attente', kickoffMs: nowMs + 5 * 3600 * 1000, verdictDateMs: null, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-b', dateMs: nowMs - 26 * 3600 * 1000, nbMatchs: 9, nbFragiles: 3, statut: 'attente', kickoffMs: nowMs + 20 * 3600 * 1000, verdictDateMs: null, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-1', dateMs: nowMs - 2 * d, nbMatchs: 7, nbFragiles: 2, statut: 'tombe', kickoffMs: null, verdictDateMs: nowMs - 2 * d + 3 * 3600 * 1000, tombeSur: 'LENS – NICE', verdictRenforce: true },
+		{ id: 'demo-2', dateMs: nowMs - 4 * d, nbMatchs: 5, nbFragiles: 1, statut: 'passe', kickoffMs: null, verdictDateMs: nowMs - 4 * d + 3 * 3600 * 1000, tombeSur: null, verdictRenforce: false },
+		{ id: 'demo-3', dateMs: nowMs - 6 * d, nbMatchs: 9, nbFragiles: 3, statut: 'tombe', kickoffMs: null, verdictDateMs: nowMs - 6 * d + 3 * 3600 * 1000, tombeSur: 'AJAX – FEYENOORD', verdictRenforce: false },
+		{ id: 'demo-4', dateMs: nowMs - 9 * d, nbMatchs: 4, nbFragiles: 0, statut: 'passe', kickoffMs: null, verdictDateMs: nowMs - 9 * d + 3 * 3600 * 1000, tombeSur: null, verdictRenforce: false }
 	];
 }
 

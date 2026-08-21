@@ -56,6 +56,19 @@
 			<span class="num t-chiffre-md">{data.stats.ticketsAnalyses}</span>
 			<span class="lbl t-small">ticket{data.stats.ticketsAnalyses > 1 ? 's' : ''} analysé{data.stats.ticketsAnalyses > 1 ? 's' : ''}</span>
 		</div>
+		{#if data.stats.ticketsRegles + data.stats.ticketsEnAttente > 0}
+			<!-- Répartition du cycle d'analyse (réglés vs en attente d'un résultat) —
+			     pas un résultat de pari : on situe où en sont tes tickets. -->
+			<div class="stat">
+				<span class="num t-chiffre-md">
+					{data.stats.ticketsRegles}
+					<span class="sur">/ {data.stats.ticketsRegles + data.stats.ticketsEnAttente}</span>
+				</span>
+				<span class="lbl t-small">
+					réglé{data.stats.ticketsRegles > 1 ? 's' : ''} · {data.stats.ticketsEnAttente} en attente
+				</span>
+			</div>
+		{/if}
 		{#if montreTombes}
 			<div class="stat">
 				<span class="num t-chiffre-md">

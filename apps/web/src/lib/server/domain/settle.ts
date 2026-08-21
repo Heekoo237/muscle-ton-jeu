@@ -132,6 +132,21 @@ export function settleTicket(selections: Selection[], scores: Map<number, FinalS
 }
 
 /**
+ * Verdict d'AFFICHAGE. Le verdict PERSISTÉ par le règlement (cron) est la source de
+ * vérité : dès qu'il vaut « passe »/« tombe », il prime. Le recalcul en direct n'est
+ * qu'un REPLI pour la fenêtre ≤ 6 h entre la fin des matchs et le passage du cron —
+ * ou si un jour la colonne était absente. On ne « rétrograde » jamais un ticket réglé
+ * en « en_attente » parce qu'un fetch de scores en direct est revenu vide.
+ */
+export function verdictAffiche(
+	stored: TicketResult | null | undefined,
+	recompute: TicketResult
+): TicketResult {
+	if (stored === 'passe' || stored === 'tombe') return stored;
+	return recompute;
+}
+
+/**
  * Résultat du ticket RENFORCÉ seul. Conservé pour compat ; délègue à `settleTicket`
  * (source unique). Le renforcé est la proposition du produit portée à l'historique.
  */

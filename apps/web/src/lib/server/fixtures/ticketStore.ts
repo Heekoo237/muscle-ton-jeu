@@ -6,7 +6,7 @@
  * (règle de facturation n°2). La persistance Supabase corrige la perte d'état
  * en serverless.
  */
-import type { Market, Selection, TicketStatus } from '$lib/types';
+import type { Market, Selection, TicketResult, TicketStatus } from '$lib/types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 
 export interface StoredResult {
@@ -29,6 +29,16 @@ export interface StoredTicket {
 	creeLeMs: number;
 	result?: StoredResult;
 	billing?: StoredBilling;
+	/**
+	 * Verdict PERSISTÉ par le règlement (cron), source de vérité de l'historique :
+	 * `resultat` = ticket renforcé, `resultatOriginale` = ticket original. `null` tant
+	 * que le ticket n'est pas réglé. On LIT ces colonnes — on ne recalcule plus le
+	 * verdict à l'affichage (règle d'archi n°2 : le temps réel lit, il ne calcule pas).
+	 */
+	resultat?: TicketResult | null;
+	resultatOriginale?: TicketResult | null;
+	/** Instant d'analyse (ms), = date d'origine du ticket réglé. `null` si inconnu. */
+	analyseLeMs?: number | null;
 	/** Propriétaire ; null tant que le ticket est anonyme (avant connexion). */
 	userId?: number | null;
 	/** Empreinte des captures (SHA-256), pour dédoublonnage et réutilisation 24 h. */
@@ -108,6 +118,10 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 		creeLeMs: t.cree_le ? Date.parse(t.cree_le as string) : Date.now(),
 		result,
 		billing,
+		// Verdict persisté par le règlement : lu tel quel, jamais recalculé à l'affichage.
+		resultat: (t.resultat as TicketResult | null) ?? null,
+		resultatOriginale: (t.resultat_originale as TicketResult | null) ?? null,
+		analyseLeMs: t.analyse_le ? Date.parse(t.analyse_le as string) : null,
 		userId: t.user_id === null || t.user_id === undefined ? null : Number(t.user_id)
 	};
 }
