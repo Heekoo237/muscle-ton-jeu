@@ -369,6 +369,50 @@ def _schema_drift(alerts: list[str]) -> None:
         print(f"schéma      OK — {path.name} aligné avec la base")
 
 
+# Rafraîchissement des scores : une ligue peut échouer une nuit (aléa réseau) sans
+# alerter ; une ligue qui échoue de façon RÉCURRENTE (≥ 2 des 3 dernières nuits) est un
+# vrai problème (clé de sport morte, alias en collision) — et chaque nuit ratée risque
+# de faire tomber un match hors de la fenêtre /scores (score perdu). On alerte alors.
+SCORES_ECHEC_NUITS = 3
+SCORES_ECHEC_MIN = 2
+
+
+def recurrent_score_failures(nights: list[dict]) -> dict[str, int]:
+    """Ligues présentes dans les `scores_echecs` d'au moins SCORES_ECHEC_MIN des nuits
+    fournies → {fd_code: nb de nuits en échec}. PURE (testable sans base)."""
+    compte: dict[str, int] = {}
+    for n in nights:
+        for fd in (n or {}).keys():
+            compte[fd] = compte.get(fd, 0) + 1
+    return {fd: c for fd, c in compte.items() if c >= SCORES_ECHEC_MIN}
+
+
+def _scores_refresh_failures(cur, alerts: list[str]) -> None:
+    """Alerte si une ligue rate le rafraîchissement de ses scores de façon récurrente.
+    Lit `scores_echecs` des derniers nocturnes (garde-fou : une nuit isolée n'alerte pas).
+    """
+    cur.execute(
+        """select detail->'scores_echecs'
+             from pipeline_runs
+            where job = 'nightly' and statut <> 'running'
+            order by demarre_le desc limit %s""",
+        (SCORES_ECHEC_NUITS,),
+    )
+    nights = [
+        (r[0] if isinstance(r[0], dict) else (json.loads(r[0]) if r[0] else {}))
+        for r in cur.fetchall()
+    ]
+    recurrents = recurrent_score_failures(nights)
+    if recurrents:
+        detail = ", ".join(f"{fd} ({c}/{len(nights)} nuits)" for fd, c in sorted(recurrents.items()))
+        alerts.append(
+            f"scores : rafraîchissement en échec RÉCURRENT — {detail}. Score perdu si le "
+            f"match sort de la fenêtre /scores (3 j). Vérifie la clé de sport / les alias."
+        )
+    else:
+        print("scores      OK — aucun échec récurrent de rafraîchissement des scores")
+
+
 def check() -> list[str]:
     """Renvoie la liste des alertes (vide si tout est frais)."""
     alerts: list[str] = []
@@ -380,6 +424,7 @@ def check() -> list[str]:
         _totals_escalation(cur, alerts)
         _nightly_coverage(cur, alerts)
         _repli_promu_rate(cur, alerts)
+        _scores_refresh_failures(cur, alerts)
         _vision_incomplete_rate(cur, alerts)
         _vision_refus_rate(cur, alerts)
     # Contrôle de schéma en DERNIER, connexion isolée (moteur potentiellement absent).

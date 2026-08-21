@@ -226,12 +226,31 @@ def resolve_fixture(con, league_id: int, fx) -> int:
     )
 
 
-def refresh_scores(con, provider, days_from: int = 3) -> int:
-    """Rafraîchit les résultats récents de chaque championnat (nocturne)."""
+def refresh_scores(con, provider, days_from: int = 3) -> tuple[int, dict[str, str]]:
+    """Rafraîchit les résultats récents de chaque championnat (nocturne).
+
+    ISOLATION PAR LIGUE (leçon coûteuse). Avant, la boucle n'avait AUCUN garde : une
+    seule ligue qui lève (clé de sport erronée → 404, `TeamMergeCollision` d'un alias
+    bruité, hoquet réseau) avortait TOUT le rafraîchissement — et les ligues suivantes
+    (ordre alphabétique par fd_code) ne recevaient jamais leurs scores cette nuit-là.
+    Un match terminé restait alors `scheduled`, et une fois hors de la fenêtre `/scores`
+    (3 jours) son score était perdu POUR TOUJOURS. Comme le collecteur, chaque ligue a
+    désormais son savepoint : ce qui échoue est annulé seul, le reste est conservé.
+
+    Renvoie (n_écrits, échecs par fd_code) pour que le nocturne journalise QUELLES
+    ligues ont échoué (une récurrence = vrai problème à corriger, pas un aléa réseau).
+    """
     n = 0
+    echecs: dict[str, str] = {}
     for lg in league_worklist(con):
-        for fx in provider.scores(lg["odds_api_key"], days_from=days_from):
-            if fx.status == "finished":
-                resolve_fixture(con, lg["league_id"], fx)
-                n += 1
-    return n
+        try:
+            with con.transaction():  # savepoint : rollback de CETTE ligue seule si elle lève
+                for fx in provider.scores(lg["odds_api_key"], days_from=days_from):
+                    if fx.status == "finished":
+                        resolve_fixture(con, lg["league_id"], fx)
+                        n += 1
+        except Exception as exc:  # noqa: BLE001 — une ligue ne prive JAMAIS les autres
+            echecs[lg["fd_code"]] = str(exc)[:200]
+    for fd, e in sorted(echecs.items()):
+        print(f"[scores] ÉCHEC {fd} : {e}")
+    return n, echecs

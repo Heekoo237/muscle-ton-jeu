@@ -10,6 +10,21 @@ est ainsi isolé et journalisé À PART du collecteur (ligne « [settle-scores] 
 Le règlement lui-même (comparer le score au marché) et l'envoi vivent côté app : ce
 job n'écrit que des scores en base (règle d'archi n°4 : le fournisseur reste dans
 provider.py, un seul service). L'app lit ensuite la base, gratuitement.
+
+LIMITE DOCUMENTÉE — le fournisseur ne score pas TOUTES les compétitions qu'il price.
+The Odds API vend des COTES pour ~44 compétitions foot, mais son endpoint `/scores` ne
+couvre pas les mêmes : certaines compétitions (surtout des divisions inférieures /
+coupes, donc en régime « cote seule ») ont des cotes mais AUCUN score. Pour ces
+matchs-là, `finished` n'arrive jamais — le ticket ne peut pas être réglé, quoi qu'on
+fasse. Ce n'est pas un bug de notre pipeline : c'est une frontière de la donnée, comme
+`hors_couverture` l'est pour les cotes. Conséquences assumées :
+  - le rafraîchissement des scores est ISOLÉ par ligue (sync.refresh_scores) : une
+    compétition non scorée (ou qui lève) ne prive JAMAIS les autres de leurs scores ;
+  - côté app, un ticket dont le dernier match réglable est passé depuis > 5 j sans
+    score passe au statut honnête « résultat indisponible » (domain/settle :
+    resultatIntrouvable) — on ne le laisse pas « en attente » à vie ;
+  - la surveillance (health.py) alerte si une MÊME ligue échoue de façon récurrente,
+    pour distinguer une vraie panne (clé morte) d'une compétition simplement non scorée.
 """
 from __future__ import annotations
 

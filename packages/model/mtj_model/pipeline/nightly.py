@@ -210,7 +210,7 @@ def _close_run(con, run_id: int, statut: str, fixtures: int, detail: dict, erreu
         )
 
 
-def _sync_via_provider(con, days: int) -> None:
+def _sync_via_provider(con, days: int) -> tuple[int | None, dict[str, str]]:
     """Étape 1-2 : rafraîchir les RÉSULTATS récents via le fournisseur (règle n°4),
     pour que les forces d'équipes soient à jour. Le calendrier et les cotes sont
     déjà amenés par le collecteur. Sans fournisseur branché, on saute — les
@@ -222,12 +222,12 @@ def _sync_via_provider(con, days: int) -> None:
     provider = get_provider()
     if isinstance(provider, NullProvider):
         print("Fournisseur non branché : synchro des résultats ignorée (base lue telle quelle).")
-        return None
+        return None, {}
     from .sync import refresh_scores  # import tardif : la synchro réelle vit à part
-    refresh_scores(con, provider, days_from=3)
+    _, echecs = refresh_scores(con, provider, days_from=3)
     # Coût MESURÉ (en-têtes fournisseur), pas supposé : c'est le SEUL poste payant du
     # nocturne (le calcul, lui, ne lit que la base). De quoi chiffrer une planification.
-    return getattr(provider, "credits_used", None)
+    return getattr(provider, "credits_used", None), echecs
 
 
 # Au-delà de ce taux de matchs sautés (toutes ligues EN FENÊTRE confondues), le run
@@ -301,7 +301,7 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
     with connect() as con:
         run_id = _open_run(con, jour)
         try:
-            credits_sync = _sync_via_provider(con, days)
+            credits_sync, scores_echecs = _sync_via_provider(con, days)
             upcoming = _fetch_upcoming(con, days)
             history = _fetch_history(con)
             fixture_ids = [int(x) for x in upcoming["fixture_id"].tolist()] if not upcoming.empty else []
@@ -376,6 +376,11 @@ def run_nightly(days: int = DEFAULT_DAYS, jour: date | None = None) -> dict:
             journal["couverture"] = couverture
             journal["couverture_resume"] = resume_cv
             journal["credits_sync"] = credits_sync  # coût mesuré du run (traçable dans le temps)
+            # Ligues dont le rafraîchissement des scores a échoué cette nuit (isolées, non
+            # fatales). Persisté pour détecter une RÉCURRENCE (surveillance) : une ligue qui
+            # échoue chaque nuit est un vrai problème (clé morte, alias en collision).
+            if scores_echecs:
+                journal["scores_echecs"] = scores_echecs
             repli_rates = _repli_rates(repli)
             if repli_rates:
                 journal["repli_marches"] = repli_rates
