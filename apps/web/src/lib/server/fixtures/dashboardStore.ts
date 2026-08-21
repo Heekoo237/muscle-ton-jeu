@@ -7,7 +7,7 @@
  * gagné », aucun taux de réussite personnel, aucun gain.
  */
 import { listAnalysedTickets, type StoredTicket } from './ticketStore';
-import { settleMarket, isSettleable } from '$lib/server/domain/settle';
+import { settleMarket, isSettleable, resultatIntrouvable } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { Fixture, Market } from '$lib/types';
 
@@ -40,13 +40,20 @@ export interface DashboardData {
 	analysed: StoredTicket[];
 	upcoming: Fixture[];
 	finished: Fixture[];
+	/** Dates (ms) des matchs réglables — inclut ceux restés sans score (indisponibles). */
+	datesReglables: Map<number, number>;
 }
 export async function loadDashboardData(userId: number, upcoming: Fixture[]): Promise<DashboardData> {
 	const [analysed, finished] = await Promise.all([
 		listAnalysedTickets(userId),
 		sports.resultsSince(new Date(0).toISOString())
 	]);
-	return { analysed, upcoming, finished };
+	// Dates des matchs réglables (pour distinguer « en attente » de « introuvable »).
+	const ids = [
+		...new Set(analysed.flatMap((t) => t.selections.filter(isSettleable).map((s) => s.fixtureId as number)))
+	];
+	const datesReglables = await sports.fixtureDates(ids);
+	return { analysed, upcoming, finished, datesReglables };
 }
 
 /**
@@ -83,15 +90,25 @@ export function dashboardStats(data: DashboardData): DashboardStats {
 	// (repli avant le passage du cron). On ne compte que les tickets qui PEUVENT être
 	// réglés (au moins un match réglable) — sinon ni réglé ni en attente.
 	const finishedIds = new Set(finished.map((f) => f.id));
+	const { datesReglables } = data;
+	const nowMs = Date.now();
 	let ticketsRegles = 0;
 	let ticketsEnAttente = 0;
 	for (const t of analysed) {
 		const regleStocke = t.resultatOriginale === 'passe' || t.resultatOriginale === 'tombe';
 		const reglables = t.selections.filter(isSettleable);
-		if (reglables.length === 0 && !regleStocke) continue;
+		if (reglables.length === 0 && !regleStocke) continue; // rien à régler : hors compte
 		const tousTermines = reglables.length > 0 && reglables.every((s) => finishedIds.has(s.fixtureId as number));
-		if (regleStocke || tousTermines) ticketsRegles += 1;
-		else ticketsEnAttente += 1;
+		if (regleStocke || tousTermines) {
+			ticketsRegles += 1;
+			continue;
+		}
+		// Résultat introuvable (dernier match passé depuis > 5 j, sans score) : ne se
+		// réglera jamais → ni réglé ni « en attente » (ne pas gonfler l'attente à vie).
+		const kicks = reglables.map((s) => datesReglables.get(s.fixtureId as number)).filter((d): d is number => d != null);
+		const dernier = kicks.length ? Math.max(...kicks) : null;
+		if (resultatIntrouvable(dernier, nowMs)) continue;
+		ticketsEnAttente += 1;
 	}
 
 	return { ticketsAnalyses, fragilesMarques, fragilesTombes, ticketsRegles, ticketsEnAttente };

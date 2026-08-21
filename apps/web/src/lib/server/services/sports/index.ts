@@ -29,6 +29,12 @@ export interface SportsDataService {
 	teams(): Promise<Team[]>;
 	/** Résultats terminés depuis une date, pour le règlement des tickets. */
 	resultsSince(sinceIso: string): Promise<Fixture[]>;
+	/**
+	 * Date de coup d'envoi (ms) par fixtureId, quel que soit le statut. Sert à dater un
+	 * match dont on n'a PAS le score (resté `scheduled` alors qu'il est passé) — invisible
+	 * de `resultsSince` (terminés) comme d'`upcomingFixtures` (à venir).
+	 */
+	fixtureDates(ids: number[]): Promise<Map<number, number>>;
 	/** Compétitions du catalogue (page publique /couverture). Lu, jamais en dur. */
 	coveredCompetitions(): Promise<CoverageEntry[]>;
 }

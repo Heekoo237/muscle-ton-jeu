@@ -5,6 +5,8 @@ import {
 	settleReinforced,
 	settleTicket,
 	verdictAffiche,
+	resultatIntrouvable,
+	DELAI_RESULTAT_INTROUVABLE_JOURS,
 	type FinalScore
 } from './settle';
 import type { Market, Selection } from '$lib/types';
@@ -132,5 +134,28 @@ describe('verdictAffiche — le verdict persisté prime sur le recalcul', () => 
 		expect(verdictAffiche(null, 'en_attente')).toBe('en_attente');
 		// 'en_attente' stocké n'est pas une valeur posée par le cron : traité comme absent.
 		expect(verdictAffiche('en_attente', 'passe')).toBe('passe');
+	});
+});
+
+describe('resultatIntrouvable — un score qui ne viendra jamais', () => {
+	const JOUR = 86_400_000;
+	const now = 1_700_000_000_000;
+
+	it('vrai quand le dernier match réglable est passé au-delà du délai', () => {
+		const vieux = now - (DELAI_RESULTAT_INTROUVABLE_JOURS + 1) * JOUR;
+		expect(resultatIntrouvable(vieux, now)).toBe(true);
+	});
+
+	it('faux tant qu’on est dans le délai (score encore possible)', () => {
+		const recent = now - (DELAI_RESULTAT_INTROUVABLE_JOURS - 1) * JOUR;
+		expect(resultatIntrouvable(recent, now)).toBe(false);
+	});
+
+	it('faux sans date de match connue', () => {
+		expect(resultatIntrouvable(null, now)).toBe(false);
+	});
+
+	it('le délai dépasse la fenêtre /scores du fournisseur (3 j)', () => {
+		expect(DELAI_RESULTAT_INTROUVABLE_JOURS).toBeGreaterThan(3);
 	});
 });

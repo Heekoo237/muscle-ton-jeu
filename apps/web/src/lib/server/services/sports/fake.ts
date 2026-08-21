@@ -35,6 +35,12 @@ export class FakeSportsData implements SportsDataService {
 		return []; // aucun résultat terminé dans le jeu factice
 	}
 
+	async fixtureDates(ids: number[]): Promise<Map<number, number>> {
+		const out = new Map<number, number>();
+		for (const f of fakeFixtures()) if (ids.includes(f.id)) out.set(f.id, Date.parse(f.dateUtc));
+		return out;
+	}
+
 	async coveredCompetitions(): Promise<CoverageEntry[]> {
 		// Jeu factice représentatif : quelques ligues mesurées + une coupe active et
 		// une inactive, pour exercer la page /couverture en local.

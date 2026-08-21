@@ -68,7 +68,8 @@ export const load: PageServerLoad = async (event) => {
 		section('dashboard-data', () => loadDashboardData(session.userId, upcoming), {
 			analysed: [],
 			upcoming,
-			finished: []
+			finished: [],
+			datesReglables: new Map<number, number>()
 		}),
 		section('historique', () => listHistoryMarquee(40), [] as Awaited<ReturnType<typeof listHistoryMarquee>>)
 	]);

@@ -25,6 +25,7 @@
 						<span class="t-h3">{jour.format(new Date(l.dateMs))} · {l.nbMatchs} match{l.nbMatchs > 1 ? 's' : ''}</span>
 						{#if l.statut === 'attente'}<span class="badge">En attente</span>{/if}
 						{#if l.statut === 'sans_reglement'}<span class="badge">Rien à régler</span>{/if}
+						{#if l.statut === 'indisponible'}<span class="badge">Résultat indisponible</span>{/if}
 					</div>
 
 					<span class="dit t-small">
@@ -41,6 +42,11 @@
 						{/if}
 					{:else if l.statut === 'sans_reglement'}
 						<span class="dit t-body">Aucun match analysable — rien à régler.</span>
+					{:else if l.statut === 'indisponible'}
+						<span class="dit t-body">On n'a pas pu récupérer le résultat de ce match.</span>
+						{#if l.verdictDateMs != null}
+							<span class="dit t-small">Joué le {jour.format(new Date(l.verdictDateMs))}</span>
+						{/if}
 					{:else if l.statut === 'passe'}
 						<span class="passe t-body">Ton ticket est passé</span>
 						{#if l.verdictDateMs != null}

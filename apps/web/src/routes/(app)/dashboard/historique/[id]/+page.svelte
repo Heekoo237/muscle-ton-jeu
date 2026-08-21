@@ -57,6 +57,18 @@
 		<p class="t-small sous">{dateLabel} · {data.nbMatchs} match{data.nbMatchs > 1 ? 's' : ''} · consultable à vie</p>
 	</div>
 
+	{#if data.verdict === 'indisponible' || data.verdict === 'sans_reglement'}
+		<!-- Statut honnête : le ticket ne se réglera jamais. On le DIT, on ne le laisse
+		     pas « en attente » à vie. -->
+		<div class="bilan neutre" role="status">
+			<p class="bilan-txt">
+				{data.verdict === 'indisponible'
+					? "On n'a pas pu récupérer le résultat de ce match. Il ne sera pas réglé."
+					: 'Aucun match analysable dans ce ticket — rien à régler.'}
+			</p>
+		</div>
+	{/if}
+
 	{#if regle}
 		<!-- Verdict du ticket réglé : la première chose vue en arrivant depuis la
 		     notification. « Le renforcé serait passé » est mis en avant. -->
@@ -158,6 +170,9 @@
 		padding: var(--s-4) var(--s-5);
 		border-radius: var(--r-md);
 		border: 1px solid var(--c-line);
+	}
+	.bilan.neutre {
+		background: var(--c-canvas-sunk);
 	}
 	.bilan.passe {
 		background: var(--c-vert-wash);

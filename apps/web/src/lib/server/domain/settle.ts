@@ -132,6 +132,27 @@ export function settleTicket(selections: Selection[], scores: Map<number, FinalS
 }
 
 /**
+ * Délai au-delà duquel un ticket EN ATTENTE dont le dernier match réglable est passé
+ * mais toujours sans score est déclaré « résultat introuvable ». Choisi > à la fenêtre
+ * `/scores` du fournisseur (3 jours) : passé ce délai, le score ne viendra jamais, et
+ * faire patienter l'utilisateur « en attente » à vie serait mentir. La marge (5 j vs 3 j)
+ * couvre un match simplement scoré en retard ou une nuit de surveillance manquée.
+ */
+export const DELAI_RESULTAT_INTROUVABLE_JOURS = 5;
+
+/**
+ * Un ticket en attente est-il « introuvable » ? Vrai si le DERNIER coup d'envoi de ses
+ * sélections réglables est passé depuis plus de `delaiJours` (le score aurait dû arriver).
+ */
+export function resultatIntrouvable(
+	dernierKickoffMs: number | null,
+	nowMs: number,
+	delaiJours: number = DELAI_RESULTAT_INTROUVABLE_JOURS
+): boolean {
+	return dernierKickoffMs != null && dernierKickoffMs < nowMs - delaiJours * 86_400_000;
+}
+
+/**
  * Verdict d'AFFICHAGE. Le verdict PERSISTÉ par le règlement (cron) est la source de
  * vérité : dès qu'il vaut « passe »/« tombe », il prime. Le recalcul en direct n'est
  * qu'un REPLI pour la fenêtre ≤ 6 h entre la fin des matchs et le passage du cron —

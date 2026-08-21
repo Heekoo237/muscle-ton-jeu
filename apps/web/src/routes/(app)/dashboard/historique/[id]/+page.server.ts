@@ -5,7 +5,13 @@ import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
 import { isAnalysable } from '$lib/server/domain/ticket';
-import { settleTicket, verdictAffiche, type FinalScore } from '$lib/server/domain/settle';
+import {
+	settleTicket,
+	verdictAffiche,
+	isSettleable,
+	resultatIntrouvable,
+	type FinalScore
+} from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { ExplicationVM, LineVM, TicketResult } from '$lib/types';
 
@@ -81,7 +87,22 @@ export const load: PageServerLoad = async (event) => {
 	// SOURCE DE VÉRITÉ : le verdict persisté par le règlement prime ; le recalcul ne
 	// sert qu'à la fenêtre ≤ 6 h avant le cron, et à situer « tombé sur ce match ».
 	const verdictOriginale = verdictAffiche(ticket.resultatOriginale, v.originale);
-	const verdict: 'attente' | TicketResult = verdictOriginale;
+
+	// Statut honnête quand le ticket ne se réglera jamais : soit rien de réglable, soit
+	// un score qui n'arrivera plus (dernier match réglable passé depuis > 5 j, sans score).
+	const reglables = ticket.selections.filter(isSettleable);
+	let statutTerminal: 'sans_reglement' | 'indisponible' | null = null;
+	if (verdictOriginale === 'en_attente') {
+		if (reglables.length === 0) statutTerminal = 'sans_reglement';
+		else {
+			const dates = await sports.fixtureDates(reglables.map((s) => s.fixtureId as number));
+			const dernier = [...dates.values()];
+			const dernierKickoff = dernier.length ? Math.max(...dernier) : null;
+			if (resultatIntrouvable(dernierKickoff, Date.now())) statutTerminal = 'indisponible';
+		}
+	}
+	const verdict: 'attente' | 'sans_reglement' | 'indisponible' | TicketResult =
+		statutTerminal ?? verdictOriginale;
 	const tombeSur =
 		verdictOriginale === 'tombe' && v.premierPerduOrdre != null
 			? (ticket.selections.find((s) => s.ordre === v.premierPerduOrdre)?.matchLabel ?? null)

@@ -113,6 +113,19 @@ export class SupabaseSportsData implements SportsDataService {
 		}));
 	}
 
+	async fixtureDates(ids: number[]): Promise<Map<number, number>> {
+		const out = new Map<number, number>();
+		if (ids.length === 0) return out;
+		const { data, error } = await supabaseAdmin()
+			.from('fixtures')
+			.select('id, date_utc')
+			.in('id', ids);
+		if (error) throw error;
+		for (const r of (data ?? []) as { id: number; date_utc: string | null }[])
+			if (r.date_utc) out.set(Number(r.id), Date.parse(r.date_utc));
+		return out;
+	}
+
 	async resultsSince(sinceIso: string): Promise<Fixture[]> {
 		const { data, error } = await supabaseAdmin()
 			.from('fixtures')

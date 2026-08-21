@@ -59,6 +59,10 @@ export interface ReglementDiag {
 		parRegime: { modele: number; cote_seule: number; inconnu: number };
 		horsFenetre3j: number;
 		dansFenetre3j: number;
+		/** Par compétition, avec son RANG dans la boucle (ordre alphabétique fd_code) :
+		 *  si les bloquées se groupent en fin de boucle → abandon de boucle ; si elles se
+		 *  dispersent quel que soit le rang → le fournisseur ne les score pas. */
+		parCompetition: { fdCode: string; regime: string; count: number; rang: number | null; surTotalActives: number }[];
 	};
 }
 
@@ -225,7 +229,13 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 
 	// AMPLEUR système : tous les matchs `scheduled` dont le coup d'envoi est passé
 	// depuis > 3 h — un score qui n'est jamais arrivé. Indépendant des tickets.
-	const matchsBloquesGlobal = { total: 0, parRegime: { modele: 0, cote_seule: 0, inconnu: 0 }, horsFenetre3j: 0, dansFenetre3j: 0 };
+	const matchsBloquesGlobal = {
+		total: 0,
+		parRegime: { modele: 0, cote_seule: 0, inconnu: 0 },
+		horsFenetre3j: 0,
+		dansFenetre3j: 0,
+		parCompetition: [] as ReglementDiag['matchsBloquesGlobal']['parCompetition']
+	};
 	const seuil3h = nowMs - 3 * 3_600_000;
 	const seuil3j = nowMs - 3 * 86_400_000;
 	const { data: bloq } = await db
@@ -250,17 +260,40 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 			const { data: cat } = await db.from('league_catalog').select('fd_code, regime').in('fd_code', refs);
 			for (const c of (cat ?? []) as { fd_code: string; regime: string }[]) regimeByRef.set(c.fd_code, c.regime);
 		}
+		// Rang dans la boucle = position alphabétique du fd_code parmi TOUTES les ligues
+		// actives (la boucle refresh_scores ordonne par fd_code). Groupé en fin → abandon
+		// de boucle ; dispersé → le fournisseur ne score pas ces compétitions.
+		const { data: actives } = await db.from('leagues').select('provider_ref').eq('actif', true);
+		const refsActifs = [
+			...new Set(((actives ?? []) as { provider_ref: string | null }[]).map((l) => l.provider_ref).filter((x): x is string => !!x))
+		].sort();
+		const rangDe = new Map(refsActifs.map((ref, i) => [ref, i + 1]));
+
+		const parComp = new Map<string, { regime: string; count: number }>();
 		for (const r of bloqRows) {
 			matchsBloquesGlobal.total += 1;
 			const ref = r.league_id != null ? refByLeague.get(Number(r.league_id)) : undefined;
-			const regime = ref ? regimeByRef.get(ref) : undefined;
+			const regime = ref ? (regimeByRef.get(ref) ?? 'inconnu') : 'inconnu';
 			if (regime === 'modele') matchsBloquesGlobal.parRegime.modele += 1;
 			else if (regime === 'cote_seule') matchsBloquesGlobal.parRegime.cote_seule += 1;
 			else matchsBloquesGlobal.parRegime.inconnu += 1;
 			const d = r.date_utc ? Date.parse(r.date_utc) : null;
 			if (d != null && d < seuil3j) matchsBloquesGlobal.horsFenetre3j += 1;
 			else matchsBloquesGlobal.dansFenetre3j += 1;
+			const cle = ref ?? '(inconnu)';
+			const cur = parComp.get(cle) ?? { regime, count: 0 };
+			cur.count += 1;
+			parComp.set(cle, cur);
 		}
+		matchsBloquesGlobal.parCompetition = [...parComp.entries()]
+			.map(([fdCode, v]) => ({
+				fdCode,
+				regime: v.regime,
+				count: v.count,
+				rang: rangDe.get(fdCode) ?? null,
+				surTotalActives: refsActifs.length
+			}))
+			.sort((a, b) => (a.rang ?? 1e9) - (b.rang ?? 1e9));
 	}
 
 	return {

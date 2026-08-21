@@ -1,7 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { listAnalysedTickets } from '$lib/server/fixtures/ticketStore';
-import { settleTicket, verdictAffiche, isSettleable, type FinalScore } from '$lib/server/domain/settle';
+import {
+	settleTicket,
+	verdictAffiche,
+	isSettleable,
+	resultatIntrouvable,
+	type FinalScore
+} from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import { DEMO_MODE, demoHistoLignes } from '$lib/server/demo';
 
@@ -10,8 +16,11 @@ export interface HistoLine {
 	dateMs: number;
 	nbMatchs: number;
 	nbFragiles: number;
-	/** `sans_reglement` : aucune sélection réglable — rien qu'un score puisse décider. */
-	statut: 'attente' | 'passe' | 'tombe' | 'sans_reglement';
+	/**
+	 * `sans_reglement` : aucune sélection réglable — rien qu'un score puisse décider.
+	 * `indisponible` : match(s) réglable(s) passé(s) depuis longtemps, score jamais arrivé.
+	 */
+	statut: 'attente' | 'passe' | 'tombe' | 'sans_reglement' | 'indisponible';
 	/** Premier coup d'envoi (état « en attente »). */
 	kickoffMs: number | null;
 	/** Date à laquelle le ticket a été réglé (dernier match terminé), état passé/tombé. */
@@ -36,6 +45,18 @@ export const load: PageServerLoad = async (event) => {
 	const dateOf = new Map<number, number>();
 	for (const f of upcoming) dateOf.set(f.id, Date.parse(f.dateUtc));
 	for (const f of finished) dateOf.set(f.id, Date.parse(f.dateUtc));
+	// Dates des matchs réglables restés SANS score (scheduled, coup d'envoi passé) : ni
+	// dans `upcoming` (à venir) ni dans `finished` (terminés). Sans elles, impossible de
+	// dire qu'un résultat est « introuvable » (le score ne viendra jamais).
+	const idsReglables = [
+		...new Set(
+			tickets.flatMap((t) => t.selections.filter(isSettleable).map((s) => s.fixtureId as number))
+		)
+	].filter((id) => !dateOf.has(id));
+	if (idsReglables.length > 0) {
+		const dates = await sports.fixtureDates(idsReglables);
+		for (const [id, ms] of dates) dateOf.set(id, ms);
+	}
 	const scores = new Map<number, FinalScore>();
 	for (const f of finished) {
 		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
@@ -73,6 +94,28 @@ export const load: PageServerLoad = async (event) => {
 		}
 
 		if (statutV === 'en_attente') {
+			const horairesReglables = t.selections
+				.filter(isSettleable)
+				.map((s) => dateOf.get(s.fixtureId as number))
+				.filter((d): d is number => d != null);
+			const dernierKickoff = horairesReglables.length ? Math.max(...horairesReglables) : null;
+
+			// Dernier match réglable passé depuis longtemps, toujours sans score → le score
+			// ne viendra jamais (hors fenêtre /scores). Statut honnête plutôt que « en attente ».
+			if (resultatIntrouvable(dernierKickoff, Date.now())) {
+				return {
+					id: t.id,
+					dateMs: t.creeLeMs,
+					nbMatchs,
+					nbFragiles,
+					statut: 'indisponible',
+					kickoffMs: null,
+					verdictDateMs: dernierKickoff,
+					tombeSur: null,
+					verdictRenforce: false
+				};
+			}
+
 			const horaires = analysables
 				.map((s) => (s.fixtureId != null ? dateOf.get(s.fixtureId) : undefined))
 				.filter((d): d is number => d != null);
