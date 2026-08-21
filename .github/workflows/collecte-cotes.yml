@@ -45,6 +45,7 @@ on:
           - echantillon           # relit predictions + état de source (lecture seule)
           - diag-totals           # diagnostic couverture plus/moins 2,5 (lecture fournisseur)
           - regler-scores         # sonde les scores des tickets en attente + déclenche le règlement/notifs (app)
+          - backfill-reglement    # RATTRAPAGE unique : règle les vieux tickets terminés hors fenêtre 7 j (app, silencieux, idempotent)
           - notif-matin           # déclenche le rendez-vous du matin (app), à la demande
 
 concurrency:
@@ -191,6 +192,18 @@ jobs:
           curl -fsS -X POST \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${MTJ_APP_URL%/}/api/cron/settle"
+
+      # ---- BACKFILL DU RÈGLEMENT (rattrapage manuel, unique) --------------
+      # Règle les tickets analysés non réglés dont les matchs sont terminés, SANS la
+      # borne de 7 jours du job régulier (qui laisse les vieux tickets en attente à vie).
+      # Silencieux (aucun push) et idempotent (resultat IS NULL) : relançable sans risque.
+      # La réponse JSON (candidats/réglés/enAttente/sansRéglable) s'imprime dans le log.
+      - name: Backfill du règlement (app, rattrapage unique)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'backfill-reglement'
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${MTJ_APP_URL%/}/api/cron/settle-backfill"
 
       # ---- RENDEZ-VOUS DU MATIN (7 h UTC = 8 h locale) ---------------------
       - name: Rendez-vous du matin (app)
