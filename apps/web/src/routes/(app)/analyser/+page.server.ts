@@ -79,6 +79,7 @@ export const actions: Actions = {
 		const images: ImageInput[] = [];
 		const hashes: string[] = [];
 		const seen = new Set<string>();
+		const diagImages: string[] = []; // trace de diagnostic : taille + intégrité par image
 		for (const f of files.slice(0, 3)) {
 			const bytes = new Uint8Array(await f.arrayBuffer());
 			const h = await sha256Hex(bytes);
@@ -87,8 +88,13 @@ export const actions: Actions = {
 			hashes.push(h);
 			const mime = ALLOWED_MIME.has(f.type) ? f.type : 'image/jpeg';
 			images.push({ mime, data: toBase64(bytes) });
+			diagImages.push(`${f.type || '?'} ${bytes.length}o ${imageIntegrite(bytes, f.type)}`);
 		}
 		const empreinte = await combinedEmpreinte(hashes);
+		// Trace de diagnostic (Vercel logs) : ce que le SERVEUR a réellement reçu — taille,
+		// type, intégrité du fichier (en-tête + marqueur de fin). Une capture tronquée à
+		// l'envoi (compression Android, réseau lent) se voit ICI, avant même la vision.
+		console.log(`[analyse] reçu ${images.length} image(s) : ${diagImages.join(' | ')}`);
 
 		// 3. Réutilisation : même capture récente (même utilisateur) → même ticket, sans
 		// relancer l'analyse ni refacturer. On la rend VISIBLE (`?reutilise=1`) : un
@@ -125,7 +131,14 @@ export const actions: Actions = {
 			console.error('[analyse] lecture indisponible:', e);
 			return fail(503, { erreur: 'indisponible' });
 		}
-		if (raw.echec) return fail(422, { erreur: raw.echec });
+		if (raw.echec) {
+			// REFUS de lecture : on journalise la raison AVEC les tailles/intégrité reçues.
+			// Un « pas_un_ticket » sur une image minuscule ou tronquée = corruption à
+			// l'envoi (pas le contenu) ; un refus sur une image saine et lourde = vrai
+			// jugement du modèle. Sans cette ligne, un refus est invisible dans les logs.
+			console.warn(`[analyse] REFUS ${raw.echec} — images: ${diagImages.join(' | ')}`);
+			return fail(422, { erreur: raw.echec });
+		}
 
 		// Trace de diagnostic : ce que la VISION a réellement extrait (texte brut),
 		// avant toute résolution. Permet de voir si un « à corriger » vient d'une
@@ -186,6 +199,28 @@ export const actions: Actions = {
 		redirect(303, '/analyser/validation');
 	}
 };
+
+/**
+ * Contrôle d'INTÉGRITÉ léger d'une image reçue, pour le diagnostic (jamais bloquant
+ * ici — on décrit, on ne refuse pas). Vérifie l'en-tête ET le marqueur de fin : une
+ * capture coupée à l'envoi (réseau lent, compression Android ratée) perd sa fin.
+ *   - JPEG : commence par FF D8, finit par FF D9.
+ *   - PNG  : signature 89 50 4E 47, finit par le chunk IEND.
+ * Renvoie « ok », « TRONQUÉE » (en-tête bon, fin absente) ou « en-tête? ».
+ */
+function imageIntegrite(b: Uint8Array, type: string): string {
+	const n = b.length;
+	if (type === 'image/jpeg' || (b[0] === 0xff && b[1] === 0xd8)) {
+		if (b[0] !== 0xff || b[1] !== 0xd8) return 'en-tête?';
+		return n >= 2 && b[n - 2] === 0xff && b[n - 1] === 0xd9 ? 'ok' : 'TRONQUÉE';
+	}
+	if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+		// IEND = 49 45 4E 44 suivi de son CRC (4 o) — on cherche la signature près de la fin.
+		const finOk = n >= 8 && b[n - 8] === 0x49 && b[n - 7] === 0x45 && b[n - 6] === 0x4e && b[n - 5] === 0x44;
+		return finOk ? 'ok' : 'TRONQUÉE';
+	}
+	return 'en-tête?';
+}
 
 /** base64 d'un buffer, sans dépendre de Buffer (Node comme edge). */
 function toBase64(bytes: Uint8Array): string {
