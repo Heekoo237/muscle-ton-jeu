@@ -153,7 +153,10 @@ export const actions: Actions = {
 			const contenuRefuse = raw.echec === 'pas_un_ticket' || raw.echec === 'illisible';
 			const erreur = contenuRefuse && imageDouteuse ? 'incomplete' : raw.echec;
 			console.warn(`[analyse] REFUS ${erreur} (vision:${raw.echec}) — images: ${diagImages.join(' | ')}`);
-			await recordVisionRefus(erreur).catch(() => {});
+			// « incomplete » (capture tronquée) est suivi via les compteurs de RÉESSAI côté
+			// client, PAS ici : sinon chaque tentative d'un même utilisateur compterait
+			// comme un refus distinct. On ne journalise en refus que le vrai « pas un ticket ».
+			if (erreur !== 'incomplete') await recordVisionRefus(erreur).catch(() => {});
 			return fail(422, { erreur });
 		}
 

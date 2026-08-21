@@ -316,12 +316,18 @@ def _vision_refus_rate(cur, alerts: list[str]) -> None:
     try:
         cur.execute("select raison, n from vision_refus where jour = current_date")
         refus = {str(r[0]): int(r[1]) for r in cur.fetchall()}
-        cur.execute("select coalesce(tickets, 0) from vision_stats where jour = current_date")
+        cur.execute(
+            "select coalesce(tickets, 0), coalesce(uploads_essai2_echec, 0) "
+            "from vision_stats where jour = current_date"
+        )
         row = cur.fetchone()
-    except Exception:  # noqa: BLE001 — table absente (migration non appliquée) : on saute
+    except Exception:  # noqa: BLE001 — table/colonne absente (migration non appliquée) : on saute
         return
     lus = int(row[0]) if row else 0
-    contenu = refus.get("pas_un_ticket", 0) + refus.get("illisible", 0) + refus.get("incomplete", 0)
+    upload_echec = int(row[1]) if row else 0
+    # « Bloqué à la porte » = vrai « pas un ticket » + upload échoué MALGRÉ le réessai.
+    # L'incomplet rattrapé par l'essai 2 n'est pas un refus, il ne compte pas ici.
+    contenu = refus.get("pas_un_ticket", 0) + refus.get("illisible", 0) + upload_echec
     tentatives = lus + contenu
     msg = vision_refus_alert(tentatives, contenu)
     if msg:

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { enhance, applyAction } from '$app/forms';
+	import { deserialize } from '$app/forms';
+	import { goto } from '$app/navigation';
+	import type { ActionResult } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
-	import { compressImage } from '$lib/compressImage';
+	import { compressImage, peutDecoder } from '$lib/compressImage';
 	import { libelleOffertes } from '$lib/offer';
 	import FlowHeader from '$lib/components/FlowHeader.svelte';
 	import LoadingCurtain from '$lib/components/LoadingCurtain.svelte';
@@ -16,6 +18,7 @@
 		pas_une_image: "Ce fichier n'est pas une image. Envoie une capture d'écran.",
 		illisible: "On n'arrive pas à lire. Réessaie ou saisis à la main.",
 		incomplete: "Ta capture n'est pas arrivée entière — ça arrive quand le réseau coupe. Renvoie-la, on garde ta photo.",
+		format_photo: "On n'arrive pas à lire ce type de photo. Fais plutôt une capture d'écran de ton ticket.",
 		manuscrit: 'On lit les captures d’écran, pas les tickets papier.',
 		pas_un_ticket: "Cette image n'est pas un ticket. Envoie la capture de ton ticket.",
 		indisponible: 'La lecture est momentanément indisponible. Réessaie, ou écris au support.',
@@ -69,11 +72,18 @@
 			clear(i);
 			return;
 		}
-		localErreur = null;
-		if (previews[i]) URL.revokeObjectURL(previews[i]!);
-		previews[i] = URL.createObjectURL(file); // aperçu immédiat depuis l'original
 		busy += 1;
 		try {
+			// Le navigateur sait-il décoder cette photo ? (HEIC iPhone sur Chrome Android
+			// = non). Si non, inutile de l'envoyer : la vision ne la lira pas non plus.
+			if (!(await peutDecoder(file))) {
+				localErreur = ERREURS.format_photo;
+				clear(i);
+				return;
+			}
+			localErreur = null;
+			if (previews[i]) URL.revokeObjectURL(previews[i]!);
+			previews[i] = URL.createObjectURL(file); // aperçu immédiat depuis l'original
 			compressed[i] = await compressImage(file); // réduit avant envoi (forfait data)
 		} finally {
 			busy -= 1;
@@ -93,6 +103,106 @@
 	// répond très vite (vision factice en local). Ce n'est pas une fausse
 	// progression : les ÉTAPES, elles, n'avancent que sur de vrais événements.
 	const MIN_VISIBLE = 600;
+
+	// ── Envoi ROBUSTE : réessai automatique sur réseau instable ──────────────────
+	// Notre marché est l'Afrique : connexion qui coupe, Android d'entrée de gamme.
+	// Un envoi qui casse ne doit PAS renvoyer l'utilisateur au geste initial. On
+	// réessaie tout seul (2 essais), l'essai 2 avec une compression PLUS DOUCE au cas
+	// où c'est notre compression qui a dégradé la lisibilité. On le DIT pendant l'attente.
+	const MAX_ESSAIS = 2;
+	let essai = $state(0); // 0 = pas en cours ; 1/2 = numéro de l'essai affiché
+
+	// Précision : pendant l'essai 2, on le DIT et on donne un ordre de grandeur du
+	// temps — un utilisateur qui attend sans signal croit que c'est planté.
+	const curtainHint = $derived(
+		essai >= 2
+			? 'On réessaie une dernière fois — ça peut prendre jusqu’à quinze secondes.'
+			: 'On garde ton ticket. Ça arrive.'
+	);
+
+	/** Recompresse les originaux plus DOUCEMENT (plus grand, meilleure qualité). */
+	async function recompresserDoux() {
+		for (const i of SLOTS) {
+			const f = inputs[i]?.files?.[0];
+			if (f) compressed[i] = await compressImage(f, 1800, 0.85);
+		}
+	}
+
+	function construireFormData(): FormData {
+		const fd = new FormData();
+		for (const i of SLOTS) {
+			if (compressed[i]) fd.set(`capture_${i}`, compressed[i]!, `capture_${i}.jpg`);
+			else if (inputs[i]?.files?.[0]) fd.set(`capture_${i}`, inputs[i]!.files![0]);
+		}
+		return fd;
+	}
+
+	/** Télémétrie best-effort : a-t-on eu besoin de l'essai 2, a-t-il échoué ? */
+	function beaconRetry(echec: boolean) {
+		fetch('/api/analyse-retry', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ echec }),
+			keepalive: true
+		}).catch(() => {});
+	}
+
+	async function soumettre(e: SubmitEvent) {
+		e.preventDefault();
+		if (reading || busy > 0) return;
+		const form = e.currentTarget as HTMLFormElement;
+		const action = form.action;
+		reading = true;
+		step = 0;
+		essai = 0;
+		localErreur = null;
+		const started = Date.now();
+		let derniereErreur: string | null = null;
+
+		for (let n = 1; n <= MAX_ESSAIS; n++) {
+			essai = n;
+			if (n === 2) await recompresserDoux();
+			const fd = construireFormData();
+			let result: ActionResult | null = null;
+			try {
+				const res = await fetch(action, {
+					method: 'POST',
+					body: fd,
+					headers: { 'x-sveltekit-action': 'true' }
+				});
+				result = deserialize(await res.text());
+			} catch {
+				result = null; // coupure réseau : l'envoi n'a pas abouti
+			}
+
+			if (result?.type === 'redirect') {
+				if (n === 2) beaconRetry(false); // l'essai 2 a sauvé l'analyse
+				const attente = Math.max(0, MIN_VISIBLE - (Date.now() - started));
+				if (attente) await new Promise((r) => setTimeout(r, attente));
+				goto(result.location); // succès → validation / résultat
+				return;
+			}
+
+			derniereErreur = result?.type === 'failure' ? String(result.data?.erreur ?? '') : 'reseau';
+			// Seuls une coupure réseau ou une capture incomplète méritent un réessai :
+			// un vrai « pas un ticket » ne s'arrangera pas en renvoyant la même image.
+			const reessayable = derniereErreur === 'incomplete' || derniereErreur === 'reseau';
+			if (reessayable && n < MAX_ESSAIS) {
+				await new Promise((r) => setTimeout(r, 1000)); // léger répit avant l'essai 2
+				continue;
+			}
+			break;
+		}
+
+		// Échec définitif.
+		if (essai === 2) beaconRetry(true); // a réessayé, a quand même échoué
+		reading = false;
+		essai = 0;
+		const reseauOuIncomplet = derniereErreur === 'reseau' || derniereErreur === 'incomplete';
+		localErreur = reseauOuIncomplet
+			? ERREURS.incomplete
+			: (ERREURS[derniereErreur ?? 'illisible'] ?? ERREURS.illisible);
+	}
 </script>
 
 <svelte:head>
@@ -115,29 +225,7 @@
 		<p class="erreur t-body" role="alert">{localErreur ?? erreurMsg}</p>
 	{/if}
 
-	<form
-		method="POST"
-		enctype="multipart/form-data"
-		use:enhance={({ formData }) => {
-			// Envoyer les versions COMPRESSÉES prêtes ; à défaut, l'original reste
-			// dans formData (jamais de refus, seulement plus léger quand on peut).
-			for (const i of SLOTS) {
-				if (compressed[i]) formData.set(`capture_${i}`, compressed[i]!, `capture_${i}.jpg`);
-			}
-			reading = true;
-			step = 0; // « On lit ta capture » — vraie durée de l'appel vision
-			const started = Date.now();
-			return async ({ result }) => {
-				// Réponse reçue : la lecture est faite, les matchs sont reconnus.
-				step = 1;
-				const wait = Math.max(0, MIN_VISIBLE - (Date.now() - started));
-				if (wait) await new Promise((r) => setTimeout(r, wait));
-				// Échec (lecture impossible) : on rend la main pour réessayer.
-				if (result.type !== 'redirect') reading = false;
-				await applyAction(result);
-			};
-		}}
-	>
+	<form method="POST" enctype="multipart/form-data" onsubmit={soumettre}>
 		<div class="slots">
 			{#each SLOTS as i (i)}
 				<div class="slot" class:filled={previews[i]}>
@@ -197,7 +285,7 @@
 
 {#if reading}
 	<!-- Rideau de lecture : étapes RÉELLES + fond « CHARGEMENT » animé (§5). -->
-	<LoadingCurtain steps={STEPS} current={step} />
+	<LoadingCurtain steps={STEPS} current={step} hint={curtainHint} />
 {/if}
 
 <style>

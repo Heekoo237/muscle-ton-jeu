@@ -9,7 +9,9 @@
     { "table": "selections", "column": "match_label", "migration": "0002" },
     { "table": "selections", "column": "libelle_fr", "migration": "0002" },
     { "table": "transactions", "column": "reference", "migration": "0013" },
-    { "table": "ondemand_calls", "column": "raison", "migration": "0021" }
+    { "table": "ondemand_calls", "column": "raison", "migration": "0021" },
+    { "table": "vision_stats", "column": "uploads_essai2", "migration": "0023" },
+    { "table": "vision_stats", "column": "uploads_essai2_echec", "migration": "0023" }
   ],
   "tables": [
     { "table": "rate_limits", "migration": "0015" },
@@ -23,6 +25,7 @@
     { "name": "debiter_credits", "migration": "0017" },
     { "name": "record_vision_read", "migration": "0011" },
     { "name": "record_vision_refus", "migration": "0022" },
+    { "name": "record_upload_retry", "migration": "0023" },
     { "name": "reserver_notification", "migration": "0012" },
     { "name": "ondemand_circuit_ouvert", "migration": "0020" }
   ]

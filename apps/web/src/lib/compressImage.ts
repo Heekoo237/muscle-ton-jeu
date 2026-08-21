@@ -36,6 +36,24 @@ async function seRedecode(blob: Blob): Promise<boolean> {
 	}
 }
 
+/**
+ * Le navigateur sait-il DÉCODER ce fichier ? Une photo iPhone en HEIC ouverte sur
+ * Chrome Android répond NON : ni notre compression (canvas) ni la vision ne la liront.
+ * Autant le dire tout de suite plutôt que d'envoyer un fichier voué au refus. Utilise
+ * le MÊME décodeur (`Image`) que la compression, pour que les deux soient d'accord.
+ */
+export async function peutDecoder(file: File): Promise<boolean> {
+	const url = URL.createObjectURL(file);
+	try {
+		const img = await loadImage(url);
+		return img.naturalWidth > 0 && img.naturalHeight > 0;
+	} catch {
+		return false;
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+}
+
 export async function compressImage(file: File, maxDim = 1400, quality = 0.7): Promise<Blob> {
 	const url = URL.createObjectURL(file);
 	try {
