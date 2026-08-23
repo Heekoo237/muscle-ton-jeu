@@ -41,7 +41,7 @@
 							<span class="passe t-body">Coup d'envoi {kickoff(l.kickoffMs)}</span>
 						{/if}
 					{:else if l.statut === 'sans_reglement'}
-						<span class="dit t-body">Aucun match analysable — rien à régler.</span>
+						<span class="dit t-body">Aucun match à vérifier ici.</span>
 					{:else if l.statut === 'indisponible'}
 						<span class="dit t-body">On n'a pas pu récupérer le résultat de ce match.</span>
 						{#if l.verdictDateMs != null}

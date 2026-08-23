@@ -141,16 +141,24 @@
 					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
 					<p class="exp-texte">{e.texte}</p>
 					{#if e.autresIssues.length > 0}
-						<!-- Autres issues du même match : on MONTRE ce qu'on sait, on ne suggère
-						     jamais. Titre neutre, bloc sobre et subordonné (règle d'or n°3). -->
+						<!-- Sur ce match : les paris les plus probables, curatés (max 2, hors double
+						     chance, hors évidence). On MONTRE ce qu'on sait, jamais « joue ça »
+						     (règle d'or n°3). En régime cote, le titre le dit — pas de mesure sous-entendue. -->
 						<div class="autres">
-							<div class="autres-t">Si tu veux garder ce match</div>
+							<div class="autres-t">
+								{e.chancesCotes
+									? 'Sur ce match, d’après les cotes'
+									: 'Sur ce match, voici ce que disent les chances'}
+							</div>
 							{#each e.autresIssues as iss (iss.libelleFr)}
 								<div class="issue">
 									<span>{iss.libelleFr}</span>
 									<span class="issue-n">{pctBig(iss.probabilitePct)}</span>
 								</div>
 							{/each}
+							{#if e.chancesCotes}
+								<div class="autres-note">On n’a pas encore étudié ce championnat.</div>
+							{/if}
 						</div>
 					{/if}
 				</article>
@@ -176,8 +184,8 @@
 				<span class="cv-pct">{pctBig(vm.probaRenforceePct)}</span> — sur les {vm.nbAnalysables} match{vm.nbAnalysables
 					> 1
 					? 's'
-					: ''} analysé{vm.nbAnalysables > 1 ? 's' : ''}.{resumeAutres ? ` ${resumeAutres}.` : ''} Ton
-				ticket entier a moins de chances.
+					: ''} qu’on a pu lire.{resumeAutres ? ` ${resumeAutres}.` : ''} Ton ticket entier a moins de
+				chances.
 			</p>
 		{/if}
 	</div>
@@ -192,7 +200,7 @@
 				<div class="t-body">{resumeAutres}.</div>
 			{/if}
 			<p class="couvre t-body">
-				On analyse le résultat (1X2), la double chance, le plus/moins de buts et les deux
+				On analyse le résultat du match, la double chance, le plus/moins de buts et les deux
 				équipes marquent. Renvoie un ticket avec un de ces paris.
 			</p>
 			<p class="gratuit t-small">Ça ne t'a rien coûté.</p>
@@ -238,7 +246,7 @@
 									>{pctBig(l.probabilitePct)}</span
 								>{/if}
 						</div>
-						<div class="serre-note">On la garde, mais c'est serré.</div>
+						<div class="serre-note">On la garde, mais elle est juste au-dessus de notre barre.</div>
 					</div>
 				{/each}
 			</div>
@@ -295,7 +303,7 @@
 							{#if l.analysable && l.probabilitePct != null}
 								<span class="mpm-pct">{pctBig(l.probabilitePct)}</span>
 							{:else}
-								<span class="mpm-na">non analysé</span>
+								<span class="mpm-na">pas d’avis</span>
 							{/if}
 							<!-- l.analysable (règle unique) implique déjà probabilitePct != null ;
 							     le second test reste un garde-fou d'affichage inoffensif. -->
@@ -431,15 +439,21 @@
 		font-size: 0.9em;
 		margin-top: 2px;
 	}
+	/* « serré » : marqueur NEUTRE (gris), jamais l'ocre du fragile ni le barré du retiré.
+	   Un 4e état discret : gardé, mais juste au-dessus de la barre. */
 	.serre-tag {
 		font-size: 11px;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-		color: var(--c-ocre);
+		color: var(--c-ink-3);
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line);
+		border-radius: 999px;
+		padding: 1px 7px;
 		vertical-align: middle;
 	}
 	.mpm-card.serree {
-		border-left: 3px solid var(--c-ocre);
+		border-left: 3px solid var(--c-line-strong);
 	}
 	.analyse {
 		color: var(--c-ink-2);
@@ -525,6 +539,11 @@
 		font-family: var(--font-mono);
 		color: var(--c-ink-2);
 		font-feature-settings: 'tnum' 1;
+	}
+	.autres-note {
+		margin-top: var(--s-2);
+		font-size: 12px;
+		color: var(--c-ink-mute);
 	}
 
 	.verdict {

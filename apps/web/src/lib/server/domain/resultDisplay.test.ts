@@ -37,8 +37,8 @@ function p(marche: Market, probabilite: number) {
 	return { marche, probabilite };
 }
 
-describe('autresIssues — on MONTRE ce qui est en base, jamais un calcul', () => {
-	// Un match complet (modélisé) : 1X2 + double chance + totals en base.
+describe('autresIssues — les paris les plus probables, curatés (hors DC, hors évidence)', () => {
+	// Un match complet en base : 1X2 + double chance + plus/moins.
 	const complet = [
 		p('WIN_HOME', 0.116),
 		p('DRAW', 0.188),
@@ -46,28 +46,35 @@ describe('autresIssues — on MONTRE ce qui est en base, jamais un calcul', () =
 		p('DC_HOME_DRAW', 0.304),
 		p('DC_DRAW_AWAY', 0.884),
 		p('DC_HOME_AWAY', 0.812),
-		p('OVER_1_5', 0.77),
+		p('OVER_1_5', 0.77), // évidence (> 72 %) → écarté
 		p('OVER_2_5', 0.47),
 		p('UNDER_2_5', 0.53),
 		p('OVER_3_5', 0.24),
-		p('UNDER_3_5', 0.76),
+		p('UNDER_3_5', 0.76), // évidence → écarté
 		p('UNDER_1_5', 0.23)
 	];
 
-	it('1X2 joué → les deux autres 1X2 (proba desc) + la double chance la plus haute', () => {
-		const out = autresIssues('WIN_HOME', complet);
-		expect(out.map((i) => i.marche)).toEqual(['WIN_AWAY', 'DRAW', 'DC_DRAW_AWAY']);
-		expect(out.length).toBe(3);
+	it('montre les DEUX plus probables, hors double chance et hors évidence', () => {
+		// WIN_AWAY 0,696 puis UNDER_2_5 0,53. OVER_1_5 (0,77) et UNDER_3_5 (0,76) sont écartés.
+		expect(autresIssues('WIN_HOME', complet).map((i) => i.marche)).toEqual(['WIN_AWAY', 'UNDER_2_5']);
 	});
 
-	it('double chance jouée → les trois issues 1X2 (proba desc), pas d’autre DC', () => {
-		const out = autresIssues('DC_HOME_DRAW', complet);
-		expect(out.map((i) => i.marche)).toEqual(['WIN_AWAY', 'DRAW', 'WIN_HOME']);
+	it('JAMAIS de double chance, même la plus haute (le pari le moins parlant)', () => {
+		const out = autresIssues('WIN_HOME', complet).map((i) => i.marche);
+		expect(out.some((m) => m.startsWith('DC_'))).toBe(false);
 	});
 
-	it('plus/moins joué → complément (même seuil) puis même direction, seuil croissant', () => {
-		const out = autresIssues('OVER_2_5', complet);
-		expect(out.map((i) => i.marche)).toEqual(['UNDER_2_5', 'OVER_1_5', 'OVER_3_5']);
+	it('écarte l’ÉVIDENCE (> 72 %) : un quasi-certain n’est jamais montré en orientation', () => {
+		expect(autresIssues('WIN_HOME', complet).map((i) => i.marche)).not.toContain('OVER_1_5');
+	});
+
+	it('exclut le pari JOUÉ lui-même (il vient d’être retiré)', () => {
+		expect(autresIssues('WIN_AWAY', complet).map((i) => i.marche)).not.toContain('WIN_AWAY');
+	});
+
+	it('jamais un pari ET son complément ensemble (redondant)', () => {
+		const paire = [p('OVER_2_5', 0.6), p('UNDER_2_5', 0.4), p('WIN_HOME', 0.1)];
+		expect(autresIssues('WIN_HOME', paire).map((i) => i.marche)).toEqual(['OVER_2_5']);
 	});
 
 	it('cote seule (seul le 2,5 en base) → une seule autre issue, jamais inventée', () => {
@@ -75,28 +82,14 @@ describe('autresIssues — on MONTRE ce qui est en base, jamais un calcul', () =
 		expect(autresIssues('OVER_2_5', coteSeule).map((i) => i.marche)).toEqual(['UNDER_2_5']);
 	});
 
-	it('cote seule 1X2 (1X2 + DC dérivée) → les autres 1X2 + la DC la plus haute', () => {
-		const coteSeule = [
-			p('WIN_HOME', 0.12),
-			p('DRAW', 0.25),
-			p('WIN_AWAY', 0.63),
-			p('DC_HOME_DRAW', 0.37),
-			p('DC_DRAW_AWAY', 0.88),
-			p('DC_HOME_AWAY', 0.75)
-		];
-		expect(autresIssues('DRAW', coteSeule).map((i) => i.marche)).toEqual([
-			'WIN_AWAY',
-			'WIN_HOME',
-			'DC_DRAW_AWAY'
-		]);
-	});
-
-	it('jamais plus de trois lignes', () => {
+	it('jamais plus de DEUX', () => {
+		expect(MAX_AUTRES_ISSUES).toBe(2);
 		expect(autresIssues('WIN_HOME', complet).length).toBeLessThanOrEqual(MAX_AUTRES_ISSUES);
 	});
 
-	it('BTTS (suspendu, aucune proba) → aucune issue', () => {
-		expect(autresIssues('BTTS_YES', complet)).toEqual([]);
+	it('rien d’éligible (que de la DC / que de l’évidence) → VIDE (le bloc ne s’affiche pas)', () => {
+		const rienDeMontrable = [p('DC_HOME_DRAW', 0.8), p('OVER_1_5', 0.9)];
+		expect(autresIssues('WIN_HOME', rienDeMontrable)).toEqual([]);
 	});
 
 	it('déterministe : même entrée → même sortie', () => {
@@ -106,26 +99,24 @@ describe('autresIssues — on MONTRE ce qui est en base, jamais un calcul', () =
 	});
 });
 
-describe('INVARIANT — le bloc « Si tu veux garder ce match » ne se vide pas en silence', () => {
+describe('INVARIANT — le bloc « ce que disent les chances » ne se vide pas en silence', () => {
 	const preds = (m: [Market, number][]) => m.map(([marche, probabilite]) => ({ marche, probabilite }));
-	// Un match complet en base pour la fixture 10 (Rodez retiré à l'extérieur).
 	const parFixture = new Map<number, { marche: Market; probabilite: number }[]>([
 		[10, preds([['WIN_HOME', 0.55], ['DRAW', 0.25], ['WIN_AWAY', 0.2], ['DC_HOME_DRAW', 0.8]])]
 	]);
 
-	it('une ligne retirée dont le match a d’autres issues en base → du contenu', () => {
+	it('une ligne retirée dont le match a d’autres paris en base → du contenu (les 2 plus probables, hors DC)', () => {
 		const map = autresIssuesParRetrait([{ ordre: 3, marche: 'WIN_AWAY', fixtureId: 10 }], parFixture);
 		expect(map.get(3)?.length).toBeGreaterThan(0);
-		// Les voisins attendus d'une victoire extérieure jouée : les deux autres 1X2 + la meilleure DC.
-		expect(map.get(3)?.map((i) => i.marche)).toEqual(['WIN_HOME', 'DRAW', 'DC_HOME_DRAW']);
+		expect(map.get(3)?.map((i) => i.marche)).toEqual(['WIN_HOME', 'DRAW']);
 	});
 
 	it('pas de contenu inventé quand le match n’a pas ses voisins en base', () => {
 		const maigre = new Map<number, { marche: Market; probabilite: number }[]>([
-			[10, preds([['WIN_AWAY', 0.2]])] // seule l'issue jouée est en base
+			[10, preds([['WIN_AWAY', 0.2]])] // seul le pari joué est en base
 		]);
 		const map = autresIssuesParRetrait([{ ordre: 3, marche: 'WIN_AWAY', fixtureId: 10 }], maigre);
-		expect(map.has(3)).toBe(false); // vide honnête, jamais une issue devinée
+		expect(map.has(3)).toBe(false); // vide honnête, jamais un pari deviné
 	});
 
 	it('plusieurs retraits : chacun garde ses propres voisins', () => {

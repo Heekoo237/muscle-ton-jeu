@@ -56,37 +56,36 @@ const SUJET_FAMILLE: Record<UncoveredFamily, string> = {
 export function phraseNonCouvert(famille?: UncoveredFamily | null): string {
 	return famille
 		? `On n'analyse pas les paris sur ${SUJET_FAMILLE[famille]}.`
-		: 'Ce marché, on ne le couvre pas.';
+		: 'Ce pari, on ne le couvre pas.';
 }
 
-/** Fragment inséré dans « Non analysé — ___. Non facturé. » (écran de résultat). */
-function fragmentNonCouvert(famille?: UncoveredFamily | null): string {
-	return famille ? `pari sur ${SUJET_FAMILLE[famille]}` : 'pari qu’on ne couvre pas';
-}
-
-/** Fragment par ligne (« Match par match ») : pourquoi CETTE ligne n'est pas analysée. */
+/** Cause par ligne (« Match par match ») : pourquoi CE match n'a pas d'avis. Phrase
+ *  autonome (elle sera suivie de « C'est gratuit. »). Mots de parieur, pas de jargon. */
 const RAISON_LIGNE: Record<RaisonNonAnalyse, string> = {
-	commence: 'ce match a déjà commencé',
-	hors_couverture: 'pas au catalogue des compétitions',
-	hors_fenetre: 'match trop loin dans le temps',
-	non_resolu: "on n'a pas retrouvé ce match",
-	non_couvert: 'pari qu’on ne couvre pas (buteur, corners…)',
-	inconnu: 'lecture incertaine',
-	ambigu: 'lecture incertaine',
-	sans_donnee: 'pas encore de données pour ce match',
-	non_cote: 'ce match n’est pas encore coté'
+	commence: 'Ce match a déjà commencé',
+	hors_couverture: 'Cette compétition, on ne la suit pas encore',
+	hors_fenetre: 'Ce match est trop loin dans le temps',
+	non_resolu: "On n'a pas retrouvé ce match",
+	non_couvert: 'Ce pari, on ne le couvre pas (buteur, corners…)',
+	inconnu: "On n'a pas pu lire ce match",
+	ambigu: "On n'a pas pu lire ce match",
+	sans_donnee: "On n'a pas encore les infos sur ce match",
+	non_cote: "Ce match n'est pas encore coté"
 };
 
-/** Verbe accordé pour le RÉSUMÉ agrégé (« 1 match a déjà commencé »). */
+/** Verbe accordé pour le RÉSUMÉ agrégé (« 1 match a déjà commencé »). Mots de parieur. */
 const RAISON_RESUME: Record<RaisonNonAnalyse, { un: string; plur: string }> = {
 	commence: { un: 'a déjà commencé', plur: 'ont déjà commencé' },
-	hors_couverture: { un: "n'est pas au catalogue", plur: 'ne sont pas au catalogue' },
+	hors_couverture: {
+		un: "porte sur une compétition qu'on ne suit pas encore",
+		plur: "portent sur des compétitions qu'on ne suit pas encore"
+	},
 	hors_fenetre: { un: 'est trop loin dans le temps', plur: 'sont trop loin dans le temps' },
 	non_resolu: { un: "n'a pas été retrouvé", plur: "n'ont pas été retrouvés" },
 	non_couvert: { un: 'porte sur un pari qu’on ne couvre pas', plur: 'portent sur un pari qu’on ne couvre pas' },
 	inconnu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
 	ambigu: { un: "n'a pas pu être lu", plur: "n'ont pas pu être lus" },
-	sans_donnee: { un: "n'a pas encore de données", plur: "n'ont pas encore de données" },
+	sans_donnee: { un: "n'a pas encore d'infos", plur: "n'ont pas encore d'infos" },
 	non_cote: { un: "n'est pas encore coté", plur: 'ne sont pas encore cotés' }
 };
 
@@ -111,13 +110,14 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 	if (!l.analysable) {
 		// Non couvert AVEC famille connue : on NOMME le type de pari (mi-temps, buteurs…)
 		// plutôt que le vague « on ne le couvre pas » — le joueur doit comprendre que
-		// c'est le TYPE de pari, pas le match.
+		// c'est le TYPE de pari, pas le match. On finit par « C'est gratuit. » : c'est ce
+		// que le joueur veut savoir, dit dans ses mots (pas « non facturé »).
 		if (l.raisonNonAnalyse === 'non_couvert' && l.familleNonCouverte) {
-			return `Non analysé — ${fragmentNonCouvert(l.familleNonCouverte)}. Non facturé.`;
+			return `On n'analyse pas les paris sur ${SUJET_FAMILLE[l.familleNonCouverte]}. C'est gratuit.`;
 		}
 		// On connaît la cause exacte : on la dit. Repli sobre si elle manque (vieux ticket).
 		const cause = l.raisonNonAnalyse ? RAISON_LIGNE[l.raisonNonAnalyse] : null;
-		return cause ? `Non analysé — ${cause}. Non facturé.` : 'Non analysé — non facturé.';
+		return cause ? `${cause}. C'est gratuit.` : "On ne l'a pas analysé. C'est gratuit.";
 	}
 	if (l.retiree) {
 		return opts?.retraitUnique
@@ -127,7 +127,7 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 	if (l.fragile) return 'Ce pari est trop juste.';
 	// Gardée mais serrée (juste au-dessus de la barre) : « pas retiré » n'est pas
 	// « solide » — on le dit, sans dramatiser (marge mesurée, voir domain/ticket.ts).
-	if (l.serree) return "On la garde, mais c'est serré.";
+	if (l.serree) return 'On la garde, mais elle est juste au-dessus de notre barre.';
 	return 'Sélection solide.';
 }
 
@@ -146,5 +146,5 @@ export function resumeNonAnalyse(raisons: RaisonNonAnalyse[]): string {
 		const forme = RAISON_RESUME[[...uniques][0]];
 		return `${n} ${mot} ${n > 1 ? forme.plur : forme.un}`;
 	}
-	return `${n} ${mot} ne sont pas analysés`;
+	return `${n} ${mot} n'ont pas pu être analysés`;
 }

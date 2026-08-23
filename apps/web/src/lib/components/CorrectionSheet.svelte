@@ -91,9 +91,9 @@
 		{:else}
 			{#if dejaNonCouvert}
 				<div class="nc-banner">
-					<p class="nc-titre">Ce marché, on ne le couvre pas encore.</p>
+					<p class="nc-titre">Ce pari, on ne le couvre pas encore.</p>
 					<p class="nc-sous">
-						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le facture pas.
+						On le garde dans ton ticket, mais on ne l'analyse pas et on ne te le compte pas.
 					</p>
 				</div>
 				<div class="glabel t-small">Si on a mal lu, choisis ton vrai pari</div>

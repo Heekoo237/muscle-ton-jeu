@@ -180,9 +180,9 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 					'Plus de 2,5 buts, c’est risqué. Lens marque peu à domicile, et Nice ferme bien le jeu. Une fois sur deux, pas plus.',
 				autresIssues: [
 					{ libelleFr: 'Moins de 2,5 buts', probabilitePct: 53 },
-					{ libelleFr: 'Plus de 1,5 but', probabilitePct: 77 },
-					{ libelleFr: 'Plus de 3,5 buts', probabilitePct: 24 }
-				]
+					{ libelleFr: 'Match nul', probabilitePct: 30 }
+				],
+				chancesCotes: false
 			},
 			{
 				ordre: 4,
@@ -193,9 +193,9 @@ export function demoTicketDetail(id: string, nowMs: number): DemoDetail {
 					'Milan gagne, c’est la moins solide de ton ticket. Milan a perdu deux fois à domicile ce mois-ci. Une fois sur trois, pas plus.',
 				autresIssues: [
 					{ libelleFr: 'Torino gagne', probabilitePct: 34 },
-					{ libelleFr: 'Match nul', probabilitePct: 28 },
-					{ libelleFr: 'Milan ou match nul', probabilitePct: 66 }
-				]
+					{ libelleFr: 'Match nul', probabilitePct: 28 }
+				],
+				chancesCotes: false
 			}
 		],
 		// Démo réglée pour montrer le verdict (les deux fragiles retirés tombent → le

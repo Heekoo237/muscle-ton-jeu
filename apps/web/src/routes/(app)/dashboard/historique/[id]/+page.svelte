@@ -73,7 +73,7 @@
 					? "On n'a pas pu récupérer le résultat de ce match. Il ne sera pas réglé."
 					: data.verdict === 'orientation_incertaine'
 						? "On vérifie l'ordre des équipes sur un de ces matchs. On préfère ne rien afficher plutôt qu'un résultat douteux."
-						: 'Aucun match analysable dans ce ticket — rien à régler.'}
+						: 'Aucun match à vérifier dans ce ticket.'}
 			</p>
 		</div>
 	{/if}
@@ -106,16 +106,23 @@
 					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
 					<p class="exp-texte">{e.texte}</p>
 					{#if e.autresIssues.length > 0}
-						<!-- Autres issues du même match (parité écran de résultat) : on MONTRE ce
-						     qu'on sait, on ne suggère jamais. Présent tant que le ticket n'est pas réglé. -->
+						<!-- Sur ce match : les paris les plus probables (parité écran de résultat).
+						     On MONTRE, jamais « joue ça ». Présent tant que le ticket n'est pas réglé. -->
 						<div class="autres">
-							<div class="autres-t">Si tu veux garder ce match</div>
+							<div class="autres-t">
+								{e.chancesCotes
+									? 'Sur ce match, d’après les cotes'
+									: 'Sur ce match, voici ce que disent les chances'}
+							</div>
 							{#each e.autresIssues as iss (iss.libelleFr)}
 								<div class="autres-l">
 									<span>{iss.libelleFr}</span>
 									<span class="autres-n">{pctBig(iss.probabilitePct)}</span>
 								</div>
 							{/each}
+							{#if e.chancesCotes}
+								<div class="autres-note">On n’a pas encore étudié ce championnat.</div>
+							{/if}
 						</div>
 					{/if}
 				</article>
@@ -154,10 +161,12 @@
 			{/if}
 		</div>
 		{#each data.lignes as l (l.ordre)}
-			<article class="mpm-card" class:fragile={l.fragile} class:removed={l.retiree}>
+			<article class="mpm-card" class:fragile={l.fragile} class:removed={l.retiree} class:serree={l.serree}>
 				<div class="mpm-top">
 					<span class="mpm-match">
-						{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}
+						{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}{#if l.serree}&nbsp;<span
+								class="serre-tag">serré</span
+							>{/if}
 					</span>
 					{#if issueDe(l.ordre) === 'passe'}
 						<span class="issue passe">passé</span>
@@ -166,7 +175,7 @@
 					{:else if l.analysable && l.probabilitePct != null}
 						<span class="mpm-pct">{pctBig(l.probabilitePct)}</span>
 					{:else}
-						<span class="mpm-na">non analysé</span>
+						<span class="mpm-na">pas d’avis</span>
 					{/if}
 				</div>
 				<div class="mpm-marche" class:oc={l.fragile}>{l.libelleFr}</div>
@@ -405,6 +414,26 @@
 	.autres-n {
 		font-variant-numeric: tabular-nums;
 		color: var(--c-ink-2);
+	}
+	.autres-note {
+		margin-top: var(--s-2);
+		font-size: 12px;
+		color: var(--c-ink-mute);
+	}
+	/* « serré » : marqueur NEUTRE (gris), jamais l'ocre du fragile ni le barré du retiré. */
+	.serre-tag {
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--c-ink-3);
+		background: var(--c-canvas-sunk);
+		border: 1px solid var(--c-line);
+		border-radius: 999px;
+		padding: 1px 7px;
+		vertical-align: middle;
+	}
+	.mpm-card.serree {
+		border-left: 3px solid var(--c-line-strong);
 	}
 
 	.verdict {

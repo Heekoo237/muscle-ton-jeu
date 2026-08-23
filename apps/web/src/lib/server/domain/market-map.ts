@@ -305,36 +305,3 @@ export function marketLabelFr(market: Market, home: string, away: string): strin
 	}
 }
 
-/**
- * Libellé d'une issue formulé « Les chances pour … » — utilisé dans le bloc « Si tu veux
- * garder ce match », où « Liverpool gagne · 52 % » se lit mal (52 % de quoi ?). On nomme
- * explicitement l'ISSUE dont on donne la probabilité. Pur affichage, jamais un calcul.
- */
-export function chancesPourLabel(market: Market, home: string, away: string): string {
-	switch (market) {
-		case 'WIN_HOME':
-			return `Les chances pour que ${home} gagne`;
-		case 'DRAW':
-			return 'Les chances pour un match nul';
-		case 'WIN_AWAY':
-			return `Les chances pour que ${away} gagne`;
-		case 'DC_HOME_DRAW':
-			return `Les chances pour ${home} ou un match nul`;
-		case 'DC_DRAW_AWAY':
-			return `Les chances pour un match nul ou ${away}`;
-		case 'DC_HOME_AWAY':
-			return `Les chances pour ${home} ou ${away}`;
-		case 'OVER_1_5':
-		case 'OVER_2_5':
-		case 'OVER_3_5':
-			return `Les chances pour plus de ${SEUIL[market]} buts`;
-		case 'UNDER_1_5':
-		case 'UNDER_2_5':
-		case 'UNDER_3_5':
-			return `Les chances pour moins de ${SEUIL[market]} buts`;
-		case 'BTTS_YES':
-			return 'Les chances pour que les deux équipes marquent';
-		case 'BTTS_NO':
-			return `Les chances pour qu'au moins une équipe ne marque pas`;
-	}
-}

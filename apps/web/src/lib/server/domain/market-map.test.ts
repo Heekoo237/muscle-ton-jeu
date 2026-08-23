@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	resolveMarket,
-	marketLabelFr,
-	chancesPourLabel,
-	splitResultMarket,
-	uncoveredFamily
-} from './market-map';
+import { resolveMarket, marketLabelFr, splitResultMarket, uncoveredFamily } from './market-map';
 
 describe('uncoveredFamily — nommer le refus (le garde-fou sait déjà quelle famille)', () => {
 	it('nomme chaque famille non couverte', () => {
@@ -126,26 +120,5 @@ describe('marketLabelFr — jamais de notation bookmaker', () => {
 		expect(marketLabelFr('WIN_AWAY', 'Arsenal', 'Liverpool')).toBe('Liverpool gagne');
 		expect(marketLabelFr('OVER_2_5', 'Arsenal', 'Liverpool')).toBe('Plus de 2,5 buts');
 		expect(marketLabelFr('BTTS_YES', 'Arsenal', 'Liverpool')).toBe('Les deux équipes marquent');
-	});
-});
-
-describe('chancesPourLabel — « Les chances pour … » (bloc « Si tu veux garder ce match »)', () => {
-	it('nomme explicitement l’issue dont on donne la probabilité', () => {
-		expect(chancesPourLabel('WIN_HOME', 'Newcastle', 'Liverpool')).toBe('Les chances pour que Newcastle gagne');
-		expect(chancesPourLabel('WIN_AWAY', 'Newcastle', 'Liverpool')).toBe('Les chances pour que Liverpool gagne');
-		expect(chancesPourLabel('DRAW', 'Newcastle', 'Liverpool')).toBe('Les chances pour un match nul');
-		expect(chancesPourLabel('DC_HOME_DRAW', 'Newcastle', 'Liverpool')).toBe('Les chances pour Newcastle ou un match nul');
-		expect(chancesPourLabel('DC_DRAW_AWAY', 'Newcastle', 'Liverpool')).toBe('Les chances pour un match nul ou Liverpool');
-		expect(chancesPourLabel('DC_HOME_AWAY', 'Newcastle', 'Liverpool')).toBe('Les chances pour Newcastle ou Liverpool');
-		expect(chancesPourLabel('OVER_2_5', 'Newcastle', 'Liverpool')).toBe('Les chances pour plus de 2,5 buts');
-		expect(chancesPourLabel('UNDER_2_5', 'Newcastle', 'Liverpool')).toBe('Les chances pour moins de 2,5 buts');
-	});
-
-	it('jamais de notation bookmaker (1X2, +2.5…)', () => {
-		for (const m of ['WIN_HOME', 'DRAW', 'DC_HOME_DRAW', 'OVER_1_5'] as const) {
-			const l = chancesPourLabel(m, 'A', 'B');
-			expect(l).toMatch(/^Les chances pour /);
-			expect(l).not.toMatch(/1X2|\+\d|\bX\b/);
-		}
 	});
 });

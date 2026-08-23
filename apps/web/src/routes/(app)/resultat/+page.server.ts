@@ -25,7 +25,7 @@ import {
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
 import type { ExplicationVM, LineVM, Market, ResultVM, Selection } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
-import { uncoveredFamily, chancesPourLabel } from '$lib/server/domain/market-map';
+import { uncoveredFamily, marketLabelFr } from '$lib/server/domain/market-map';
 import { multiplicateurRetrait, autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
@@ -350,17 +350,20 @@ export const load: PageServerLoad = async (event) => {
 		predsParFixture
 	);
 	const autresParOrdre = new Map<number, { libelleFr: string; probabilitePct: number }[]>();
+	const cotesParOrdre = new Map<number, boolean>(); // régime cote seule par retrait
 	for (const s of retireesVoisins) {
+		cotesParOrdre.set(s.ordre, regimeOf(s.source) === 'cote');
 		const issues = contenuAutres.get(s.ordre);
 		if (!issues) continue;
 		// matchLabel = « Home – Away » (resolve.ts) : on en tire les deux équipes pour
 		// libeller « X gagne » / « X ou nul ». Split défensif : sans les deux, on n'affiche
-		// que les issues sans nom d'équipe (nul, plus/moins).
+		// que les paris sans nom d'équipe (nul, plus/moins). Le titre porte « les chances » :
+		// la ligne dit juste le pari (marketLabelFr), pas « les chances pour… » (redondant).
 		const parts = s.matchLabel.split(' – ');
 		const [home, away] = parts.length === 2 ? parts : ['', ''];
 		autresParOrdre.set(
 			s.ordre,
-			issues.map((iss) => ({ libelleFr: chancesPourLabel(iss.marche, home, away), probabilitePct: pct1(iss.probabilite) }))
+			issues.map((iss) => ({ libelleFr: marketLabelFr(iss.marche, home, away), probabilitePct: pct1(iss.probabilite) }))
 		);
 	}
 
@@ -377,7 +380,8 @@ export const load: PageServerLoad = async (event) => {
 				libelleFr: l.libelleFr,
 				avecBadge: l.fragile,
 				texte: p.texte,
-				autresIssues: autresParOrdre.get(p.ordre) ?? []
+				autresIssues: autresParOrdre.get(p.ordre) ?? [],
+				chancesCotes: cotesParOrdre.get(p.ordre) ?? false
 			} satisfies ExplicationVM;
 		})
 		.filter((x): x is ExplicationVM => x !== null)

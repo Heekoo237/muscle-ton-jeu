@@ -9,7 +9,7 @@
 	// se lirait comme un ratio — on donne l'effet, pas le rapport (CLAUDE.md).
 	const entete = $derived(
 		data.nbBascules > 0
-			? `${data.nbBascules} ticket${data.nbBascules > 1 ? 's ont' : ' a'} basculé : perdu${data.nbBascules > 1 ? 's' : ''} tel${data.nbBascules > 1 ? 's' : ''} quel${data.nbBascules > 1 ? 's' : ''}, gagnant${data.nbBascules > 1 ? 's' : ''} après retrait des lignes trop justes.`
+			? `${data.nbBascules} ticket${data.nbBascules > 1 ? 's ont' : ' a'} basculé : perdu${data.nbBascules > 1 ? 's' : ''} tel${data.nbBascules > 1 ? 's' : ''} quel${data.nbBascules > 1 ? 's' : ''}, gagnant${data.nbBascules > 1 ? 's' : ''} après retrait des paris trop justes.`
 			: "Aujourd'hui, le retrait n'a fait basculer aucun ticket."
 	);
 </script>

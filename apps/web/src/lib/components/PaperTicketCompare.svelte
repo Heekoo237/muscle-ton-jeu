@@ -81,7 +81,7 @@
 								{l.matchLabel}{#if l.fragile}&nbsp;<span class="tri">▲</span>{/if}
 							</div>
 							<div class="pmarket">{l.libelleFr}</div>
-							{#if l.analysable === false}<div class="pnote muted">non analysé</div>{/if}
+							{#if l.analysable === false}<div class="pnote muted">pas d’avis</div>{/if}
 						</div>
 					{/each}
 				</div>
@@ -126,7 +126,7 @@
 							</div>
 							<div class="pmarket" class:strike={l.retiree}>{l.libelleFr}</div>
 							{#if l.analysable === false}
-								<div class="pnote muted">non analysé</div>
+								<div class="pnote muted">pas d’avis</div>
 							{:else if l.mentionNeutre}
 								<div class="pnote">la moins solide de ton ticket</div>
 							{/if}

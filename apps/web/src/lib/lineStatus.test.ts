@@ -7,16 +7,17 @@ import { ligneNote, resumeNonAnalyse } from './lineStatus';
 const base = { analysable: true, retiree: false, fragile: false };
 
 describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => {
-	it('non analysable → « Non analysé — non facturé », jamais « solide »/« fragile »', () => {
+	it('non analysable → cause + « C’est gratuit », jamais « solide »/« fragile »/mot technique', () => {
 		const note = ligneNote({ analysable: false, retiree: false, fragile: false });
-		expect(note).toBe('Non analysé — non facturé.');
+		expect(note).toBe("On ne l'a pas analysé. C'est gratuit.");
 		expect(note).not.toContain('solide');
 		expect(note).not.toContain('fragile');
+		expect(note).not.toMatch(/facturé|analysable/); // mots techniques bannis
 	});
 
 	it('non analysable prime même si des drapeaux traînent (VM incohérent) — aucun jugement', () => {
 		expect(ligneNote({ analysable: false, retiree: true, fragile: true })).toBe(
-			'Non analysé — non facturé.'
+			"On ne l'a pas analysé. C'est gratuit."
 		);
 	});
 
@@ -29,10 +30,11 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote({ ...base, fragile: true, retiree: true })).toContain('Retirée');
 	});
 
-	it('ligne SERRÉE gardée → « On la garde, mais c\'est serré » (jamais « solide »)', () => {
+	it('ligne SERRÉE gardée → « juste au-dessus de notre barre » (jamais « solide » ni « seuil »)', () => {
 		const note = ligneNote({ ...base, serree: true });
-		expect(note).toBe("On la garde, mais c'est serré.");
+		expect(note).toBe('On la garde, mais elle est juste au-dessus de notre barre.');
 		expect(note).not.toContain('solide');
+		expect(note).not.toContain('seuil'); // « barre », pas le mot de statisticien
 	});
 
 	it('une ligne retirée ou fragile prime sur serrée (pas de double statut)', () => {
@@ -54,13 +56,18 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote(retiree)).not.toContain('la plus');
 	});
 
-	it('non analysée AVEC raison → la VRAIE cause, jamais « non couvert » par défaut', () => {
+	it('non analysée AVEC raison → la VRAIE cause + « C’est gratuit », jamais un mot technique', () => {
 		expect(ligneNote({ analysable: false, retiree: false, fragile: false, raisonNonAnalyse: 'commence' })).toBe(
-			'Non analysé — ce match a déjà commencé. Non facturé.'
+			"Ce match a déjà commencé. C'est gratuit."
 		);
+		// « catalogue » banni → « on ne la suit pas encore ».
 		expect(
 			ligneNote({ analysable: false, retiree: false, fragile: false, raisonNonAnalyse: 'hors_couverture' })
-		).toContain('pas au catalogue');
+		).toContain('on ne la suit pas encore');
+		// « données » banni → « les infos ».
+		expect(
+			ligneNote({ analysable: false, retiree: false, fragile: false, raisonNonAnalyse: 'sans_donnee' })
+		).toContain('les infos');
 		// Un match commencé ne dit JAMAIS « non couvert » (le bug signalé).
 		expect(
 			ligneNote({ analysable: false, retiree: false, fragile: false, raisonNonAnalyse: 'commence' })
@@ -71,7 +78,9 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 describe('resumeNonAnalyse — la mention sous le pourcentage reflète la VRAIE raison', () => {
 	it('une seule cause, un match → message précis accordé au singulier', () => {
 		expect(resumeNonAnalyse(['commence'])).toBe('1 match a déjà commencé');
-		expect(resumeNonAnalyse(['hors_couverture'])).toBe("1 match n'est pas au catalogue");
+		expect(resumeNonAnalyse(['hors_couverture'])).toBe(
+			"1 match porte sur une compétition qu'on ne suit pas encore"
+		);
 	});
 
 	it('une seule cause, plusieurs matchs → accord au pluriel', () => {
@@ -80,7 +89,7 @@ describe('resumeNonAnalyse — la mention sous le pourcentage reflète la VRAIE 
 
 	it('plusieurs causes distinctes → compte neutre, jamais une cause approximative', () => {
 		expect(resumeNonAnalyse(['commence', 'hors_couverture', 'non_couvert'])).toBe(
-			'3 matchs ne sont pas analysés'
+			"3 matchs n'ont pas pu être analysés"
 		);
 	});
 

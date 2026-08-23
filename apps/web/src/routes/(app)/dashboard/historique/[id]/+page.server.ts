@@ -16,7 +16,8 @@ import {
 } from '$lib/server/domain/settle';
 import { sports, predictions } from '$lib/server/services';
 import { autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
-import { chancesPourLabel } from '$lib/server/domain/market-map';
+import { marketLabelFr } from '$lib/server/domain/market-map';
+import { regimeOf } from '$lib/server/domain/regime';
 import type { ExplicationVM, LineVM, Market, TicketResult } from '$lib/types';
 
 /**
@@ -70,6 +71,7 @@ export const load: PageServerLoad = async (event) => {
 		(s) => s.retireeDuRenforce && isAnalysable(s) && s.fixtureId !== null && s.marche !== null
 	);
 	const autresParOrdre = new Map<number, { libelleFr: string; probabilitePct: number }[]>();
+	const cotesParOrdre = new Map<number, boolean>(); // régime cote seule par retrait
 	if (!dejaRegle && retireesVoisins.length > 0) {
 		const preds = await predictions.forFixtures([
 			...new Set(retireesVoisins.map((s) => s.fixtureId as number))
@@ -79,14 +81,16 @@ export const load: PageServerLoad = async (event) => {
 			preds
 		);
 		for (const s of retireesVoisins) {
+			cotesParOrdre.set(s.ordre, regimeOf(s.source) === 'cote');
 			const issues = contenu.get(s.ordre);
 			if (!issues) continue;
 			const parts = s.matchLabel.split(' – ');
 			const [home, away] = parts.length === 2 ? parts : ['', ''];
+			// Le titre porte « les chances » : la ligne dit juste le pari (marketLabelFr).
 			autresParOrdre.set(
 				s.ordre,
 				issues.map((iss) => ({
-					libelleFr: chancesPourLabel(iss.marche, home, away),
+					libelleFr: marketLabelFr(iss.marche, home, away),
 					probabilitePct: Math.round(iss.probabilite * 100 * 10) / 10
 				}))
 			);
@@ -107,7 +111,8 @@ export const load: PageServerLoad = async (event) => {
 				avecBadge: l.fragile,
 				texte: p.texte,
 				// Alternatives du match retiré, tant que le ticket n'est pas réglé (sinon vide).
-				autresIssues: autresParOrdre.get(p.ordre) ?? ([] as ExplicationVM['autresIssues'])
+				autresIssues: autresParOrdre.get(p.ordre) ?? ([] as ExplicationVM['autresIssues']),
+				chancesCotes: cotesParOrdre.get(p.ordre) ?? false
 			} satisfies ExplicationVM;
 		})
 		.filter((x): x is ExplicationVM => x !== null)

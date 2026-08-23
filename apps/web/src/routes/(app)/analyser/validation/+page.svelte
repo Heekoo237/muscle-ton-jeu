@@ -171,7 +171,7 @@
 		<!-- Rien d'analysable : on ne laisse pas un bouton « Analyser 0 » bloqué. On
 		     le dit clairement et on propose une sortie. -->
 		<div class="rien">
-			<p class="t-body">Aucun match analysable sur ce ticket.</p>
+			<p class="t-body">On n'a rien à analyser sur ce ticket.</p>
 			<p class="t-small">
 				Les matchs de championnats qu'on ne couvre pas encore, et les paris qu'on ne couvre pas, ne
 				sont pas analysés.
@@ -183,7 +183,7 @@
 			<button class="btn-dark" type="submit">
 				Analyser {analysables} match{analysables > 1 ? 's' : ''} sur {total}
 			</button>
-			<p class="t-small compteur">Les lignes non analysables ne sont pas comptées</p>
+			<p class="t-small compteur">Les matchs qu'on n'a pas pu lire ne comptent pas</p>
 		</form>
 	{/if}
 </main>

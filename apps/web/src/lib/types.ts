@@ -205,11 +205,14 @@ export interface ExplicationVM {
 	avecBadge: boolean;
 	texte: string;
 	/**
-	 * Autres issues du MÊME match, lues en base (max 3, jamais un calcul nouveau).
-	 * Titrées « Si tu veux garder ce match » — on MONTRE, on ne suggère jamais. Vide
-	 * si aucune issue voisine n'est en base (ex. cote seule sans 1X2).
+	 * Sur ce match, les paris les plus probables lus en base (max 2, jamais un calcul
+	 * nouveau, ni double chance, ni évidence). On MONTRE, on ne suggère jamais. Vide si
+	 * rien d'éligible en base.
 	 */
 	autresIssues: { libelleFr: string; probabilitePct: number }[];
+	/** Régime cote seule (non backtesté) : le titre dit « d'après les cotes », jamais un
+	 *  mot qui suggère une mesure. Faux = régime mesuré. */
+	chancesCotes: boolean;
 }
 
 export interface ResultVM {
