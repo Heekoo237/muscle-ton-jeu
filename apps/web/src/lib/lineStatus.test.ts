@@ -29,6 +29,17 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote({ ...base, fragile: true, retiree: true })).toContain('Retirée');
 	});
 
+	it('ligne SERRÉE gardée → « On la garde, mais c\'est serré » (jamais « solide »)', () => {
+		const note = ligneNote({ ...base, serree: true });
+		expect(note).toBe("On la garde, mais c'est serré.");
+		expect(note).not.toContain('solide');
+	});
+
+	it('une ligne retirée ou fragile prime sur serrée (pas de double statut)', () => {
+		expect(ligneNote({ ...base, fragile: true, serree: true })).toBe('Ce pari est trop juste.');
+		expect(ligneNote({ ...base, retiree: true, serree: true })).toContain('Retirée');
+	});
+
 	it('« la plus fragile » UNIQUEMENT s’il n’y a qu’un seul retrait', () => {
 		const retiree = { analysable: true, retiree: true, fragile: true };
 		// Un seul retrait → superlatif autorisé.

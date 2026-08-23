@@ -94,6 +94,8 @@ export interface LigneStatutIn {
 	analysable: boolean;
 	retiree: boolean;
 	fragile: boolean;
+	/** GARDÉE mais serrée (juste au-dessus de la barre) : « pas retiré » ≠ « solide ». */
+	serree?: boolean;
 	/** Raison précise quand la ligne n'est pas analysée (sinon absente). */
 	raisonNonAnalyse?: RaisonNonAnalyse;
 	/** Si non couvert ET famille connue : la nommer (mi-temps, buteurs…). */
@@ -123,6 +125,9 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 			: 'Retirée du ticket renforcé — sélection fragile.';
 	}
 	if (l.fragile) return 'Ce pari est trop juste.';
+	// Gardée mais serrée (juste au-dessus de la barre) : « pas retiré » n'est pas
+	// « solide » — on le dit, sans dramatiser (marge mesurée, voir domain/ticket.ts).
+	if (l.serree) return "On la garde, mais c'est serré.";
 	return 'Sélection solide.';
 }
 

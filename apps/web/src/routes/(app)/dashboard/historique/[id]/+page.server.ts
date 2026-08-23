@@ -5,7 +5,7 @@ import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
 import { supprimerTicket } from '$lib/server/fixtures/ticketDeletion';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
-import { isAnalysable } from '$lib/server/domain/ticket';
+import { isAnalysable, estSerree } from '$lib/server/domain/ticket';
 import {
 	settleTicket,
 	verdictAffiche,
@@ -45,10 +45,11 @@ export const load: PageServerLoad = async (event) => {
 		fragile: s.fragile,
 		retiree: s.retireeDuRenforce,
 		mentionNeutre: s.retireeDuRenforce && !s.fragile,
-		// « Serré » n'est pas recalculé en re-vue : le seuil cote seule par ligne n'est
-		// pas persisté (seuilFragile null) — on ne devine pas plutôt que d'afficher un
-		// « serré » faux. La nuance vit à l'écran de résultat, sur données fraîches.
-		serree: false,
+		// GARDÉE mais serrée (« pas retiré » ≠ « solide »). Le seuil cote seule par ligne
+		// n'est pas persisté (seuilFragile null) → estSerree retombe sur le seuil MODÈLE :
+		// exact sur les 1X2 (mêmes seuils modèle/cote seule) et à ±0,02 près sur la double
+		// chance. L'écart penche vers « serré », le côté prudent — on ne dit jamais « solide » à tort.
+		serree: !s.retireeDuRenforce && estSerree(s),
 		// Règle unique : analysable = résolu ET pourvu d'une probabilité (figée au moment
 		// de l'analyse). Un match résolu sans proba reste « non analysé », jamais compté.
 		analysable: isAnalysable(s),
