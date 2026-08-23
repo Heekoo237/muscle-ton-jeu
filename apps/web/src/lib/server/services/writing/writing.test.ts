@@ -77,39 +77,50 @@ describe('règle de causalité (brief §4.4)', () => {
 	});
 });
 
-describe('synthèse neutre — un retrait sans badge ne se contredit pas', () => {
-	it('ne dit ni « rien à retirer » ni « aucun fragile » suivi d’un retrait sec', () => {
-		const inp = input([retrait({ avecBadge: false })], { nbFragiles: 0, nbMatchs: 6 });
-		const s = syntheseDeterministe(inp);
-		expect(s).toContain('moins solide'); // le retrait est reconnu
-		expect(s).not.toMatch(/rien à retirer/i); // réservé au vrai zéro retrait (gratuit)
-		expect(s).toMatch(/vraiment|juste/); // ton qui reconnaît la tension
+describe('synthèse — le FAIT d’abord, le jugement ensuite (plus jamais « ton ticket tient »)', () => {
+	it('commence TOUJOURS par le décompte neutre, jamais par un verdict global', () => {
+		const s = syntheseDeterministe(input([retrait({ avecBadge: false })], { nbMatchs: 6 }));
+		expect(s.startsWith('Ton ticket de six matchs.')).toBe(true);
+		expect(s).not.toMatch(/ton ticket tient/i);
 	});
 
-	it('accorde le pluriel selon le nombre de retraits', () => {
+	it('retrait sans badge → « on a retiré la moins solide » (pluriel accordé)', () => {
 		const un = syntheseDeterministe(input([retrait({ avecBadge: false })], { nbFragiles: 0, nbMatchs: 6 }));
-		expect(un).toContain('la sélection la moins solide');
+		expect(un).toBe('Ton ticket de six matchs. On a retiré la moins solide.');
 		const deux = syntheseDeterministe(
 			input([retrait({ ordre: 2, avecBadge: false }), retrait({ ordre: 4, avecBadge: false })], {
 				nbFragiles: 0,
 				nbMatchs: 7
 			})
 		);
-		expect(deux).toContain('les sélections les moins solides');
+		expect(deux).toBe('Ton ticket de sept matchs. On a retiré les deux moins solides.');
 	});
 
-	it('(c) toutes fragiles : jamais « tient debout », on le DIT', () => {
-		const s = syntheseDeterministe(
+	it('retrait de badges → « trop juste », compté sur les retraits RÉELS (pas de contradiction)', () => {
+		const un = syntheseDeterministe(input([retrait({ avecBadge: true })], { nbMatchs: 4 }));
+		expect(un).toBe("Ton ticket de quatre matchs. Un est trop juste, on l'a retiré.");
+		const deux = syntheseDeterministe(
+			input([retrait({ ordre: 1, avecBadge: true }), retrait({ ordre: 2, avecBadge: true })], { nbMatchs: 6 })
+		);
+		expect(deux).toBe('Ton ticket de six matchs. Deux sont trop justes, on les a retirés.');
+	});
+
+	it('(c) toutes fragiles : jamais « tient », on le DIT (singulier/pluriel)', () => {
+		const un = syntheseDeterministe(
 			input([], { rienARetirer: true, toutesFragiles: true, nbMatchs: 1, nbFragiles: 1 })
 		);
-		expect(s).toContain('Toutes tes sélections sont trop justes');
-		expect(s).toContain('sans le vider');
-		expect(s).not.toContain('tient debout');
+		expect(un).toBe("Ton ticket d'un match. Il est trop juste, mais le retirer viderait ton ticket.");
+		const plus = syntheseDeterministe(
+			input([], { rienARetirer: true, toutesFragiles: true, nbMatchs: 3, nbFragiles: 3 })
+		);
+		expect(plus).toBe("Ton ticket de trois matchs. Tous sont trop justes — impossible de l'alléger sans le vider.");
+		expect(plus).not.toMatch(/tient/i);
 	});
 
-	it('(b) rien de fragile et rien de serré : « Ton ticket tient. Rien à retirer. »', () => {
+	it('(b) rien de fragile, rien de serré → « Rien à retirer. » sans « tient » en tête', () => {
 		const s = syntheseDeterministe(input([], { rienARetirer: true, nbMatchs: 4, nbSerrees: 0 }));
-		expect(s).toBe('Ton ticket tient. Rien à retirer.');
+		expect(s).toBe('Ton ticket de quatre matchs. Rien à retirer.');
+		expect(s).not.toMatch(/ton ticket tient/i);
 	});
 });
 
@@ -296,22 +307,21 @@ describe('synthèse « rien à retirer » — solide vs serré (« pas retiré �
 		nbFragiles: 0, retraits: [], rienARetirer: true
 	};
 
-	it('tout solide → « Ton ticket tient. Rien à retirer. » (jamais « ça passe »)', () => {
+	it('tout solide → « Rien à retirer. » (jamais « ça passe », jamais « solide »)', () => {
 		const s = syntheseDeterministe({ ...base, nbSerrees: 0 });
-		expect(s).toBe('Ton ticket tient. Rien à retirer.');
-		expect(s).not.toMatch(/tient debout|solide|sûr|passe/i);
+		expect(s).toBe('Ton ticket de trois matchs. Rien à retirer.');
+		expect(s).not.toMatch(/tient|solide|sûr|passe/i);
 	});
 
-	it('une serrée → on le DIT, sans « tient debout »', () => {
+	it('une serrée → « Un est serré, on le garde. »', () => {
 		const s = syntheseDeterministe({ ...base, nbSerrees: 1 });
-		expect(s).toMatch(/serrée/i);
-		expect(s).not.toMatch(/tient debout/i);
+		expect(s).toBe('Ton ticket de trois matchs. Un est serré, on le garde.');
+		expect(s).not.toMatch(/tient|solide/i);
 	});
 
-	it('plusieurs serrées → pluriel, sans « tient debout »', () => {
+	it('plusieurs serrées → « Deux sont serrés, on les garde. »', () => {
 		const s = syntheseDeterministe({ ...base, nbSerrees: 2 });
-		expect(s).toMatch(/serrées/i);
-		expect(s).not.toMatch(/tient debout/i);
+		expect(s).toBe('Ton ticket de trois matchs. Deux sont serrés, on les garde.');
 	});
 
 	it('toutes fragiles prime : jamais « tient » ni « serré »', () => {

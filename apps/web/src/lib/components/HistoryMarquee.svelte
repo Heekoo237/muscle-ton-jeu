@@ -17,7 +17,7 @@
 					{#each items as it, i (dup + '-' + i)}
 						<span class="lbl">{it.matchLabel}</span>
 						<span class="sep">·</span>
-						<span class="mk">{it.fragile ? 'marqué trop juste' : 'solide'}</span>
+						<span class="mk">{it.fragile ? 'marqué trop juste' : 'non marqué'}</span>
 						<span class="sep">·</span>
 						<span class="out" class:tombe={!it.passe}>{it.passe ? 'PASSÉ' : 'TOMBÉ'}</span>
 						<span class="slash">/</span>

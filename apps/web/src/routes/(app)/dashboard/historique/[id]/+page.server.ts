@@ -15,7 +15,7 @@ import {
 } from '$lib/server/domain/settle';
 import { sports, predictions } from '$lib/server/services';
 import { autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
-import { marketLabelFr } from '$lib/server/domain/market-map';
+import { chancesPourLabel } from '$lib/server/domain/market-map';
 import type { ExplicationVM, LineVM, Market, TicketResult } from '$lib/types';
 
 /**
@@ -85,7 +85,7 @@ export const load: PageServerLoad = async (event) => {
 			autresParOrdre.set(
 				s.ordre,
 				issues.map((iss) => ({
-					libelleFr: marketLabelFr(iss.marche, home, away),
+					libelleFr: chancesPourLabel(iss.marche, home, away),
 					probabilitePct: Math.round(iss.probabilite * 100 * 10) / 10
 				}))
 			);

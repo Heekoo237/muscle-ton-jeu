@@ -87,78 +87,45 @@ function cap(s: string): string {
  * toujours le même texte.
  */
 export function syntheseDeterministe(input: WritingInput): string {
-	if (input.rienARetirer) return synthRienARetirer(input);
-	const m = input.nbMatchs;
-	const matchs = `${enMots(m)} match${m > 1 ? 's' : ''}`;
-	if (input.nbFragiles <= 0) return choisir(synthNeutre(matchs, enMots(m), input.nbRetirees), input);
-	return choisir(synthFragiles(matchs, input.nbFragiles), input);
-}
-
-/** Contraste renforcement/total : à quel point retirer améliore les chances. */
-function contrasteBucket(input: WritingInput): number {
-	const t = input.probaTotalePct;
-	if (t <= 0) return 0;
-	const ratio = input.probaRenforceePct / t;
-	return ratio >= 2.2 ? 2 : ratio >= 1.5 ? 1 : 0;
-}
-
-/** Choix DÉTERMINISTE d'une variante selon le contexte du ticket. */
-function choisir(variantes: string[], input: WritingInput): string {
-	const idx = (input.nbFragiles + contrasteBucket(input) + input.nbMatchs) % variantes.length;
-	return variantes[idx];
-}
-
-function synthFragiles(matchs: string, nbFragiles: number): string[] {
-	const un = nbFragiles === 1;
-	const fMot = enMots(nbFragiles);
-	const sontFragiles = un ? 'Un seul est trop juste' : `${cap(fMot)} sont trop justes`;
-	const maillons = un ? 'un maillon faible' : `${fMot} maillons faibles`;
-	const neTiennent = un ? 'une ne tient pas la route' : `${fMot} ne tiennent pas la route`;
-	return [
-		`Ton ticket tient sur ${matchs}. ${sontFragiles}.`,
-		`${cap(matchs)}, ${maillons}. Un seul suffit à tout faire tomber.`,
-		`Sur tes ${matchs.replace('match', 'sélection')}, ${neTiennent}.`,
-		`Ton ticket tient sur ${matchs}. ${sontFragiles}, et il suffit d'un pour tout faire tomber.`,
-		`${cap(matchs)} sur ton ticket. ${sontFragiles}.`,
-		`Tu joues ${matchs}. ${sontFragiles} — reste sur tes gardes.`
-	];
+	const n = input.nbMatchs;
+	// LE FAIT d'abord : ce que le joueur a joué, décompte neutre. JAMAIS « ton ticket
+	// tient » en tête — ça se lit comme un feu vert, et contredit un retrait. Ensuite
+	// seulement le JUGEMENT : ce qu'on en a fait.
+	// « d'un match » (élision + masculin), pas « de une match ».
+	const ticket = n === 1 ? `Ton ticket d'un match.` : `Ton ticket de ${enMots(n)} matchs.`;
+	return `${ticket} ${input.rienARetirer ? finSansRetrait(input) : finAvecRetrait(input)}`;
 }
 
 /**
- * Cas « aucun badge rouge, mais un retrait » (ex. double chance) : le ticket
- * n'est PAS « tout solide » — une sélection moins fiable a été allégée, et il est
- * facturé. La synthèse doit donc reconnaître le retrait sans se contredire : ni
- * « rien à retirer » (réservé au vrai zéro retrait, gratuit), ni « aucun fragile »
- * suivi d'un retrait sec.
+ * Fin de phrase quand RIEN n'est retiré. « Pas retiré » n'est pas « solide » : d'où le
+ * cas serré, dit sans dramatiser. Le cas « toutes fragiles » ne prétend jamais tenir.
  */
-function synthNeutre(matchs: string, mMot: string, nbRetirees: number): string[] {
-	const lesMoins =
-		nbRetirees <= 1 ? 'la sélection la moins solide' : 'les sélections les moins solides';
-	return [
-		`${cap(matchs)}. Aucun n'est vraiment risqué, mais on a allégé ${lesMoins}.`,
-		`Ton ticket tient sur ${matchs}. Rien de vraiment risqué, on a juste retiré ${lesMoins}.`,
-		`Sur tes ${mMot} sélections, aucune n'est vraiment risquée. On a allégé ${lesMoins}.`
-	];
+function finSansRetrait(input: WritingInput): string {
+	if (input.toutesFragiles)
+		return input.nbMatchs === 1
+			? `Il est trop juste, mais le retirer viderait ton ticket.`
+			: `Tous sont trop justes — impossible de l'alléger sans le vider.`;
+	const s = input.nbSerrees ?? 0;
+	if (s > 0)
+		return s === 1 ? `Un est serré, on le garde.` : `${cap(enMots(s))} sont serrés, on les garde.`;
+	return 'Rien à retirer.';
 }
 
-function synthRienARetirer(input: WritingInput): string {
-	// Cas (c) : TOUTES les sélections sont fragiles. Alléger viderait le ticket, on ne
-	// le fait pas. Ne JAMAIS dire « tient debout » — ce serait le mensonge latent
-	// (ticket faible, message rassurant). On le dit honnêtement.
-	if (input.toutesFragiles)
-		return 'Toutes tes sélections sont trop justes. On ne peut pas alléger ce ticket sans le vider.';
-	// Cas (b-serré) : rien à RETIRER, mais des lignes GARDÉES restent serrées (juste
-	// au-dessus de la barre). « Pas retiré » n'est pas « solide » : on le dit, sans
-	// dramatiser — le détail « on la garde, mais c'est serré » suit ligne par ligne.
-	const nbSerrees = input.nbSerrees ?? 0;
-	if (nbSerrees > 0) {
-		const un = nbSerrees === 1;
-		return un
-			? 'Rien à retirer. Une sélection reste serrée, juste au-dessus de la barre.'
-			: `Rien à retirer. ${cap(enMots(nbSerrees))} sélections restent serrées, juste au-dessus de la barre.`;
-	}
-	// Cas (b-solide) : rien de serré non plus — le ticket tient vraiment.
-	return 'Ton ticket tient. Rien à retirer.';
+/**
+ * Fin de phrase quand on a RETIRÉ. Compte TOUJOURS les retraits réels (`nbRetirees`) —
+ * sinon la synthèse contredirait le ticket renforcé (le bug qu'on corrige). Le mot suit
+ * le marquage : si TOUS les retirés portent le badge → « trop juste » ; sinon (double
+ * chance, mixte) → « la/les moins solide(s) » — on ne crie pas « trop juste » là où le
+ * badge est neutre.
+ */
+function finAvecRetrait(input: WritingInput): string {
+	const r = input.nbRetirees;
+	const tousBadges = input.nbFragiles > 0 && input.nbFragiles === r;
+	if (tousBadges)
+		return r === 1
+			? `Un est trop juste, on l'a retiré.`
+			: `${cap(enMots(r))} sont trop justes, on les a retirés.`;
+	return r === 1 ? `On a retiré la moins solide.` : `On a retiré les ${enMots(r)} moins solides.`;
 }
 
 /* ------------------------------------------------------------------------ */

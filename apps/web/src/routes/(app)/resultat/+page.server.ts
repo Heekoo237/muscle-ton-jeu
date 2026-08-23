@@ -25,7 +25,7 @@ import {
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
 import type { ExplicationVM, LineVM, Market, ResultVM, Selection } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
-import { uncoveredFamily, marketLabelFr } from '$lib/server/domain/market-map';
+import { uncoveredFamily, chancesPourLabel } from '$lib/server/domain/market-map';
 import { multiplicateurRetrait, autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
@@ -360,7 +360,7 @@ export const load: PageServerLoad = async (event) => {
 		const [home, away] = parts.length === 2 ? parts : ['', ''];
 		autresParOrdre.set(
 			s.ordre,
-			issues.map((iss) => ({ libelleFr: marketLabelFr(iss.marche, home, away), probabilitePct: pct1(iss.probabilite) }))
+			issues.map((iss) => ({ libelleFr: chancesPourLabel(iss.marche, home, away), probabilitePct: pct1(iss.probabilite) }))
 		);
 	}
 
