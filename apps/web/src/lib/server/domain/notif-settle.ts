@@ -28,6 +28,9 @@ export interface TicketARegler {
 export interface SettlePorts {
 	/** Score final par fixtureId (null si le match n'est pas terminé). */
 	scoresFor(fixtureIds: number[]): Promise<Map<number, FinalScore>>;
+	/** Fixtures RETOURNÉS parmi ceux fournis (DC modèle vs 1X2 coté). Sert au garde :
+	 *  une sélection SANS snapshot sur l'un d'eux n'est pas réglée (orientation incertaine). */
+	flipSuspectsFor(fixtureIds: number[]): Promise<Set<number>>;
 	/** Réservation atomique d'un envoi : true si CE passage l'a pris, false sinon. */
 	reserver(cle: string, userId: number, type: 'settle' | 'matin'): Promise<boolean>;
 	/** Envoi effectif à tous les appareils de l'utilisateur. */
@@ -82,7 +85,18 @@ export async function runSettlement(
 			...new Set(t.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
 		];
 		const scores = await ports.scoresFor(fixtureIds);
-		const verdict = settleTicket(t.selections, scores);
+		const flip = await ports.flipSuspectsFor(fixtureIds);
+		const verdict = settleTicket(t.selections, scores, flip);
+
+		// GARDE orientation : une sélection sans snapshot sur un fixture retourné est
+		// RETENUE (non réglée). On le JOURNALISE — c'est un ticket à regarder à la main,
+		// jamais un faux verdict posé en silence. Marqueur stable pour la surveillance.
+		if (verdict.retenues.length > 0) {
+			console.warn(
+				`[règlement] ORIENTATION INCERTAINE ticket ${t.id} — ${verdict.retenues.length} ` +
+					`sélection(s) sans snapshot sur un fixture retourné : NON réglé, laissé en attente.`
+			);
+		}
 
 		// Pas encore tous les matchs analysés terminés → on laisse en attente.
 		if (verdict.originale === 'en_attente') continue;

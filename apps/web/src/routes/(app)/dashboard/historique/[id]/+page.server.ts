@@ -11,6 +11,7 @@ import {
 	verdictAffiche,
 	isSettleable,
 	resultatIntrouvable,
+	fixtureFlipSuspect,
 	type FinalScore
 } from '$lib/server/domain/settle';
 import { sports, predictions } from '$lib/server/services';
@@ -123,7 +124,23 @@ export const load: PageServerLoad = async (event) => {
 		if (f.scoreHome != null && f.scoreAway != null)
 			scores.set(f.id, { home: f.scoreHome, away: f.scoreAway, homeTeamId: f.teamHomeId });
 	}
-	const v = settleTicket(ticket.selections, scores);
+	// GARDE orientation : pour les sélections SANS snapshot (avant 0025), on repère les
+	// fixtures RETOURNÉS (DC modèle vs 1X2 coté) afin de ne pas AFFICHER un faux verdict.
+	const flipSuspects = new Set<number>();
+	const sansSnapshot = ticket.selections.filter((s) => s.equipeDomId == null && isSettleable(s));
+	if (sansSnapshot.length > 0) {
+		const preds = await predictions.forFixtures([
+			...new Set(sansSnapshot.map((s) => s.fixtureId as number))
+		]);
+		for (const [fid, liste] of preds) {
+			const p = (m: Market) => liste.find((x) => x.marche === m);
+			const dc = p('DC_HOME_DRAW');
+			const dcModel = dc?.source === 'model' ? dc.probabilite : null;
+			if (fixtureFlipSuspect(dcModel, p('WIN_HOME')?.probabilite ?? null, p('DRAW')?.probabilite ?? null))
+				flipSuspects.add(fid);
+		}
+	}
+	const v = settleTicket(ticket.selections, scores, flipSuspects);
 	// SOURCE DE VÉRITÉ : le verdict persisté par le règlement prime ; le recalcul ne
 	// sert qu'à la fenêtre ≤ 6 h avant le cron, et à situer « tombé sur ce match ».
 	const verdictOriginale = verdictAffiche(ticket.resultatOriginale, v.originale);
@@ -131,9 +148,12 @@ export const load: PageServerLoad = async (event) => {
 	// Statut honnête quand le ticket ne se réglera jamais : soit rien de réglable, soit
 	// un score qui n'arrivera plus (dernier match réglable passé depuis > 5 j, sans score).
 	const reglables = ticket.selections.filter(isSettleable);
-	let statutTerminal: 'sans_reglement' | 'indisponible' | null = null;
+	let statutTerminal: 'sans_reglement' | 'indisponible' | 'orientation_incertaine' | null = null;
 	if (verdictOriginale === 'en_attente') {
-		if (reglables.length === 0) statutTerminal = 'sans_reglement';
+		// Orientation incertaine : une sélection sans snapshot sur un fixture retourné a été
+		// RETENUE. On le dit honnêtement plutôt que d'afficher un verdict douteux.
+		if (v.retenues.length > 0) statutTerminal = 'orientation_incertaine';
+		else if (reglables.length === 0) statutTerminal = 'sans_reglement';
 		else {
 			const dates = await sports.fixtureDates(reglables.map((s) => s.fixtureId as number));
 			const dernier = [...dates.values()];
@@ -141,7 +161,7 @@ export const load: PageServerLoad = async (event) => {
 			if (resultatIntrouvable(dernierKickoff, Date.now())) statutTerminal = 'indisponible';
 		}
 	}
-	const verdict: 'attente' | 'sans_reglement' | 'indisponible' | TicketResult =
+	const verdict: 'attente' | 'sans_reglement' | 'indisponible' | 'orientation_incertaine' | TicketResult =
 		statutTerminal ?? verdictOriginale;
 	const tombeSur =
 		verdictOriginale === 'tombe' && v.premierPerduOrdre != null

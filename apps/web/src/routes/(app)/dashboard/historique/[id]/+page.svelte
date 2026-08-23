@@ -63,14 +63,17 @@
 		<p class="t-small sous">{dateLabel} · {data.nbMatchs} match{data.nbMatchs > 1 ? 's' : ''} · consultable à vie</p>
 	</div>
 
-	{#if data.verdict === 'indisponible' || data.verdict === 'sans_reglement'}
-		<!-- Statut honnête : le ticket ne se réglera jamais. On le DIT, on ne le laisse
-		     pas « en attente » à vie. -->
+	{#if data.verdict === 'indisponible' || data.verdict === 'sans_reglement' || data.verdict === 'orientation_incertaine'}
+		<!-- Statut honnête : le ticket ne se réglera jamais (ou pas avec certitude). On le
+		     DIT, on ne le laisse pas « en attente » à vie, et on ne pose JAMAIS un verdict
+		     douteux (orientation incertaine du match). -->
 		<div class="bilan neutre" role="status">
 			<p class="bilan-txt">
 				{data.verdict === 'indisponible'
 					? "On n'a pas pu récupérer le résultat de ce match. Il ne sera pas réglé."
-					: 'Aucun match analysable dans ce ticket — rien à régler.'}
+					: data.verdict === 'orientation_incertaine'
+						? "On vérifie l'ordre des équipes sur un de ces matchs. On préfère ne rien afficher plutôt qu'un résultat douteux."
+						: 'Aucun match analysable dans ce ticket — rien à régler.'}
 			</p>
 		</div>
 	{/if}

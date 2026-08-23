@@ -81,6 +81,50 @@ export function isSettleable(s: Selection): boolean {
 	return s.etatResolution === 'certain' && s.marche !== null && s.fixtureId !== null;
 }
 
+/** Marchés dont le verdict DÉPEND du camp domicile/extérieur. Le nul, les plus/moins et
+ *  « les deux marquent » sont SYMÉTRIQUES : un retournement ne les change pas. */
+const MARCHES_ORIENTES: ReadonlySet<string> = new Set<Market>([
+	'WIN_HOME', 'WIN_AWAY', 'DC_HOME_DRAW', 'DC_DRAW_AWAY', 'DC_HOME_AWAY'
+]);
+export function orientationSensible(marche: Market | string | null): boolean {
+	return marche !== null && MARCHES_ORIENTES.has(marche);
+}
+
+/** Seuil de RETOURNEMENT (DC modèle vs 1X2 coté), partagé avec la surveillance et le
+ *  diagnostic de cohérence : une seule valeur pour un seul phénomène. */
+export const SEUIL_FLIP_DC = 0.25;
+
+/**
+ * Un fixture est-il RETOURNÉ ? La double chance MODÈLE (orientée par le fixture) et le
+ * 1X2 coté (orienté par le fournisseur) désignent des favoris opposés → écart énorme.
+ * Passer `dcHomeDrawModele` seulement si sa source est « model » (une DC dérivée d'une
+ * cote est la somme de ses composantes — jamais un flip).
+ */
+export function fixtureFlipSuspect(
+	dcHomeDrawModele: number | null,
+	winHome: number | null,
+	draw: number | null
+): boolean {
+	if (dcHomeDrawModele == null || winHome == null || draw == null) return false;
+	return Math.abs(dcHomeDrawModele - (winHome + draw)) >= SEUIL_FLIP_DC;
+}
+
+/**
+ * Faut-il RETENIR cette sélection (ne pas la régler) ? Vrai quand elle n'a PAS de
+ * snapshot d'orientation (ticket d'avant 0025), que son marché dépend du camp, ET que
+ * son fixture est retourné : on ne peut alors garantir l'orientation, donc « en attente »
+ * plutôt qu'un faux verdict. Une sélection AVEC snapshot est réglée normalement (score
+ * permuté au besoin) — jamais retenue.
+ */
+export function selectionRetenue(s: Selection, flipSuspects?: ReadonlySet<number>): boolean {
+	return (
+		s.equipeDomId == null &&
+		s.fixtureId !== null &&
+		orientationSensible(s.marche) &&
+		!!flipSuspects?.has(s.fixtureId)
+	);
+}
+
 /**
  * Le fixture a-t-il été RETOURNÉ depuis l'analyse ? Vrai si le snapshot d'orientation
  * de la sélection (équipe domicile figée à l'analyse) ne correspond PAS à l'équipe
@@ -128,6 +172,9 @@ export interface TicketVerdict {
 	renforce: TicketResult;
 	/** Ordre de la 1re sélection réglable tombée (pour « tombé sur ce match »). */
 	premierPerduOrdre: number | null;
+	/** Ordres des sélections RETENUES (orientation incertaine) : non réglées à dessein.
+	 *  Tant qu'il y en a, le ticket reste « en attente » — jamais un faux verdict. */
+	retenues: number[];
 }
 
 /**
@@ -139,9 +186,22 @@ export interface TicketVerdict {
  * « tombe » si une est perdue une fois tout terminé ; « passe » sinon. C'est LE
  * point de règlement d'un ticket — l'historique et le tableau de bord en dérivent.
  */
-export function settleTicket(selections: Selection[], scores: Map<number, FinalScore>): TicketVerdict {
+export function settleTicket(
+	selections: Selection[],
+	scores: Map<number, FinalScore>,
+	flipSuspects?: ReadonlySet<number>
+): TicketVerdict {
 	const parSelection = new Map<number, boolean | null>();
+	const retenues: number[] = [];
 	for (const s of selections) {
+		// GARDE : sélection sans snapshot sur un fixture retourné → on ne règle pas
+		// (orientation incertaine). Elle reste « null » (en attente) : le ticket ne se
+		// verra jamais poser un faux verdict à cause d'elle.
+		if (selectionRetenue(s, flipSuspects)) {
+			parSelection.set(s.ordre, null);
+			retenues.push(s.ordre);
+			continue;
+		}
 		const sc = s.fixtureId != null ? (scores.get(s.fixtureId) ?? null) : null;
 		parSelection.set(s.ordre, selectionOutcome(s, sc));
 	}
@@ -152,7 +212,8 @@ export function settleTicket(selections: Selection[], scores: Map<number, FinalS
 		parSelection,
 		originale: groupVerdict(reglables.map((s) => parSelection.get(s.ordre) ?? null)),
 		renforce: groupVerdict(gardees.map((s) => parSelection.get(s.ordre) ?? null)),
-		premierPerduOrdre: premierPerdu ? premierPerdu.ordre : null
+		premierPerduOrdre: premierPerdu ? premierPerdu.ordre : null,
+		retenues
 	};
 }
 

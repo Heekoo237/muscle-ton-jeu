@@ -31,6 +31,9 @@ function fakePorts(scores: Map<number, FinalScore>) {
 		async scoresFor(ids) {
 			return new Map(ids.map((id) => [id, scores.get(id) ?? null]));
 		},
+		async flipSuspectsFor() {
+			return new Set<number>(); // aucun fixture retourné dans ces tests
+		},
 		async reserver(cle) {
 			if (reserved.has(cle)) return false;
 			reserved.add(cle);

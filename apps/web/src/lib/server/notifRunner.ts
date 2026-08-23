@@ -12,7 +12,7 @@ import type { Selection, TicketResult } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
 import { notifications } from '$lib/server/services';
 import { runSettlement, type SettlePorts, type TicketARegler, type SettleStats } from '$lib/server/domain/notif-settle';
-import { settleTicket } from '$lib/server/domain/settle';
+import { settleTicket, fixtureFlipSuspect } from '$lib/server/domain/settle';
 import { buildMorningNotification } from '$lib/server/domain/notif-text';
 import { ANALYSES_OFFERTES } from '$lib/offer';
 import { enHeuresCalmes } from '$lib/server/domain/notif-schedule';
@@ -95,9 +95,51 @@ async function pendingSettleTickets(nowMs: number): Promise<TicketARegler[]> {
 	return rows.map((t) => ({ id: t.id, userId: t.user_id, selections: parTicket.get(t.id) ?? [] }));
 }
 
+/**
+ * Fixtures RETOURNÉS parmi ceux fournis : la DC modèle (orientée fixture) contredit
+ * le 1X2 coté (orienté fournisseur). Lecture SEULE de predictions. Sert au garde du
+ * règlement : une sélection SANS snapshot sur l'un d'eux n'est pas réglée.
+ */
+async function flipSuspectsDepuisBase(
+	db: ReturnType<typeof supabaseAdmin>,
+	fixtureIds: number[]
+): Promise<Set<number>> {
+	const out = new Set<number>();
+	if (fixtureIds.length === 0) return out;
+	const { data } = await db
+		.from('predictions')
+		.select('fixture_id, marche, probabilite, source, jour_calcul')
+		.in('fixture_id', fixtureIds)
+		.in('marche', ['WIN_HOME', 'DRAW', 'DC_HOME_DRAW'])
+		.order('jour_calcul', { ascending: false });
+	// Dernière valeur par (fixture, marché).
+	const vu = new Map<number, Set<string>>();
+	const val = new Map<number, { wh: number | null; dr: number | null; dc: number | null; dcSrc: string | null }>();
+	for (const r of (data ?? []) as Record<string, unknown>[]) {
+		const fid = Number(r.fixture_id);
+		const marche = String(r.marche);
+		let m = vu.get(fid);
+		if (!m) { m = new Set(); vu.set(fid, m); }
+		if (m.has(marche)) continue;
+		m.add(marche);
+		const v = val.get(fid) ?? { wh: null, dr: null, dc: null, dcSrc: null };
+		const p = Number(r.probabilite);
+		if (marche === 'WIN_HOME') v.wh = p;
+		else if (marche === 'DRAW') v.dr = p;
+		else if (marche === 'DC_HOME_DRAW') { v.dc = p; v.dcSrc = r.source == null ? null : String(r.source); }
+		val.set(fid, v);
+	}
+	for (const [fid, v] of val) {
+		const dcModel = v.dcSrc === 'model' ? v.dc : null; // DC dérivée d'une cote ≠ flip
+		if (fixtureFlipSuspect(dcModel, v.wh, v.dr)) out.add(fid);
+	}
+	return out;
+}
+
 function supabaseSettlePorts(origin: string): SettlePorts {
 	const db = supabaseAdmin();
 	return {
+		flipSuspectsFor: (fixtureIds) => flipSuspectsDepuisBase(db, fixtureIds),
 		async scoresFor(fixtureIds) {
 			const out = new Map<number, FinalScore>();
 			if (fixtureIds.length === 0) return out;
@@ -190,7 +232,14 @@ export async function runBackfillJob(nowMs: number): Promise<BackfillStats> {
 			...new Set(selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
 		];
 		const scores = await ports.scoresFor(fixtureIds);
-		const v = settleTicket(selections, scores);
+		const flip = await ports.flipSuspectsFor(fixtureIds);
+		const v = settleTicket(selections, scores, flip);
+		if (v.retenues.length > 0) {
+			console.warn(
+				`[backfill] ORIENTATION INCERTAINE ticket ${t.id} — ${v.retenues.length} ` +
+					`sélection(s) sans snapshot sur un fixture retourné : NON réglé, laissé en attente.`
+			);
+		}
 		if (v.originale === 'en_attente') {
 			// Distingue « un score manque encore » de « rien de réglable ici ».
 			if (selections.some((s) => s.etatResolution === 'certain' && s.marche !== null && s.fixtureId !== null))

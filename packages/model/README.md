@@ -442,6 +442,47 @@ les probabilités se figent une fois par nuit :
 Base cible : une seule variable, `MTJ_DATABASE_URL` (chaîne Postgres du pooler
 Supabase). Migrations : `0005_predictions_pipeline.sql` + `0006_league_catalog.sql`.
 
+### Règle des UPSERTS — un `ON CONFLICT` doit RÉ-ÉCRIRE toute colonne dérivée du fournisseur
+
+**Un `INSERT … ON CONFLICT DO UPDATE SET` qui omet une colonne la GÈLE à sa valeur
+du premier insert — à vie.** Chaque relevé suivant la laisse intacte, même si le
+fournisseur l'a corrigée. Le défaut est invisible : la ligne existe, elle a l'air
+fraîche, mais une de ses colonnes date du tout premier appel.
+
+C'est exactement le bug « le PSG affiché perdant » : `upsert_fixture` mettait à jour
+statut/score/date mais **pas** `team_home_id`/`team_away_id`. The Odds API renvoie
+parfois l'orientation domicile/extérieur inversée au premier relevé puis se corrige ;
+les cotes (re-collectées) suivaient, le fixture non. Résultat : `score_home`
+n'appartenait plus à `team_home_id`, et un match sur cinq sortait faux. Le même trou
+existait dans `backfill._batch_fixtures`. Les deux sont corrigés (l'orientation est
+maintenant dans le `SET`), et un test verrouille le `DO UPDATE SET`.
+
+**La règle, générale — même esprit que l'isolation d'erreur des boucles par ligue :**
+
+> Le `DO UPDATE SET` (ou le payload d'un `.upsert()` Supabase) doit contenir **toute
+> colonne que le fournisseur peut CORRIGER d'un relevé à l'autre**. Une colonne
+> dérivée d'une source externe et absente du `SET` est un gel silencieux : la
+> première valeur devient la valeur éternelle, et diverge sans bruit des données
+> fraîches. **L'exception, à COMMENTER explicitement, ce sont les colonnes locales ou
+> historiques qu'on préserve VOLONTAIREMENT** — `league_source_state.bascule_le` (la
+> date d'une bascule passée ne se réécrit pas), `league_catalog.regime` (un
+> championnat onboardé au modèle ne redevient pas « cote seule » à un re-sync). Tout
+> le reste doit suivre la source.
+
+Audit des upserts au moment du correctif (à refaire si on en ajoute) :
+
+| Upsert | Clé | Met à jour | Verdict |
+|---|---|---|---|
+| `sync.upsert_fixture` (fixtures) | provider_ref | orientation + statut + score + date | **corrigé** (orientation ajoutée) |
+| `backfill._batch_fixtures` (fixtures) | provider_ref | orientation + statut + score + date | **corrigé** (orientation ajoutée) |
+| `predictions_io.write_predictions` | fixture,marché,jour | proba, confiance, source, seuil, book, calcule_le | complet |
+| `collector._write_snapshot` (odds_snapshots) | fixture,marché,book,fenêtre | cote, relevé_le | complet |
+| `nightly` (league_source_state) | fd_code | mode, marge, maj_le (bascule_le préservé) | complet, exception commentée |
+| `catalogue_sync` (league_catalog) | fd_code | odds_api_key, nom (regime/relevés préservés) | complet, exception commentée |
+| `catalogue_sync` (leagues) | provider_ref | actif | ok (nom/pays = cosmétique) |
+| `ondemand.upsertFixture` (TS, fixtures) | provider_ref | tout le payload, orientation comprise | ok (Supabase écrit tout le payload) |
+| `ondemand.ecrirePredictions` (TS) | fixture,marché,jour | proba, source, confiance, seuil | ok (calcule_le non rafraîchi, cosmétique) |
+
 ## Fournisseur : The Odds API
 
 Orienté cotes, **Pinnacle disponible en région `eu`** (notre référence de

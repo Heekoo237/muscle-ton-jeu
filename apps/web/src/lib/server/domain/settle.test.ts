@@ -6,6 +6,8 @@ import {
 	settleTicket,
 	selectionOutcome,
 	fixtureRetourne,
+	fixtureFlipSuspect,
+	orientationSensible,
 	verdictAffiche,
 	resultatIntrouvable,
 	DELAI_RESULTAT_INTROUVABLE_JOURS,
@@ -206,5 +208,53 @@ describe('snapshot d’orientation — un verdict ne se retourne jamais (cas Ren
 		const s = selOr('DRAW', 7);
 		expect(selectionOutcome(s, { home: 1, away: 1, homeTeamId: 9 })).toBe(true);
 		expect(selectionOutcome(s, { home: 2, away: 1, homeTeamId: 9 })).toBe(false);
+	});
+});
+
+describe('garde orientation — sélection SANS snapshot sur fixture retourné : retenue', () => {
+	const scores = (m: Record<number, FinalScore>) =>
+		new Map<number, FinalScore>(Object.entries(m).map(([k, v]) => [Number(k), v]));
+
+	it('fixtureFlipSuspect : écart énorme DC modèle vs 1X2 coté', () => {
+		expect(fixtureFlipSuspect(0.864, 0.17, 0.2)).toBe(true); // écart 0,49
+		expect(fixtureFlipSuspect(0.37, 0.16, 0.2)).toBe(false); // cohérent
+		expect(fixtureFlipSuspect(null, 0.16, 0.2)).toBe(false); // DC non-modèle → null
+	});
+
+	it('orientationSensible : 1X2/DC oui, nul et symétriques non', () => {
+		expect(orientationSensible('WIN_HOME')).toBe(true);
+		expect(orientationSensible('DC_DRAW_AWAY')).toBe(true);
+		expect(orientationSensible('DRAW')).toBe(false);
+		expect(orientationSensible('OVER_2_5')).toBe(false);
+		expect(orientationSensible('BTTS_YES')).toBe(false);
+	});
+
+	it('sélection SANS snapshot sur fixture flip-suspect → RETENUE, ticket en attente', () => {
+		const s = [sel(1, 'WIN_HOME', 10)]; // pas d'equipeDomId
+		const v = settleTicket(s, scores({ 10: { home: 2, away: 0, homeTeamId: 9 } }), new Set([10]));
+		expect(v.retenues).toEqual([1]);
+		expect(v.parSelection.get(1)).toBeNull(); // non réglée
+		expect(v.originale).toBe('en_attente'); // jamais un faux verdict
+	});
+
+	it('sélection AVEC snapshot : jamais retenue, réglée normalement (permutation)', () => {
+		const s: Selection[] = [{ ...sel(1, 'WIN_HOME', 10), equipeDomId: 7, equipeExtId: 8 }];
+		const v = settleTicket(s, scores({ 10: { home: 0, away: 2, homeTeamId: 9 } }), new Set([10]));
+		expect(v.retenues).toEqual([]);
+		expect(v.parSelection.get(1)).toBe(true); // 7 gagne après permutation
+	});
+
+	it('marché symétrique sans snapshot sur fixture flip-suspect : PAS retenu (nul)', () => {
+		const s = [sel(1, 'DRAW', 10)];
+		const v = settleTicket(s, scores({ 10: { home: 1, away: 1, homeTeamId: 9 } }), new Set([10]));
+		expect(v.retenues).toEqual([]);
+		expect(v.parSelection.get(1)).toBe(true);
+	});
+
+	it('sans set de flip-suspects : comportement historique, rien retenu', () => {
+		const s = [sel(1, 'WIN_HOME', 10)];
+		const v = settleTicket(s, scores({ 10: { home: 2, away: 0, homeTeamId: 9 } }));
+		expect(v.retenues).toEqual([]);
+		expect(v.parSelection.get(1)).toBe(true);
 	});
 });

@@ -78,11 +78,17 @@ def _odds_team_keys(con) -> dict[int, set[str]]:
 
 
 def _batch_fixtures(con, rows: list[tuple]) -> None:
+    # Comme sync.upsert_fixture : l'orientation (team_home_id/team_away_id) est
+    # RÉ-ÉCRITE sur conflit, jamais gelée. Le score écrit ici est dans l'ordre du
+    # fournisseur (parse_scores) ; l'orientation DOIT suivre le même relevé, sinon
+    # score_home n'appartiendrait plus à team_home_id (le bug « favori perdant »).
     sql = """
         insert into fixtures
             (provider_ref, date_utc, team_home_id, team_away_id, league_id, statut, score_home, score_away)
         values (%s, %s, %s, %s, %s, 'finished', %s, %s)
         on conflict (provider_ref) do update set
+            team_home_id = excluded.team_home_id,
+            team_away_id = excluded.team_away_id,
             statut = 'finished', score_home = excluded.score_home,
             score_away = excluded.score_away, date_utc = excluded.date_utc
     """
