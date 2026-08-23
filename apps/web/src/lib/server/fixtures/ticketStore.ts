@@ -56,6 +56,51 @@ let memCounter = 0;
 /* ------------------------------------------------------------------------ */
 type Row = Record<string, unknown>;
 
+/** Colonnes OPTIONNELLES (ajoutées par une migration récente) : leur absence en base
+ *  ne doit JAMAIS bloquer une écriture de ticket — c'est le cœur du produit. */
+const COLONNES_OPTIONNELLES = ['equipe_dom_id', 'equipe_ext_id'] as const;
+
+/** L'erreur d'insert vient-elle d'une COLONNE optionnelle absente (migration non
+ *  appliquée) ? PostgREST renvoie PGRST204 « Could not find the 'x' column ». */
+function colonneOptionnelleAbsente(err: { code?: string; message?: string } | null): boolean {
+	if (!err) return false;
+	const msg = err.message ?? '';
+	return err.code === 'PGRST204' || COLONNES_OPTIONNELLES.some((c) => msg.includes(c));
+}
+
+/**
+ * Insère des sélections en TOLÉRANT l'absence des colonnes optionnelles (snapshot
+ * d'orientation, migration 0025). Si la base ne les a pas encore, on RÉESSAIE sans
+ * elles plutôt que de faire échouer TOUTE l'analyse — le snapshot est une protection
+ * en plus, jamais un prérequis. On le JOURNALISE : `/api/health/schema` signale par
+ * ailleurs la colonne manquante (règle d'archi n°8), l'utilisateur n'est pas bloqué.
+ */
+async function insererSelections(
+	sb: ReturnType<typeof supabaseAdmin>,
+	ticketId: number,
+	selections: Selection[]
+): Promise<void> {
+	if (!selections.length) return;
+	const rows = selections.map((s) => selectionToRow(ticketId, s));
+	const { error } = await sb.from('selections').insert(rows);
+	if (!error) return;
+	if (colonneOptionnelleAbsente(error)) {
+		console.warn(
+			'[ticket] colonnes d’orientation absentes (migration 0025 non appliquée ?) — ' +
+				'insertion SANS snapshot pour ne pas bloquer l’analyse. À corriger via /api/health/schema.'
+		);
+		const rowsSansSnap = rows.map((r) => {
+			const copie = { ...r };
+			for (const c of COLONNES_OPTIONNELLES) delete copie[c];
+			return copie;
+		});
+		const { error: e2 } = await sb.from('selections').insert(rowsSansSnap);
+		if (e2) throw e2;
+		return;
+	}
+	throw error;
+}
+
 function selectionToRow(ticketId: number, s: Selection): Row {
 	return {
 		ticket_id: ticketId,
@@ -161,12 +206,7 @@ export async function createTicket(
 		.select('id, statut, cree_le')
 		.single();
 	if (error) throw error;
-	if (selections.length) {
-		const { error: se } = await sb
-			.from('selections')
-			.insert(selections.map((s) => selectionToRow(t.id, s)));
-		if (se) throw se;
-	}
+	await insererSelections(sb, t.id, selections);
 	return rowToTicket(t, selections.map((s) => selectionToRow(t.id, s)));
 }
 
@@ -211,9 +251,7 @@ export async function updateTicket(
 	}
 	if (patch.selections) {
 		await sb.from('selections').delete().eq('ticket_id', Number(id));
-		if (patch.selections.length) {
-			await sb.from('selections').insert(patch.selections.map((s) => selectionToRow(Number(id), s)));
-		}
+		await insererSelections(sb, Number(id), patch.selections);
 	}
 	return getTicket(id);
 }
