@@ -71,7 +71,11 @@ function selectionToRow(ticketId: number, s: Selection): Row {
 		match_label: s.matchLabel,
 		libelle_fr: s.libelleFr,
 		raison: s.raison ?? null,
-		candidates: s.candidates ?? null
+		candidates: s.candidates ?? null,
+		// Snapshot d'orientation (migration 0025) : le règlement compare ceci à
+		// l'orientation courante du fixture pour survivre à un retournement.
+		equipe_dom_id: s.equipeDomId ?? null,
+		equipe_ext_id: s.equipeExtId ?? null
 	};
 }
 
@@ -82,6 +86,8 @@ function rowToSelection(r: Row): Selection {
 		texteBrut: (r.texte_brut as string) ?? '',
 		fixtureId: r.fixture_id === null || r.fixture_id === undefined ? null : Number(r.fixture_id),
 		matchLabel: (r.match_label as string) ?? '',
+		equipeDomId: num(r.equipe_dom_id),
+		equipeExtId: num(r.equipe_ext_id),
 		marche: (r.marche as Market | null) ?? null,
 		etatResolution: r.etat_resolution as Selection['etatResolution'],
 		raison: (r.raison as Selection['raison']) ?? undefined,

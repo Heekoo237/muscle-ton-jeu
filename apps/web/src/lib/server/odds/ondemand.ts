@@ -596,6 +596,8 @@ export async function remplirMatchsNonResolus(
 							dateUtc: trouve.ev.commenceIso,
 							teamHome: trouve.homeTeam.nom,
 							teamAway: trouve.awayTeam.nom,
+							teamHomeId: trouve.homeTeam.id,
+							teamAwayId: trouve.awayTeam.id,
 							leagueId: m.leagueId,
 							statut: 'scheduled',
 							scoreHome: null,

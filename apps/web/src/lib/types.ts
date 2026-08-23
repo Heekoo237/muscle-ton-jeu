@@ -63,6 +63,10 @@ export interface Fixture {
 	dateUtc: string; // ISO
 	teamHome: string;
 	teamAway: string;
+	/** Ids des équipes domicile/extérieur — l'ORIENTATION courante du fixture. Sert au
+	 *  snapshot d'orientation de la sélection (règlement à l'épreuve d'un retournement). */
+	teamHomeId: number;
+	teamAwayId: number;
 	leagueId: number;
 	statut: FixtureStatus;
 	scoreHome: number | null;
@@ -105,6 +109,16 @@ export interface Selection {
 	fixtureId: number | null;
 	/** Match reconnu, prêt à afficher (« Arsenal – Liverpool »). */
 	matchLabel: string;
+	/**
+	 * SNAPSHOT d'orientation : ids des équipes domicile/extérieur du fixture AU MOMENT
+	 * DE L'ANALYSE (une analyse est une photographie). Le règlement compare ce snapshot
+	 * à l'orientation COURANTE du fixture : s'ils diffèrent (fixture corrigé/retourné
+	 * après coup), on permute le score avant de régler — le verdict ne se retourne
+	 * jamais. `null` sur les sélections d'avant la migration 0025 (règlement sans
+	 * permutation, comportement historique).
+	 */
+	equipeDomId?: number | null;
+	equipeExtId?: number | null;
 	marche: Market | null;
 	etatResolution: ResolutionState;
 	/**

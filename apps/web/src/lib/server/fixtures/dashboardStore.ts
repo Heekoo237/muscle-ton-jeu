@@ -7,7 +7,12 @@
  * gagné », aucun taux de réussite personnel, aucun gain.
  */
 import { listAnalysedTickets, type StoredTicket } from './ticketStore';
-import { settleMarket, isSettleable, resultatIntrouvable } from '$lib/server/domain/settle';
+import {
+	selectionOutcome,
+	isSettleable,
+	resultatIntrouvable,
+	type FinalScore
+} from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
 import type { Fixture, Market } from '$lib/types';
 
@@ -66,11 +71,12 @@ export function dashboardStats(data: DashboardData): DashboardStats {
 	const ticketsAnalyses = analysed.length;
 	const fragilesMarques = analysed.reduce((n, t) => n + (t.result?.nbFragiles ?? 0), 0);
 
-	// Matchs terminés connus, indexés par fixture.
-	const scoreOf = new Map<number, { h: number; a: number }>();
+	// Matchs terminés connus, indexés par fixture. On garde l'orientation courante
+	// (homeTeamId) pour que le règlement se recale sur le snapshot de la sélection.
+	const scoreOf = new Map<number, FinalScore>();
 	for (const f of finished) {
 		if (f.scoreHome != null && f.scoreAway != null) {
-			scoreOf.set(f.id, { h: f.scoreHome, a: f.scoreAway });
+			scoreOf.set(f.id, { home: f.scoreHome, away: f.scoreAway, homeTeamId: f.teamHomeId });
 		}
 	}
 
@@ -80,7 +86,7 @@ export function dashboardStats(data: DashboardData): DashboardStats {
 			if (!s.fragile || s.fixtureId === null || s.marche === null) continue;
 			const sc = scoreOf.get(s.fixtureId);
 			if (!sc) continue; // match non terminé : ni passé ni tombé
-			const passe = settleMarket(s.marche as Market, sc.h, sc.a);
+			const passe = selectionOutcome(s, sc);
 			if (passe === false) fragilesTombes += 1;
 		}
 	}

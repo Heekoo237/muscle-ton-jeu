@@ -37,6 +37,8 @@ function rowToSel(r: Record<string, unknown>): Selection {
 		texteBrut: '',
 		fixtureId: r.fixture_id == null ? null : Number(r.fixture_id),
 		matchLabel: (r.match_label as string) ?? '',
+		equipeDomId: r.equipe_dom_id == null ? null : Number(r.equipe_dom_id),
+		equipeExtId: r.equipe_ext_id == null ? null : Number(r.equipe_ext_id),
 		marche: (r.marche as Selection['marche']) ?? null,
 		etatResolution: r.etat_resolution as Selection['etatResolution'],
 		coteSaisie: null,
@@ -82,7 +84,7 @@ async function pendingSettleTickets(nowMs: number): Promise<TicketARegler[]> {
 	const ids = rows.map((t) => t.id);
 	const { data: sels } = await db
 		.from('selections')
-		.select('ticket_id, ordre, fixture_id, match_label, marche, etat_resolution, fragile, retiree_du_renforce')
+		.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
 		.in('ticket_id', ids);
 	const parTicket = new Map<number, Selection[]>();
 	for (const r of (sels ?? []) as Record<string, unknown>[]) {
@@ -101,12 +103,17 @@ function supabaseSettlePorts(origin: string): SettlePorts {
 			if (fixtureIds.length === 0) return out;
 			const { data } = await db
 				.from('fixtures')
-				.select('id, score_home, score_away, statut')
+				.select('id, score_home, score_away, statut, team_home_id')
 				.in('id', fixtureIds)
 				.eq('statut', 'finished');
 			for (const f of (data ?? []) as Record<string, unknown>[]) {
 				if (f.score_home != null && f.score_away != null) {
-					out.set(Number(f.id), { home: Number(f.score_home), away: Number(f.score_away) });
+					out.set(Number(f.id), {
+						home: Number(f.score_home),
+						away: Number(f.score_away),
+						// Orientation courante : le règlement permute si la sélection a figé l'autre.
+						homeTeamId: f.team_home_id == null ? null : Number(f.team_home_id)
+					});
 				}
 			}
 			return out;
@@ -165,7 +172,7 @@ export async function runBackfillJob(nowMs: number): Promise<BackfillStats> {
 	const ids = rows.map((t) => t.id);
 	const { data: sels } = await db
 		.from('selections')
-		.select('ticket_id, ordre, fixture_id, match_label, marche, etat_resolution, fragile, retiree_du_renforce')
+		.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
 		.in('ticket_id', ids)
 		.limit(30000);
 	const parTicket = new Map<number, Selection[]>();

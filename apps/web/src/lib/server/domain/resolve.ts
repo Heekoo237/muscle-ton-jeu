@@ -507,6 +507,11 @@ export function resolveTicket(raw: RawTicketRead, fixtures: Fixture[], teams: Te
 				ordre,
 				texteBrut: ligne.texteBrut,
 				matchLabel,
+				// SNAPSHOT d'orientation : l'id domicile/extérieur du fixture AU MOMENT de
+				// l'analyse. Le règlement s'y réfère pour rester juste si le fixture est
+				// retourné plus tard (voir migration 0025 et settle.selectionOutcome).
+				equipeDomId: fx.fixture.teamHomeId,
+				equipeExtId: fx.fixture.teamAwayId,
 				fixtureId: fx.fixture.id,
 				marche: market.market,
 				etatResolution: 'certain',

@@ -63,8 +63,14 @@ export function settleMarket(marche: Market | string | null, h: number, a: numbe
 	return marketOutcome(marche as Market, h, a);
 }
 
-/** Score final d'un match, ou null tant qu'il n'est pas terminé. */
-export type FinalScore = { home: number; away: number } | null;
+/**
+ * Score final d'un match, ou null tant qu'il n'est pas terminé. `homeTeamId` (l'équipe
+ * domicile COURANTE du fixture) permet au règlement de se recaler sur le SNAPSHOT
+ * d'orientation de la sélection : si le fixture a été retourné après l'analyse, on
+ * permute avant de régler. Absent (ancien code) → aucune permutation, comportement
+ * historique.
+ */
+export type FinalScore = { home: number; away: number; homeTeamId?: number | null } | null;
 
 /**
  * Une sélection est RÉGLABLE si elle porte un marché couvert sur un match résolu.
@@ -75,10 +81,29 @@ export function isSettleable(s: Selection): boolean {
 	return s.etatResolution === 'certain' && s.marche !== null && s.fixtureId !== null;
 }
 
+/**
+ * Le fixture a-t-il été RETOURNÉ depuis l'analyse ? Vrai si le snapshot d'orientation
+ * de la sélection (équipe domicile figée à l'analyse) ne correspond PAS à l'équipe
+ * domicile COURANTE du fixture. On ne tranche que si les DEUX ids sont connus — un
+ * ancien ticket sans snapshot n'est jamais permuté (comportement historique).
+ */
+export function fixtureRetourne(s: Selection, score: FinalScore): boolean {
+	if (score == null) return false;
+	const snap = s.equipeDomId;
+	const courant = score.homeTeamId;
+	return snap != null && courant != null && snap !== courant;
+}
+
 /** Résultat d'une sélection : true = passée, false = tombée, null = en attente. */
 export function selectionOutcome(s: Selection, score: FinalScore): boolean | null {
 	if (!isSettleable(s) || s.marche === null || score === null) return null;
-	return settleMarket(s.marche, score.home, score.away);
+	// Si le fixture a été retourné après l'analyse, le score courant est dans l'ordre
+	// INVERSE de celui que la sélection a figé : on permute domicile/extérieur avant de
+	// régler. Le verdict d'un ticket déjà analysé ne peut donc jamais se retourner.
+	const retourne = fixtureRetourne(s, score);
+	const h = retourne ? score.away : score.home;
+	const a = retourne ? score.home : score.away;
+	return settleMarket(s.marche, h, a);
 }
 
 export interface SettlementResult {

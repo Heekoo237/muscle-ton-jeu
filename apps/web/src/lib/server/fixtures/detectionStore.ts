@@ -22,13 +22,18 @@ export async function computeDetection(): Promise<DetectionStats> {
 	// 1. Matchs terminés avec score connu.
 	const { data: fx } = await sb
 		.from('fixtures')
-		.select('id, score_home, score_away')
+		.select('id, score_home, score_away, team_home_id')
 		.eq('statut', 'finished')
 		.not('score_home', 'is', null)
 		.not('score_away', 'is', null);
 	if (!fx || fx.length === 0) return detectionStats([]);
-	const score = new Map<number, { h: number; a: number }>();
-	for (const f of fx as Row[]) score.set(Number(f.id), { h: Number(f.score_home), a: Number(f.score_away) });
+	const score = new Map<number, { h: number; a: number; homeId: number }>();
+	for (const f of fx as Row[])
+		score.set(Number(f.id), {
+			h: Number(f.score_home),
+			a: Number(f.score_away),
+			homeId: Number(f.team_home_id)
+		});
 
 	// 2. Tickets réellement ANALYSÉS : une sélection n'a un flag fragile SENSÉ qu'après
 	//    analyse (avant, fragile = false par défaut, ce qui polluerait le seau solide).
@@ -39,7 +44,7 @@ export async function computeDetection(): Promise<DetectionStats> {
 	// 3. Sélections réglables sur ces matchs, issues d'un ticket analysé.
 	const { data: sel } = await sb
 		.from('selections')
-		.select('ticket_id, fixture_id, marche, fragile, etat_resolution')
+		.select('ticket_id, fixture_id, marche, fragile, etat_resolution, equipe_dom_id')
 		.in('fixture_id', [...score.keys()])
 		.eq('etat_resolution', 'certain')
 		.not('marche', 'is', null);
@@ -52,7 +57,10 @@ export async function computeDetection(): Promise<DetectionStats> {
 		const marche = String(s.marche);
 		const sc = score.get(fid);
 		if (!sc) continue;
-		const passe = settleMarket(marche as Market, sc.h, sc.a);
+		// Snapshot d'orientation : permute si le fixture a été retourné depuis l'analyse.
+		const snap = s.equipe_dom_id;
+		const [h, a] = snap != null && Number(snap) !== sc.homeId ? [sc.a, sc.h] : [sc.h, sc.a];
+		const passe = settleMarket(marche as Market, h, a);
 		if (passe === null) continue; // marché non couvert : jamais réglé
 		const cle = `${fid}:${marche}`;
 		if (!vues.has(cle)) vues.set(cle, { fragile: Boolean(s.fragile), tombe: passe === false });

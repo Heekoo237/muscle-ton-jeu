@@ -4,6 +4,8 @@ import {
 	settleMarket,
 	settleReinforced,
 	settleTicket,
+	selectionOutcome,
+	fixtureRetourne,
 	verdictAffiche,
 	resultatIntrouvable,
 	DELAI_RESULTAT_INTROUVABLE_JOURS,
@@ -157,5 +159,52 @@ describe('resultatIntrouvable — un score qui ne viendra jamais', () => {
 
 	it('le délai dépasse la fenêtre /scores du fournisseur (3 j)', () => {
 		expect(DELAI_RESULTAT_INTROUVABLE_JOURS).toBeGreaterThan(3);
+	});
+});
+
+describe('snapshot d’orientation — un verdict ne se retourne jamais (cas Rennes–PSG)', () => {
+	/** Sélection avec snapshot d’orientation : domicile = equipeDomId à l’analyse. */
+	const selOr = (marche: Market, domId: number): Selection => ({
+		...sel(1, marche, 10),
+		equipeDomId: domId,
+		equipeExtId: domId + 1
+	});
+
+	it('fixture INCHANGÉ (snapshot = orientation courante) : score lu tel quel', () => {
+		// PSG (domicile à l’analyse, id 7) gagne 0-2 en tant que… non : domicile marque 0.
+		const s = selOr('WIN_HOME', 7);
+		const score: FinalScore = { home: 2, away: 0, homeTeamId: 7 };
+		expect(fixtureRetourne(s, score)).toBe(false);
+		expect(selectionOutcome(s, score)).toBe(true); // domicile gagne 2-0
+	});
+
+	it('fixture RETOURNÉ après l’analyse : on permute, le verdict tient', () => {
+		// À l’analyse, domicile = équipe 7 (WIN_HOME misé sur 7). Le fixture est corrigé :
+		// l’équipe 7 est désormais l’EXTÉRIEUR (team_home_id courant = 9). Le score courant
+		// 0-2 est donc « 9 marque 0, 7 marque 2 ». Le pari WIN_HOME(7) DOIT gagner.
+		const s = selOr('WIN_HOME', 7);
+		const score: FinalScore = { home: 0, away: 2, homeTeamId: 9 };
+		expect(fixtureRetourne(s, score)).toBe(true);
+		expect(selectionOutcome(s, score)).toBe(true); // après permutation : 2-0 pour 7
+	});
+
+	it('sans snapshot (ancien ticket) : jamais de permutation, comportement historique', () => {
+		const s = sel(1, 'WIN_HOME', 10); // pas d’equipeDomId
+		const score: FinalScore = { home: 0, away: 2, homeTeamId: 9 };
+		expect(fixtureRetourne(s, score)).toBe(false);
+		expect(selectionOutcome(s, score)).toBe(false); // domicile perd 0-2, lu tel quel
+	});
+
+	it('orientation courante inconnue (score sans homeTeamId) : pas de permutation', () => {
+		const s = selOr('WIN_HOME', 7);
+		const score: FinalScore = { home: 2, away: 0 };
+		expect(fixtureRetourne(s, score)).toBe(false);
+		expect(selectionOutcome(s, score)).toBe(true);
+	});
+
+	it('un DRAW est insensible au retournement (symétrique)', () => {
+		const s = selOr('DRAW', 7);
+		expect(selectionOutcome(s, { home: 1, away: 1, homeTeamId: 9 })).toBe(true);
+		expect(selectionOutcome(s, { home: 2, away: 1, homeTeamId: 9 })).toBe(false);
 	});
 });

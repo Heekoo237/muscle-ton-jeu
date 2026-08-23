@@ -127,7 +127,7 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 	if (fixtureIds.size > 0) {
 		const { data: fx } = await db
 			.from('fixtures')
-			.select('id, statut, score_home, score_away, date_utc, provider_ref')
+			.select('id, statut, score_home, score_away, date_utc, provider_ref, team_home_id')
 			.in('id', [...fixtureIds])
 			.limit(20000);
 		for (const f of (fx ?? []) as Record<string, unknown>[]) {
@@ -137,7 +137,11 @@ export async function diagnostiquerReglement(nowMs: number): Promise<ReglementDi
 			if (f.date_utc) fxDate.set(id, Date.parse(f.date_utc as string));
 			if (f.provider_ref == null) fxSansRef.add(id);
 			if (f.score_home != null && f.score_away != null)
-				fxScore.set(id, { home: Number(f.score_home), away: Number(f.score_away) });
+				fxScore.set(id, {
+					home: Number(f.score_home),
+					away: Number(f.score_away),
+					homeTeamId: f.team_home_id == null ? null : Number(f.team_home_id)
+				});
 		}
 	}
 

@@ -59,7 +59,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 	const scores = new Map<number, FinalScore>();
 	for (const f of finished) {
-		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
+		if (f.scoreHome != null && f.scoreAway != null)
+			scores.set(f.id, { home: f.scoreHome, away: f.scoreAway, homeTeamId: f.teamHomeId });
 	}
 
 	const lignes: HistoLine[] = tickets.map((t) => {

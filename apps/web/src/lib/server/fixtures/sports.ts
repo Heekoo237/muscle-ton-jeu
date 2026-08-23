@@ -54,6 +54,9 @@ export function fakeFixtures(): Fixture[] {
 		dateUtc: inDays(days),
 		teamHome,
 		teamAway,
+		// Repli local : orientation = id du match (pas de vraies équipes en base ici).
+		teamHomeId: id * 10 + 1,
+		teamAwayId: id * 10 + 2,
 		leagueId,
 		statut: 'scheduled',
 		scoreHome: null,

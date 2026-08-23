@@ -120,7 +120,8 @@ export const load: PageServerLoad = async (event) => {
 	const finished = await sports.resultsSince(depuis);
 	const scores = new Map<number, FinalScore>();
 	for (const f of finished) {
-		if (f.scoreHome != null && f.scoreAway != null) scores.set(f.id, { home: f.scoreHome, away: f.scoreAway });
+		if (f.scoreHome != null && f.scoreAway != null)
+			scores.set(f.id, { home: f.scoreHome, away: f.scoreAway, homeTeamId: f.teamHomeId });
 	}
 	const v = settleTicket(ticket.selections, scores);
 	// SOURCE DE VÉRITÉ : le verdict persisté par le règlement prime ; le recalcul ne

@@ -60,6 +60,7 @@ type SelRow = {
 	cote_saisie: number | string | null;
 	retiree_du_renforce: boolean | null;
 	fixture_id: number | null;
+	equipe_dom_id: number | null;
 };
 
 export async function computePublicHistory(now: number = Date.now()): Promise<PublicHistoryData> {
@@ -103,20 +104,20 @@ export async function computePublicHistory(now: number = Date.now()): Promise<Pu
 	const ids = tickets.map((t) => t.id);
 	const { data: sel } = await sb
 		.from('selections')
-		.select('ticket_id, ordre, match_label, libelle_fr, marche, cote_saisie, retiree_du_renforce, fixture_id')
+		.select('ticket_id, ordre, match_label, libelle_fr, marche, cote_saisie, retiree_du_renforce, fixture_id, equipe_dom_id')
 		.in('ticket_id', ids);
 	const selections = (sel ?? []) as SelRow[];
 	const fixtureIds = [...new Set(selections.map((s) => s.fixture_id).filter((x): x is number => x != null))];
-	const scores = new Map<number, { h: number; a: number }>();
+	const scores = new Map<number, { h: number; a: number; homeId: number }>();
 	if (fixtureIds.length > 0) {
 		const { data: fx } = await sb
 			.from('fixtures')
-			.select('id, score_home, score_away')
+			.select('id, score_home, score_away, team_home_id')
 			.in('id', fixtureIds)
 			.not('score_home', 'is', null)
 			.not('score_away', 'is', null);
-		for (const f of (fx ?? []) as { id: number; score_home: number; score_away: number }[])
-			scores.set(Number(f.id), { h: Number(f.score_home), a: Number(f.score_away) });
+		for (const f of (fx ?? []) as { id: number; score_home: number; score_away: number; team_home_id: number }[])
+			scores.set(Number(f.id), { h: Number(f.score_home), a: Number(f.score_away), homeId: Number(f.team_home_id) });
 	}
 
 	const selByTicket = new Map<number, SelRow[]>();
@@ -133,7 +134,9 @@ export async function computePublicHistory(now: number = Date.now()): Promise<Pu
 		const rows = (selByTicket.get(t.id) ?? []).slice().sort((a, b) => a.ordre - b.ordre);
 		const lignes: LignePublique[] = rows.map((s) => {
 			const sc = s.fixture_id != null ? scores.get(s.fixture_id) : undefined;
-			const outcome = sc ? settleMarket(s.marche, sc.h, sc.a) : null;
+			// Snapshot d'orientation : permute si le fixture a été retourné depuis l'analyse.
+			const flip = sc != null && s.equipe_dom_id != null && Number(s.equipe_dom_id) !== sc.homeId;
+			const outcome = sc ? settleMarket(s.marche, flip ? sc.a : sc.h, flip ? sc.h : sc.a) : null;
 			return {
 				matchLabel: s.match_label ?? '',
 				libelleFr: s.libelle_fr ?? '',

@@ -60,7 +60,7 @@ export async function listHistoryMarquee(limit = 40): Promise<HistoryItem[]> {
 		// 3. Sélections analysables portant sur ces matchs.
 		const { data: sel } = await sb
 			.from('selections')
-			.select('fixture_id, marche, fragile, etat_resolution')
+			.select('fixture_id, marche, fragile, etat_resolution, equipe_dom_id')
 			.in('fixture_id', [...fxMap.keys()])
 			.eq('etat_resolution', 'certain')
 			.not('marche', 'is', null)
@@ -73,9 +73,13 @@ export async function listHistoryMarquee(limit = 40): Promise<HistoryItem[]> {
 			if (!f) continue;
 			const home = nameOf.get(Number(f.team_home_id));
 			const away = nameOf.get(Number(f.team_away_id));
-			const sh = numOrNull(f.score_home);
-			const sa = numOrNull(f.score_away);
+			let sh = numOrNull(f.score_home);
+			let sa = numOrNull(f.score_away);
 			if (!home || !away || sh === null || sa === null) continue;
+			// Snapshot d'orientation : si le fixture a été retourné depuis l'analyse, le
+			// score courant est dans l'ordre inverse de celui qu'a figé la sélection.
+			const snap = s.equipe_dom_id;
+			if (snap != null && Number(snap) !== Number(f.team_home_id)) [sh, sa] = [sa, sh];
 			const passe = settleMarket(s.marche as Market, sh, sa);
 			if (passe === null) continue; // marché non couvert : jamais réglé
 			items.push({ matchLabel: `${home} – ${away}`, fragile: Boolean(s.fragile), passe });

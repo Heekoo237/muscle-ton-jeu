@@ -10,8 +10,8 @@ const teams: Team[] = [
 	{ id: 13, nom: 'Tottenham', aliases: ['tottenham', 'spurs'], leagueId: 1 }
 ];
 const fixtures: Fixture[] = [
-	{ id: 100, dateUtc: '', teamHome: 'Arsenal', teamAway: 'Liverpool', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null },
-	{ id: 101, dateUtc: '', teamHome: 'Manchester United', teamAway: 'Tottenham', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+	{ id: 100, dateUtc: '', teamHome: 'Arsenal', teamAway: 'Liverpool', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 },
+	{ id: 101, dateUtc: '', teamHome: 'Manchester United', teamAway: 'Tottenham', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 ];
 
 function raw(...lignes: string[]): RawTicketRead {
@@ -62,8 +62,8 @@ const teamsFr: Team[] = [
 	{ id: 23, nom: 'Rennes', aliases: ['rennes', 'stade rennais'], leagueId: 2 }
 ];
 const fixturesFr: Fixture[] = [
-	{ id: 200, dateUtc: '', teamHome: 'Lens', teamAway: 'Paris SG', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null },
-	{ id: 201, dateUtc: '', teamHome: 'Lyon', teamAway: 'Rennes', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+	{ id: 200, dateUtc: '', teamHome: 'Lens', teamAway: 'Paris SG', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 },
+	{ id: 201, dateUtc: '', teamHome: 'Lyon', teamAway: 'Rennes', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 ];
 
 /** Ligne STRUCTURÉE, comme la vraie vision (match/marché/cote isolés). */
@@ -127,8 +127,8 @@ describe('resolveTicket — deux clubs distincts ne se confondent jamais', () =>
 		{ id: 32, nom: 'Lorient', aliases: ['lorient', 'fc lorient'], leagueId: 3 }
 	];
 	const parisFx: Fixture[] = [
-		{ id: 300, dateUtc: '', teamHome: 'Paris FC', teamAway: 'Lorient', leagueId: 3, statut: 'scheduled', scoreHome: null, scoreAway: null },
-		{ id: 301, dateUtc: '', teamHome: 'Paris SG', teamAway: 'Lorient', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		{ id: 300, dateUtc: '', teamHome: 'Paris FC', teamAway: 'Lorient', leagueId: 3, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 },
+		{ id: 301, dateUtc: '', teamHome: 'Paris SG', teamAway: 'Lorient', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 	];
 
 	it('« Paris » seul, ambigu entre deux clubs → INCONNU, jamais deviné', () => {
@@ -160,7 +160,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 		{ id: 4, nom: 'Braga', aliases: ['braga'], leagueId: 2 }
 	];
 	const F: Fixture[] = [
-		{ id: 100, dateUtc: '', teamHome: 'Paris Saint-Germain', teamAway: 'Lens', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+		{ id: 100, dateUtc: '', teamHome: 'Paris Saint-Germain', teamAway: 'Lens', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		// PAS de fixture Sporting Lisbon - Braga → hors fenêtre
 	];
 
@@ -173,7 +173,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 	it('match trouvé mais au-delà de la période analysée → hors_fenetre', () => {
 		const far: Fixture[] = [
 			...F,
-			{ id: 300, dateUtc: '2099-12-31T18:45:00Z', teamHome: 'Sporting Lisbon', teamAway: 'Braga', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 300, dateUtc: '2099-12-31T18:45:00Z', teamHome: 'Sporting Lisbon', teamAway: 'Braga', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const [s] = resolveTicket(raw('Sporting Lisbon - Braga  1  1.80'), far, T);
 		expect(s.raison).toBe('hors_fenetre');
@@ -206,7 +206,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 			{ id: 1377, nom: 'USL Dunkerque', aliases: [], leagueId: 2, clubId: 1377 }
 		];
 		const F2: Fixture[] = [
-			{ id: 400, dateUtc: '', teamHome: 'Stade de Reims', teamAway: 'USL Dunkerque', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 400, dateUtc: '', teamHome: 'Stade de Reims', teamAway: 'USL Dunkerque', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const [s] = resolveTicket(raw('Reims - Dunkerque  Reims ou Nul - Double chance (t. rég)  1.19'), F2, T2);
 		expect(s.etatResolution).toBe('certain');
@@ -221,7 +221,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 			{ id: 1366, nom: 'Saint Etienne', aliases: [], leagueId: 2, clubId: 1366 }
 		];
 		const F3: Fixture[] = [
-			{ id: 401, dateUtc: '', teamHome: 'Saint Etienne', teamAway: 'Clermont', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 401, dateUtc: '', teamHome: 'Saint Etienne', teamAway: 'Clermont', leagueId: 2, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const [s] = resolveTicket(raw('Saint Etienne - Clermont  1  2.0'), F3, T3);
 		expect(s.etatResolution).toBe('certain');
@@ -234,7 +234,7 @@ describe('resolveTicket — la cause de non-résolution est diagnostiquée, pas 
 			{ id: 6, nom: 'Çorum FK', aliases: ['corum fk'], leagueId: 1 }
 		];
 		const F2: Fixture[] = [
-			{ id: 200, dateUtc: '', teamHome: 'Galatasaray', teamAway: 'Çorum FK', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 200, dateUtc: '', teamHome: 'Galatasaray', teamAway: 'Çorum FK', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const [s] = resolveTicket(raw('Galatasaray - Corum Belediyespor  1  1.5'), F2, T2);
 		expect(s.etatResolution).toBe('certain');
@@ -256,7 +256,7 @@ describe('resolveTicket — un match déjà commencé n’est pas analysé', () 
 
 	it('coup d’envoi passé → raison « commence », gardé, non analysé', () => {
 		const F: Fixture[] = [
-			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const [s] = resolveTicket(raw('Reims - Dunkerque  1  1.25'), F, T);
 		expect(s.etatResolution).toBe('inconnu');
@@ -266,8 +266,8 @@ describe('resolveTicket — un match déjà commencé n’est pas analysé', () 
 
 	it('ticket MIXTE : le match à venir est analysé, le commencé seulement signalé', () => {
 		const F: Fixture[] = [
-			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null },
-			{ id: 501, dateUtc: future, teamHome: 'Lyon', teamAway: 'Rennes', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null }
+			{ id: 500, dateUtc: past, teamHome: 'Reims', teamAway: 'Dunkerque', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 },
+			{ id: 501, dateUtc: future, teamHome: 'Lyon', teamAway: 'Rennes', leagueId: 1, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 1, teamAwayId: 2 }
 		];
 		const out = resolveTicket(raw('Reims - Dunkerque  1  1.25', 'Lyon - Rennes  1  2.0'), F, T);
 		expect(out[0].raison).toBe('commence');
