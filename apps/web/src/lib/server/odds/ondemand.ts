@@ -491,6 +491,11 @@ async function upsertFixture(
 	leagueId: number,
 	dateUtc: string
 ): Promise<number | null> {
+	// On NE met PAS `statut` dans le payload : à l'insert la colonne prend son défaut
+	// (`scheduled`, migration 0001) ; sur conflit, Supabase ne met à jour que les colonnes
+	// FOURNIES, donc un fixture déjà `finished` GARDE son statut. Le forcer à `scheduled`
+	// serait le gel à l'envers (« dé-terminer » un match joué) — même famille de bug que
+	// l'orientation gelée dans les upserts fixtures (voir README, règle des upserts).
 	const { data, error } = await supabaseAdmin()
 		.from('fixtures')
 		.upsert(
@@ -499,8 +504,7 @@ async function upsertFixture(
 				date_utc: dateUtc,
 				team_home_id: homeId,
 				team_away_id: awayId,
-				league_id: leagueId,
-				statut: 'scheduled'
+				league_id: leagueId
 			},
 			{ onConflict: 'provider_ref' }
 		)

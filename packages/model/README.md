@@ -480,7 +480,7 @@ Audit des upserts au moment du correctif (à refaire si on en ajoute) :
 | `nightly` (league_source_state) | fd_code | mode, marge, maj_le (bascule_le préservé) | complet, exception commentée |
 | `catalogue_sync` (league_catalog) | fd_code | odds_api_key, nom (regime/relevés préservés) | complet, exception commentée |
 | `catalogue_sync` (leagues) | provider_ref | actif | ok (nom/pays = cosmétique) |
-| `ondemand.upsertFixture` (TS, fixtures) | provider_ref | tout le payload, orientation comprise | ok (Supabase écrit tout le payload) |
+| `ondemand.upsertFixture` (TS, fixtures) | provider_ref | orientation + date (statut RETIRÉ du payload) | **corrigé** — `statut` forcé à `scheduled` re-terminait un match joué (gel à l'envers) ; retiré → défaut à l'insert, préservé sur conflit |
 | `ondemand.ecrirePredictions` (TS) | fixture,marché,jour | proba, source, confiance, seuil | ok (calcule_le non rafraîchi, cosmétique) |
 
 ## Fournisseur : The Odds API
