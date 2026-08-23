@@ -195,11 +195,27 @@ def upsert_fixture(
     score_home: int | None = None, score_away: int | None = None,
 ) -> int:
     """Upsert d'un match par référence fournisseur ; renvoie fixture_id."""
+    # DÉGEL D'ORIENTATION. On met à jour team_home_id / team_away_id À CHAQUE upsert,
+    # plus seulement à l'insert. Le fournisseur (The Odds API) renvoie parfois l'ordre
+    # domicile/extérieur inversé au premier relevé puis se corrige ; l'ancien upsert
+    # gelait ce premier ordre à vie (colonnes absentes du SET), d'où « le PSG affiché
+    # perdant » : le fixture disait home=PSG alors que les cotes, re-collectées toutes
+    # les 6 h, portaient l'orientation correcte. On re-synchronise donc l'orientation
+    # sur le fournisseur à chaque passage — et le score l'accompagne (même relevé, même
+    # ordre), donc la ligne reste TOUJOURS cohérente (score_home appartient à team_home_id).
+    #
+    # SÛR pour les tickets déjà analysés : chaque sélection fige son orientation à
+    # l'analyse (selections.equipe_dom_id, migration 0025) ; le règlement permute le
+    # score si le fixture a été retourné depuis (settle.selectionOutcome). Un verdict
+    # ne peut donc pas se retourner. Les tickets d'AVANT 0025 (sans snapshot) ne sont
+    # pas rattrapés — ils sont identifiés à part pour prévenir les testeurs.
     sql = """
         insert into fixtures
             (provider_ref, date_utc, team_home_id, team_away_id, league_id, statut, score_home, score_away)
         values (%s, %s, %s, %s, %s, %s, %s, %s)
         on conflict (provider_ref) do update set
+            team_home_id = excluded.team_home_id,
+            team_away_id = excluded.team_away_id,
             statut     = excluded.statut,
             score_home = excluded.score_home,
             score_away = excluded.score_away,

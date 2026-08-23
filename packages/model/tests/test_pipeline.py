@@ -306,3 +306,36 @@ def test_hysteresis_returns_to_odds_below_8pct():
 
 def test_hysteresis_no_switch_without_data():
     assert not next_mode("model", None).changed
+
+
+def test_upsert_fixture_updates_orientation_on_conflict():
+    """DÉGEL : l'upsert doit RÉ-ÉCRIRE team_home_id / team_away_id sur conflit, pas les
+    geler. C'est le correctif du fixture inversé (« le PSG affiché perdant ») : le
+    fournisseur corrige parfois l'orientation d'un relevé à l'autre, on doit le suivre."""
+    from mtj_model.pipeline.sync import upsert_fixture
+
+    captured = {}
+
+    class _Cur:
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def execute(self, sql, params):
+            captured["sql"] = sql
+        def fetchone(self):
+            return (42,)
+
+    class _Con:
+        def cursor(self):
+            return _Cur()
+
+    fid = upsert_fixture(
+        _Con(), provider_ref="ev1", league_id=1, home_id=7, away_id=9,
+        date_utc=pd.Timestamp("2026-08-23T18:45:00Z"), status="scheduled",
+    )
+    assert fid == 42
+    sql = " ".join(captured["sql"].split()).lower()
+    # Les DEUX colonnes d'orientation sont dans le DO UPDATE SET (plus seulement à l'insert).
+    assert "team_home_id = excluded.team_home_id" in sql
+    assert "team_away_id = excluded.team_away_id" in sql

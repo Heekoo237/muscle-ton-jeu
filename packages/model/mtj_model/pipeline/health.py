@@ -387,6 +387,66 @@ def recurrent_score_failures(nights: list[dict]) -> dict[str, int]:
     return {fd: c for fd, c in compte.items() if c >= SCORES_ECHEC_MIN}
 
 
+# ── Orientation des fixtures (fixture retourné) ──────────────────────────────
+# Un match sur cinq a été trouvé inversé (fixture home/away à l'envers des cotes),
+# d'où « le PSG affiché perdant ». Le dégel de l'upsert corrige la cause ; cette
+# surveillance CRIE si ça remonte. Signal : la double chance MODÈLE (orientée par le
+# fixture) et le 1X2 CoTÉ (orienté par le fournisseur) désignent des favoris opposés
+# → écart énorme entre DC_HOME_DRAW (model) et WIN_HOME+DRAW (odds). Seuil 0,25 :
+# sépare franchement le désaccord modèle/marché (< 0,15) du retournement.
+FLIP_ECART = 0.25
+# Un retournement isolé peut apparaître le temps d'un relevé fournisseur incohérent ;
+# on n'alerte qu'au-delà d'une poignée, pour ne pas crier sur un transitoire.
+FLIP_ALERT_MIN = 3
+
+
+def orientation_flip_alert(n: int, seuil: int = FLIP_ALERT_MIN) -> str | None:
+    """Message d'alerte si trop de fixtures sont retournés. PURE (testable sans base)."""
+    if n < seuil:
+        return None
+    return (
+        f"orientation : {n} fixture(s) RETOURNÉ(s) — double chance modèle et 1X2 coté "
+        f"désignent des favoris opposés (écart ≥ {FLIP_ECART}). Le fixture home/away est "
+        f"à l'envers des cotes (« favori affiché perdant »). Vérifie le dégel de l'upsert "
+        f"et /api/health/coherence."
+    )
+
+
+def _orientation_flip(cur, alerts: list[str]) -> None:
+    """Compte les fixtures (fenêtre -7 j / +14 j) dont la DC modèle contredit le 1X2 coté."""
+    cur.execute(
+        """
+        with latest as (
+            select distinct on (fixture_id, marche)
+                   fixture_id, marche, probabilite, source
+              from predictions
+             where marche in ('WIN_HOME','DRAW','DC_HOME_DRAW')
+             order by fixture_id, marche, jour_calcul desc
+        ),
+        piv as (
+            select fixture_id,
+                   max(probabilite) filter (where marche='WIN_HOME')      as wh,
+                   max(probabilite) filter (where marche='DRAW')          as dr,
+                   max(probabilite) filter (where marche='DC_HOME_DRAW')  as dc,
+                   max(source::text) filter (where marche='DC_HOME_DRAW') as dc_src
+              from latest group by fixture_id
+        )
+        select count(*)
+          from piv join fixtures f on f.id = piv.fixture_id
+         where f.date_utc between now() - interval '7 days' and now() + interval '14 days'
+           and dc_src = 'model' and wh is not null and dr is not null and dc is not null
+           and abs(dc - (wh + dr)) >= %s
+        """,
+        (FLIP_ECART,),
+    )
+    n = int(cur.fetchone()[0] or 0)
+    msg = orientation_flip_alert(n)
+    if msg:
+        alerts.append(msg)
+    else:
+        print(f"orientation OK — {n} fixture(s) retourné(s) (seuil d'alerte {FLIP_ALERT_MIN})")
+
+
 def _scores_refresh_failures(cur, alerts: list[str]) -> None:
     """Alerte si une ligue rate le rafraîchissement de ses scores de façon récurrente.
     Lit `scores_echecs` des derniers nocturnes (garde-fou : une nuit isolée n'alerte pas).
@@ -425,6 +485,7 @@ def check() -> list[str]:
         _nightly_coverage(cur, alerts)
         _repli_promu_rate(cur, alerts)
         _scores_refresh_failures(cur, alerts)
+        _orientation_flip(cur, alerts)
         _vision_incomplete_rate(cur, alerts)
         _vision_refus_rate(cur, alerts)
     # Contrôle de schéma en DERNIER, connexion isolée (moteur potentiellement absent).

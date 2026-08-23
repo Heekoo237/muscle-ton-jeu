@@ -10,7 +10,9 @@ import { computeCoherence } from '$lib/server/fixtures/coherenceStore';
  *
  *   /api/health/coherence?key=<CRON_SECRET>
  *     → combien de matchs ont une somme 1X2 ≠ 100 %, une double chance désalignée,
- *       ou une orientation proba/cote qui se contredit (le symptôme du cas 1).
+ *       une orientation proba/cote qui se contredit, un fixture RETOURNÉ (flipSuspect),
+ *       ET les tickets EXPOSÉS (analysés sur un fixture retourné sans snapshot 0025 —
+ *       à prévenir : ticket, propriétaire, déjà réglé ou non).
  *
  *   /api/health/coherence?key=<CRON_SECRET>&equipe=rennes
  *     → le DÉTAIL complet (proba ET cote de chaque marché) des matchs d'une équipe :

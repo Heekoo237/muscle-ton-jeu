@@ -112,6 +112,16 @@ export interface CoherenceRapport {
 	flipSuspect: { n: number; seuil: number; exemples: ExempleFlip[] };
 	// (4) Proba et cote qui se contredisent sur la même ligne 1X2.
 	orientationSuspecte: { n: number; exemples: ExempleOrientation[] };
+	// TICKETS EXPOSÉS : analysés sur un fixture inversé SANS snapshot d'orientation
+	// (migration 0025) — leur verdict peut être faux. À prévenir. n = 0 attendu à terme.
+	ticketsExposes: { n: number; exemples: TicketExpose[] };
+}
+export interface TicketExpose {
+	ticketId: number;
+	userId: number | null;
+	dejaRegle: boolean;
+	fixtureId: number;
+	match: string;
 }
 
 const DC_COMPOSANTES: Record<string, [Market, Market]> = {
@@ -225,7 +235,8 @@ const EMPTY: CoherenceRapport = {
 	sommeHors100: { n: 0, tolerance: TOL_SOMME, exemples: [] },
 	dcDeriveeIncoherente: { n: 0, tolerance: TOL_DC_DERIVEE, exemples: [] },
 	flipSuspect: { n: 0, seuil: SEUIL_FLIP_DC, exemples: [] },
-	orientationSuspecte: { n: 0, exemples: [] }
+	orientationSuspecte: { n: 0, exemples: [] },
+	ticketsExposes: { n: 0, exemples: [] }
 };
 
 /**
@@ -317,8 +328,12 @@ export async function computeCoherence(
 		sommeHors100: { n: 0, tolerance: TOL_SOMME, exemples: [] },
 		dcDeriveeIncoherente: { n: 0, tolerance: TOL_DC_DERIVEE, exemples: [] },
 		flipSuspect: { n: 0, seuil: SEUIL_FLIP_DC, exemples: [] },
-		orientationSuspecte: { n: 0, exemples: [] }
+		orientationSuspecte: { n: 0, exemples: [] },
+		ticketsExposes: { n: 0, exemples: [] }
 	};
+	// Tous les fixtures retournés (pas seulement les 15 exemples) → tickets exposés.
+	const flipFixtureIds = new Set<number>();
+	const matchDe = new Map<number, string>();
 
 	for (const f of fx) {
 		const home = nomDe.get(Number(f.team_home_id)) ?? `#${f.team_home_id}`;
@@ -383,6 +398,8 @@ export async function computeCoherence(
 
 		// (3) RETOURNEMENT : DC modèle et 1X2 coté désignent des favoris opposés.
 		for (const d of a.flipDc) {
+			flipFixtureIds.add(f.id);
+			matchDe.set(f.id, `${home} – ${away}`);
 			rapport.flipSuspect.n++;
 			if (rapport.flipSuspect.exemples.length < 15) {
 				rapport.flipSuspect.exemples.push({
@@ -406,6 +423,38 @@ export async function computeCoherence(
 					probWinHome: winHome as number, coteWinHome: cote('WIN_HOME') as number,
 					probWinAway: winAway as number, coteWinAway: cote('WIN_AWAY') as number,
 					commentaire: `proba favorise ${favProba}, cote favorise ${favCote}`
+				});
+			}
+		}
+	}
+
+	// TICKETS EXPOSÉS : sélections sur un fixture retourné, SANS snapshot d'orientation
+	// (equipe_dom_id null → analysées avant la migration 0025). Leur verdict peut être
+	// faux ; on les nomme pour prévenir les testeurs. Les sélections AVEC snapshot sont
+	// protégées (le règlement permute) et ne sont donc pas listées.
+	if (flipFixtureIds.size > 0) {
+		const { data: sel } = await sb
+			.from('selections')
+			.select('ticket_id, fixture_id, tickets(id, user_id, resultat, supprime_le)')
+			.in('fixture_id', [...flipFixtureIds])
+			.is('equipe_dom_id', null);
+		const vus = new Set<number>();
+		for (const r of (sel ?? []) as Record<string, unknown>[]) {
+			const t = (Array.isArray(r.tickets) ? r.tickets[0] : r.tickets) as
+				| { id: number; user_id: number | null; resultat: string | null; supprime_le: string | null }
+				| null;
+			if (!t || t.supprime_le != null) continue; // ticket supprimé/anonymisé : hors périmètre
+			if (vus.has(t.id)) continue;
+			vus.add(t.id);
+			rapport.ticketsExposes.n++;
+			if (rapport.ticketsExposes.exemples.length < 50) {
+				const fid = Number(r.fixture_id);
+				rapport.ticketsExposes.exemples.push({
+					ticketId: t.id,
+					userId: t.user_id == null ? null : Number(t.user_id),
+					dejaRegle: t.resultat != null,
+					fixtureId: fid,
+					match: matchDe.get(fid) ?? `#${fid}`
 				});
 			}
 		}
