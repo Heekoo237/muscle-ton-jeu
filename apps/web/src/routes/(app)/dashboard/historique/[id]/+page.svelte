@@ -102,6 +102,19 @@
 					</div>
 					<div class="exp-marche" class:oc={e.avecBadge}>{e.libelleFr}</div>
 					<p class="exp-texte">{e.texte}</p>
+					{#if e.autresIssues.length > 0}
+						<!-- Autres issues du même match (parité écran de résultat) : on MONTRE ce
+						     qu'on sait, on ne suggère jamais. Présent tant que le ticket n'est pas réglé. -->
+						<div class="autres">
+							<div class="autres-t">Si tu veux garder ce match</div>
+							{#each e.autresIssues as iss (iss.libelleFr)}
+								<div class="autres-l">
+									<span>{iss.libelleFr}</span>
+									<span class="autres-n">{pctBig(iss.probabilitePct)}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</article>
 			{/each}
 		</div>
@@ -368,6 +381,27 @@
 		line-height: 1.45;
 		color: var(--c-ink);
 		max-width: var(--measure);
+	}
+	.autres {
+		margin-top: var(--s-3);
+		padding-top: var(--s-2);
+		border-top: 1px solid var(--c-line);
+	}
+	.autres-t {
+		font-size: 13px;
+		color: var(--c-ink-2);
+		margin-bottom: var(--s-1);
+	}
+	.autres-l {
+		display: flex;
+		justify-content: space-between;
+		gap: var(--s-3);
+		font-size: 14px;
+		padding: 2px 0;
+	}
+	.autres-n {
+		font-variant-numeric: tabular-nums;
+		color: var(--c-ink-2);
 	}
 
 	.verdict {

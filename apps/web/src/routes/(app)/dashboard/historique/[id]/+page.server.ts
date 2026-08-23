@@ -13,8 +13,10 @@ import {
 	resultatIntrouvable,
 	type FinalScore
 } from '$lib/server/domain/settle';
-import { sports } from '$lib/server/services';
-import type { ExplicationVM, LineVM, TicketResult } from '$lib/types';
+import { sports, predictions } from '$lib/server/services';
+import { autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
+import { marketLabelFr } from '$lib/server/domain/market-map';
+import type { ExplicationVM, LineVM, Market, TicketResult } from '$lib/types';
 
 /**
  * Consultation d'une analyse passée, telle qu'elle a été rendue. Lecture seule,
@@ -56,6 +58,39 @@ export const load: PageServerLoad = async (event) => {
 		raisonNonAnalyse: isAnalysable(s) ? undefined : (s.raison ?? 'sans_donnee')
 	}));
 
+	// Autres issues du même match d'une ligne retirée — PARITÉ avec l'écran de résultat.
+	// UNIQUEMENT tant que le ticket n'est pas réglé (matchs à venir) : sur un ticket réglé,
+	// les matchs sont joués et « si tu veux garder ce match » n'a plus de sens. Lecture
+	// SEULE de predictions (aucun calcul, aucune proba dérivée — règles d'or n°1/n°3) ;
+	// contenu produit par la fonction PURE verrouillée par test (autresIssuesParRetrait).
+	const dejaRegle = ticket.resultatOriginale === 'passe' || ticket.resultatOriginale === 'tombe';
+	const retireesVoisins = ticket.selections.filter(
+		(s) => s.retireeDuRenforce && isAnalysable(s) && s.fixtureId !== null && s.marche !== null
+	);
+	const autresParOrdre = new Map<number, { libelleFr: string; probabilitePct: number }[]>();
+	if (!dejaRegle && retireesVoisins.length > 0) {
+		const preds = await predictions.forFixtures([
+			...new Set(retireesVoisins.map((s) => s.fixtureId as number))
+		]);
+		const contenu = autresIssuesParRetrait(
+			retireesVoisins.map((s) => ({ ordre: s.ordre, marche: s.marche as Market, fixtureId: s.fixtureId as number })),
+			preds
+		);
+		for (const s of retireesVoisins) {
+			const issues = contenu.get(s.ordre);
+			if (!issues) continue;
+			const parts = s.matchLabel.split(' – ');
+			const [home, away] = parts.length === 2 ? parts : ['', ''];
+			autresParOrdre.set(
+				s.ordre,
+				issues.map((iss) => ({
+					libelleFr: marketLabelFr(iss.marche, home, away),
+					probabilitePct: Math.round(iss.probabilite * 100 * 10) / 10
+				}))
+			);
+		}
+	}
+
 	// Texte figé, relu tel quel (deux niveaux ; ancien texte plat toléré).
 	const analyse = parseAnalyse(await getAnalysisText(ticket.id));
 	const parLigne = new Map(lignes.map((l) => [l.ordre, l]));
@@ -69,10 +104,8 @@ export const load: PageServerLoad = async (event) => {
 				libelleFr: l.libelleFr,
 				avecBadge: l.fragile,
 				texte: p.texte,
-				// Pas d'autres issues sur une re-vue figée : cette page ne LIT jamais
-				// predictions (lecture seule), et sur un ticket réglé les alternatives sont
-				// jouées — l'affordance « si tu veux garder ce match » n'a de sens qu'au résultat.
-				autresIssues: [] as ExplicationVM['autresIssues']
+				// Alternatives du match retiré, tant que le ticket n'est pas réglé (sinon vide).
+				autresIssues: autresParOrdre.get(p.ordre) ?? ([] as ExplicationVM['autresIssues'])
 			} satisfies ExplicationVM;
 		})
 		.filter((x): x is ExplicationVM => x !== null)
