@@ -163,6 +163,22 @@ Le second fournisseur (API-Football) est un **secours tiède** : interface prêt
 - Les marchés sont affichés en français, jamais en notation bookmaker
   Correct : « Arsenal ou match nul ». Incorrect : « 1X »
 
+### Aucun mot technique à l'écran. Jamais.
+
+**Le test du cousin de Douala :** si quelqu'un qui parie le week-end ne dit pas ce mot, on ne l'écrit pas dans l'interface. Un mot simple mal choisi vaut mieux qu'un mot juste que personne ne comprend.
+
+Trois familles de mots interdits à l'écran, chacune avec sa traduction terrain :
+
+| Famille | Interdit à l'écran | On dit plutôt |
+|---|---|---|
+| **Designer** | marqueur, curation, orientation, affordance, état, composant | (on le montre, on ne le nomme pas) |
+| **Statisticien** | probabilité, seuil, calibration, calibré, écart, marge, variance, échantillon | « chances », « notre barre », « mesuré / pas mesuré », « d'après les cotes » |
+| **Développeur** | source, régime, fixture, marché (au sens technique), analysable, détection, dévigeage | « le match », « le pari », « ce qu'on a pu lire » |
+
+Ce n'est pas une préférence de style : un mot technique à l'écran exclut l'utilisateur qu'on vise. La règle vaut pour **tout texte visible** — libellés, notes, messages d'erreur, notifications, image de partage, page publique. Elle ne vaut pas pour le code, les commentaires, les noms de variables ni cette documentation, qui parlent entre nous.
+
+On l'a déjà appliquée une fois (« marché » → « pari », « probabilité » → « chances »). Elle se re-passe à chaque ajout de texte visible, et en revue périodique sur tout le produit.
+
 ---
 
 ## Règle de sobriété chiffrée

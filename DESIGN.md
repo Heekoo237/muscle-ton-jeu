@@ -137,6 +137,20 @@ Deux couloirs stricts, plus une exception justifiée. Auto-hébergé, `woff2`, s
 7. **`text-wrap: pretty`** sur le corps, **`text-wrap: balance`** sur `h1`/`h2`/`display` pour que les blocs de titre restent des rectangles.
 8. **Aucune italique** dans le système : aucune des trois familles n'embarque son italique (économie de poids). L'italique synthétique est interdite.
 
+### 3.4 Aucun mot technique à l'écran
+
+**Le test du cousin de Douala** : si quelqu'un qui parie le week-end ne dit pas ce mot, il n'apparaît pas dans l'interface. Un mot simple mal choisi vaut mieux qu'un mot juste que personne ne comprend. Autorité : `CLAUDE.md` (règle de rédaction) — reprise ici parce que c'est à l'écran qu'elle se vérifie.
+
+Trois familles bannies de tout texte visible, avec leur traduction terrain :
+
+| Famille | Bannis à l'écran | On dit |
+|---|---|---|
+| **Designer** | marqueur, curation, orientation, affordance, état, composant | on le MONTRE, on ne le nomme pas |
+| **Statisticien** | probabilité, seuil, calibration, écart, marge, variance, échantillon | « chances », « notre barre », « mesuré / pas mesuré », « d'après les cotes » |
+| **Développeur** | source, régime, fixture, marché *(au sens technique)*, analysable, détection | « le match », « le pari », « ce qu'on a pu lire » |
+
+Vaut pour libellés, notes, messages d'erreur, notifications, image de partage, page publique. Ne vaut PAS pour le code, les commentaires ni les noms de composants CSS (`serre-line`, `tally-block`…), qui parlent entre nous — un nom de classe technique est normal, le texte qu'il affiche ne l'est jamais.
+
 ---
 
 ## 4. LAYOUT
