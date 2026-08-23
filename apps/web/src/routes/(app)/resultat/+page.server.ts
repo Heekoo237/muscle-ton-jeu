@@ -26,7 +26,7 @@ import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/ser
 import type { ExplicationVM, LineVM, Market, ResultVM, Selection } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
 import { uncoveredFamily, marketLabelFr } from '$lib/server/domain/market-map';
-import { multiplicateurRetrait, autresIssues } from '$lib/server/domain/resultDisplay';
+import { multiplicateurRetrait, autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
 
 // Fenêtre d'exécution de la fonction Vercel. La PREMIÈRE analyse rédige via l'IA
 // (writeSafely, ≤ 20 s d'AbortController) ; sans ce réglage, la valeur par défaut
@@ -343,19 +343,25 @@ export const load: PageServerLoad = async (event) => {
 	const predsParFixture = voisinFixtureIds.length
 		? await predictions.forFixtures(voisinFixtureIds)
 		: new Map();
+	// Contenu des issues voisines PAR RETRAIT (fonction pure, verrouillée par test :
+	// « une ligne retirée dont le match a des issues → du contenu »). Le formatage FR suit.
+	const contenuAutres = autresIssuesParRetrait(
+		retireesVoisins.map((s) => ({ ordre: s.ordre, marche: s.marche as Market, fixtureId: s.fixtureId as number })),
+		predsParFixture
+	);
 	const autresParOrdre = new Map<number, { libelleFr: string; probabilitePct: number }[]>();
 	for (const s of retireesVoisins) {
-		const preds = predsParFixture.get(s.fixtureId as number) ?? [];
+		const issues = contenuAutres.get(s.ordre);
+		if (!issues) continue;
 		// matchLabel = « Home – Away » (resolve.ts) : on en tire les deux équipes pour
 		// libeller « X gagne » / « X ou nul ». Split défensif : sans les deux, on n'affiche
 		// que les issues sans nom d'équipe (nul, plus/moins).
 		const parts = s.matchLabel.split(' – ');
 		const [home, away] = parts.length === 2 ? parts : ['', ''];
-		const issues = autresIssues(s.marche as Market, preds).map((iss) => ({
-			libelleFr: marketLabelFr(iss.marche, home, away),
-			probabilitePct: pct1(iss.probabilite)
-		}));
-		if (issues.length) autresParOrdre.set(s.ordre, issues);
+		autresParOrdre.set(
+			s.ordre,
+			issues.map((iss) => ({ libelleFr: marketLabelFr(iss.marche, home, away), probabilitePct: pct1(iss.probabilite) }))
+		);
 	}
 
 	// Explications par sélection retirée, rattachées à leur ligne (ordre, libellés,

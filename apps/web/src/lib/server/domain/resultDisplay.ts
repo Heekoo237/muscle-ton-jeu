@@ -93,3 +93,23 @@ export function autresIssues(
 	}
 	return []; // BTTS (suspendu) ou marché sans voisin défini.
 }
+
+/**
+ * Rattache à CHAQUE sélection retirée ses issues voisines (ordre → issues), depuis les
+ * prédictions de son match. C'est le MAILLON entre le retrait et le bloc « Si tu veux
+ * garder ce match » : extrait ici (plutôt qu'inline dans le +page.server) pour être
+ * VERROUILLÉ par test — un bloc conditionné qui cesse de se déclencher est le bug qu'on
+ * ne voit qu'en production. INVARIANT : une ligne retirée dont le match a des issues en
+ * base ressort avec du contenu. Le formatage (libellé FR, %) reste à l'appelant.
+ */
+export function autresIssuesParRetrait(
+	retirees: { ordre: number; marche: Market; fixtureId: number }[],
+	predsParFixture: Map<number, { marche: Market; probabilite: number }[]>
+): Map<number, IssueVoisine[]> {
+	const out = new Map<number, IssueVoisine[]>();
+	for (const s of retirees) {
+		const issues = autresIssues(s.marche, predsParFixture.get(s.fixtureId) ?? []);
+		if (issues.length) out.set(s.ordre, issues);
+	}
+	return out;
+}

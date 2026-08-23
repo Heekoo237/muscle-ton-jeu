@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { multiplicateurRetrait, autresIssues, MAX_AUTRES_ISSUES } from './resultDisplay';
+import {
+	multiplicateurRetrait,
+	autresIssues,
+	autresIssuesParRetrait,
+	MAX_AUTRES_ISSUES
+} from './resultDisplay';
 import type { Market } from '$lib/types';
 
 describe('multiplicateurRetrait — effet du retrait, à côté du pourcentage', () => {
@@ -98,5 +103,41 @@ describe('autresIssues — on MONTRE ce qui est en base, jamais un calcul', () =
 		const a = autresIssues('WIN_HOME', complet).map((i) => i.marche);
 		const b = autresIssues('WIN_HOME', complet).map((i) => i.marche);
 		expect(a).toEqual(b);
+	});
+});
+
+describe('INVARIANT — le bloc « Si tu veux garder ce match » ne se vide pas en silence', () => {
+	const preds = (m: [Market, number][]) => m.map(([marche, probabilite]) => ({ marche, probabilite }));
+	// Un match complet en base pour la fixture 10 (Rodez retiré à l'extérieur).
+	const parFixture = new Map<number, { marche: Market; probabilite: number }[]>([
+		[10, preds([['WIN_HOME', 0.55], ['DRAW', 0.25], ['WIN_AWAY', 0.2], ['DC_HOME_DRAW', 0.8]])]
+	]);
+
+	it('une ligne retirée dont le match a d’autres issues en base → du contenu', () => {
+		const map = autresIssuesParRetrait([{ ordre: 3, marche: 'WIN_AWAY', fixtureId: 10 }], parFixture);
+		expect(map.get(3)?.length).toBeGreaterThan(0);
+		// Les voisins attendus d'une victoire extérieure jouée : les deux autres 1X2 + la meilleure DC.
+		expect(map.get(3)?.map((i) => i.marche)).toEqual(['WIN_HOME', 'DRAW', 'DC_HOME_DRAW']);
+	});
+
+	it('pas de contenu inventé quand le match n’a pas ses voisins en base', () => {
+		const maigre = new Map<number, { marche: Market; probabilite: number }[]>([
+			[10, preds([['WIN_AWAY', 0.2]])] // seule l'issue jouée est en base
+		]);
+		const map = autresIssuesParRetrait([{ ordre: 3, marche: 'WIN_AWAY', fixtureId: 10 }], maigre);
+		expect(map.has(3)).toBe(false); // vide honnête, jamais une issue devinée
+	});
+
+	it('plusieurs retraits : chacun garde ses propres voisins', () => {
+		const m = new Map<number, { marche: Market; probabilite: number }[]>([
+			[10, preds([['WIN_HOME', 0.55], ['DRAW', 0.25], ['WIN_AWAY', 0.2]])],
+			[11, preds([['OVER_2_5', 0.44], ['UNDER_2_5', 0.56]])]
+		]);
+		const map = autresIssuesParRetrait(
+			[{ ordre: 1, marche: 'WIN_HOME', fixtureId: 10 }, { ordre: 2, marche: 'OVER_2_5', fixtureId: 11 }],
+			m
+		);
+		expect(map.get(1)?.length).toBeGreaterThan(0);
+		expect(map.get(2)?.map((i) => i.marche)).toEqual(['UNDER_2_5']);
 	});
 });
