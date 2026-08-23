@@ -25,9 +25,17 @@ import type { Market } from '$lib/types';
 // Tolérances. Le dévigeage écrit 4 décimales : l'arrondi cumulé sur 3 issues reste
 // bien sous 0,005. On prend 0,02 — large, pour ne signaler que de VRAIS écarts.
 const TOL_SOMME = 0.02;
-const TOL_DC = 0.02;
-// Orientation : on ne crie qu'au DÉSACCORD FRANC (proba et cote qui se contredisent
-// nettement), jamais sur un quasi pile-ou-face où l'ordre n'a pas de sens.
+// Double chance DÉRIVÉE (cote_derivee) : DC = somme EXACTE de ses composantes cotées.
+// Un écart au-delà de l'arrondi trahit un bug d'arithmétique — c'est un vrai défaut.
+const TOL_DC_DERIVEE = 0.02;
+// Double chance MODÈLE (source « model ») : elle vient de la grille Dixon-Coles, PAS
+// du 1X2 coté. Modèle et marché divergent NORMALEMENT de quelques points — ce n'est
+// pas un bug. On ne parle de RETOURNEMENT que si l'écart est ÉNORME : le modèle
+// (orientation du fixture) et la cote (orientation fournisseur) désignent des favoris
+// opposés. 0,25 sépare franchement le désaccord modèle/marché (< 0,15) du retournement.
+const SEUIL_FLIP_DC = 0.25;
+// Orientation par la cote : on ne crie qu'au DÉSACCORD FRANC (proba et cote qui se
+// contredisent nettement), jamais sur un quasi pile-ou-face où l'ordre n'a pas de sens.
 const ECART_PROBA_MIN = 0.05; // il faut un favori proba net…
 const ECART_COTE_MIN = 0.1; // …ET une cote qui dit franchement l'inverse.
 
@@ -39,6 +47,7 @@ interface Ligne {
 	marche: Market;
 	proba: number | null;
 	cote: number | null;
+	source: string | null;
 }
 export interface FixtureCoherence {
 	fixtureId: number;
@@ -79,14 +88,29 @@ export interface ExempleDc {
 	attendu: number;
 	ecart: number;
 }
+export interface ExempleFlip {
+	fixtureId: number;
+	home: string;
+	away: string;
+	dc: Market;
+	dcModele: number;
+	composantesCote: number;
+	ecart: number;
+	commentaire: string;
+}
 export interface CoherenceRapport {
 	configured: boolean;
 	fenetre: { depuis: string; jusqua: string };
 	fixturesExamines: number;
 	avec1x2Complet: number;
 	tronque: boolean;
+	// (1) 1X2 coté qui ne somme pas à 100 % — dévigeage cassé.
 	sommeHors100: { n: number; tolerance: number; exemples: ExempleSomme[] };
-	dcIncoherent: { n: number; tolerance: number; exemples: ExempleDc[] };
+	// (2) Double chance DÉRIVÉE (cote_derivee) ≠ somme de ses composantes — bug arithmétique.
+	dcDeriveeIncoherente: { n: number; tolerance: number; exemples: ExempleDc[] };
+	// (3) RETOURNEMENT : DC modèle vs 1X2 coté, favoris opposés — fixture inversé.
+	flipSuspect: { n: number; seuil: number; exemples: ExempleFlip[] };
+	// (4) Proba et cote qui se contredisent sur la même ligne 1X2.
 	orientationSuspecte: { n: number; exemples: ExempleOrientation[] };
 }
 
@@ -97,19 +121,32 @@ const DC_COMPOSANTES: Record<string, [Market, Market]> = {
 };
 
 /**
- * ANOMALIES d'un seul match — fonction PURE (proba + cote → écarts), verrouillée par
- * test. Le store se contente d'agréger ce qu'elle renvoie. On sépare le JUGEMENT
+ * ANOMALIES d'un seul match — fonction PURE (proba + cote + source → écarts),
+ * verrouillée par test. Le store agrège ce qu'elle renvoie. On sépare le JUGEMENT
  * (ici) de l'ACCÈS BASE (le store) : c'est le jugement qu'on veut tester sans mock.
+ *
+ * Trois familles d'anomalies, VOLONTAIREMENT distinctes :
+ *  - `sommeHors100`   : le 1X2 coté ne somme pas à 1 → dévigeage cassé (rare, grave).
+ *  - `dcDerivee`      : une double chance DÉRIVÉE (cote_derivee) ≠ somme de ses cotes
+ *                       → bug d'arithmétique (doit être ~0).
+ *  - `flipDc`         : une double chance MODÈLE s'écarte ÉNORMÉMENT du 1X2 coté →
+ *                       le modèle (orienté par le fixture) et la cote (orientée par le
+ *                       fournisseur) désignent des favoris OPPOSÉS. C'est l'empreinte
+ *                       du fixture retourné, détectable SANS connaître le vrai match.
+ *  - `orientationCote`: proba et cote se contredisent sur la MÊME ligne (mauvais côté
+ *                       posé au dévigeage). Complémentaire de `flipDc`.
  */
 export interface AnomaliesFixture {
 	somme1x2: number | null;
 	sommeHors100: boolean;
-	dc: { dc: Market; valeur: number; attendu: number; ecart: number }[];
-	orientation: { favProba: 'home' | 'away'; favCote: 'home' | 'away' } | null;
+	dcDerivee: { dc: Market; valeur: number; attendu: number; ecart: number }[];
+	flipDc: { dc: Market; dcModele: number; composantesCote: number; ecart: number }[];
+	orientationCote: { favProba: 'home' | 'away'; favCote: 'home' | 'away' } | null;
 }
 export function analyserFixture(
 	proba: (m: Market) => number | null,
-	cote: (m: Market) => number | null
+	cote: (m: Market) => number | null,
+	source: (m: Market) => string | null
 ): AnomaliesFixture {
 	const winHome = proba('WIN_HOME');
 	const draw = proba('DRAW');
@@ -117,7 +154,8 @@ export function analyserFixture(
 	const a1x2 = winHome != null && draw != null && winAway != null;
 	const somme1x2 = a1x2 ? (winHome as number) + (draw as number) + (winAway as number) : null;
 
-	const dc: AnomaliesFixture['dc'] = [];
+	const dcDerivee: AnomaliesFixture['dcDerivee'] = [];
+	const flipDc: AnomaliesFixture['flipDc'] = [];
 	for (const [nom, [x, y]] of Object.entries(DC_COMPOSANTES)) {
 		const v = proba(nom as Market);
 		const px = proba(x);
@@ -125,10 +163,19 @@ export function analyserFixture(
 		if (v == null || px == null || py == null) continue;
 		const attendu = px + py;
 		const ecart = Math.abs(v - attendu);
-		if (ecart > TOL_DC) dc.push({ dc: nom as Market, valeur: v, attendu, ecart });
+		const src = source(nom as Market);
+		if (src === 'model') {
+			// DC modèle vs 1X2 coté : divergence attendue, on ne signale que le RETOURNEMENT.
+			if (ecart >= SEUIL_FLIP_DC) {
+				flipDc.push({ dc: nom as Market, dcModele: v, composantesCote: attendu, ecart });
+			}
+		} else if (ecart > TOL_DC_DERIVEE) {
+			// DC dérivée d'une cote : elle DOIT égaler la somme de ses composantes.
+			dcDerivee.push({ dc: nom as Market, valeur: v, attendu, ecart });
+		}
 	}
 
-	let orientation: AnomaliesFixture['orientation'] = null;
+	let orientationCote: AnomaliesFixture['orientationCote'] = null;
 	const ch = cote('WIN_HOME');
 	const ca = cote('WIN_AWAY');
 	if (winHome != null && winAway != null && ch != null && ca != null) {
@@ -139,15 +186,16 @@ export function analyserFixture(
 			Math.abs(dCote) >= ECART_COTE_MIN &&
 			Math.sign(dProba) !== Math.sign(dCote)
 		) {
-			orientation = { favProba: dProba > 0 ? 'home' : 'away', favCote: dCote > 0 ? 'home' : 'away' };
+			orientationCote = { favProba: dProba > 0 ? 'home' : 'away', favCote: dCote > 0 ? 'home' : 'away' };
 		}
 	}
 
 	return {
 		somme1x2,
 		sommeHors100: somme1x2 != null && Math.abs(somme1x2 - 1) > TOL_SOMME,
-		dc,
-		orientation
+		dcDerivee,
+		flipDc,
+		orientationCote
 	};
 }
 
@@ -175,7 +223,8 @@ const EMPTY: CoherenceRapport = {
 	avec1x2Complet: 0,
 	tronque: false,
 	sommeHors100: { n: 0, tolerance: TOL_SOMME, exemples: [] },
-	dcIncoherent: { n: 0, tolerance: TOL_DC, exemples: [] },
+	dcDeriveeIncoherente: { n: 0, tolerance: TOL_DC_DERIVEE, exemples: [] },
+	flipSuspect: { n: 0, seuil: SEUIL_FLIP_DC, exemples: [] },
 	orientationSuspecte: { n: 0, exemples: [] }
 };
 
@@ -224,16 +273,24 @@ export async function computeCoherence(
 	const fixtureIds = fx.map((f) => f.id);
 
 	// 3) Predictions (dernier jour_calcul par marché) et 4) cotes (dernière relève).
+	// On lit AUSSI `source` : une DC « model » diverge normalement du 1X2 coté, une DC
+	// « cote_derivee » doit l'égaler. Sans cette distinction on prend le désaccord
+	// modèle/marché — normal — pour un bug (les 169 « incohérences » sur-comptées).
 	const { data: pData, error: pErr } = await sb
 		.from('predictions')
-		.select('fixture_id, marche, probabilite, jour_calcul')
+		.select('fixture_id, marche, probabilite, source, jour_calcul')
 		.in('fixture_id', fixtureIds)
 		.order('jour_calcul', { ascending: false });
 	if (pErr) throw pErr;
 	const predParFx = dernierParMarche(
-		((pData ?? []) as { fixture_id: number; marche: Market; probabilite: string | number }[]).map(
-			(r) => ({ ...r, probabilite: Number(r.probabilite) })
-		)
+		(
+			(pData ?? []) as {
+				fixture_id: number;
+				marche: Market;
+				probabilite: string | number;
+				source: string | null;
+			}[]
+		).map((r) => ({ ...r, probabilite: Number(r.probabilite) }))
 	);
 
 	const { data: oData, error: oErr } = await sb
@@ -252,10 +309,16 @@ export async function computeCoherence(
 	// 5) Recoupement par match.
 	const filtre = filtreEquipe ? filtreEquipe.toLowerCase().trim() : null;
 	const detail: FixtureCoherence[] = [];
-	const rapport: CoherenceRapport = { ...EMPTY, configured: true, fenetre: { depuis, jusqua }, tronque };
-	rapport.sommeHors100 = { n: 0, tolerance: TOL_SOMME, exemples: [] };
-	rapport.dcIncoherent = { n: 0, tolerance: TOL_DC, exemples: [] };
-	rapport.orientationSuspecte = { n: 0, exemples: [] };
+	const rapport: CoherenceRapport = {
+		...EMPTY,
+		configured: true,
+		fenetre: { depuis, jusqua },
+		tronque,
+		sommeHors100: { n: 0, tolerance: TOL_SOMME, exemples: [] },
+		dcDeriveeIncoherente: { n: 0, tolerance: TOL_DC_DERIVEE, exemples: [] },
+		flipSuspect: { n: 0, seuil: SEUIL_FLIP_DC, exemples: [] },
+		orientationSuspecte: { n: 0, exemples: [] }
+	};
 
 	for (const f of fx) {
 		const home = nomDe.get(Number(f.team_home_id)) ?? `#${f.team_home_id}`;
@@ -270,13 +333,15 @@ export async function computeCoherence(
 
 		const proba = (m: Market) => preds.get(m)?.probabilite ?? null;
 		const cote = (m: Market) => cotes?.get(m)?.cote ?? null;
+		const source = (m: Market) => preds.get(m)?.source ?? null;
 		const winHome = proba('WIN_HOME');
 		const draw = proba('DRAW');
 		const winAway = proba('WIN_AWAY');
-		const a = analyserFixture(proba, cote);
+		const a = analyserFixture(proba, cote, source);
 		if (a.somme1x2 != null) rapport.avec1x2Complet++;
 
-		// Détail complet quand on cible une équipe (le cas Rennes–PSG, à l'œil).
+		// Détail complet quand on cible une équipe (le cas Rennes–PSG, à l'œil). La
+		// SOURCE est incluse : on voit d'un coup qu'une DC « model » côtoie un 1X2 « odds ».
 		if (filtre) {
 			const marches = new Set<Market>([...preds.keys(), ...(cotes?.keys() ?? [])]);
 			detail.push({
@@ -288,7 +353,7 @@ export async function computeCoherence(
 				draw,
 				winAway,
 				somme1x2: a.somme1x2,
-				lignes: [...marches].map((m) => ({ marche: m, proba: proba(m), cote: cote(m) }))
+				lignes: [...marches].map((m) => ({ marche: m, proba: proba(m), cote: cote(m), source: source(m) }))
 			});
 		}
 
@@ -303,11 +368,11 @@ export async function computeCoherence(
 			}
 		}
 
-		// (2) Double chance désalignée de ses composantes.
-		for (const d of a.dc) {
-			rapport.dcIncoherent.n++;
-			if (rapport.dcIncoherent.exemples.length < 15) {
-				rapport.dcIncoherent.exemples.push({
+		// (2) Double chance DÉRIVÉE désalignée de ses composantes cotées.
+		for (const d of a.dcDerivee) {
+			rapport.dcDeriveeIncoherente.n++;
+			if (rapport.dcDeriveeIncoherente.exemples.length < 15) {
+				rapport.dcDeriveeIncoherente.exemples.push({
 					fixtureId: f.id, home, away, dc: d.dc,
 					valeur: Math.round(d.valeur * 1000) / 1000,
 					attendu: Math.round(d.attendu * 1000) / 1000,
@@ -316,12 +381,26 @@ export async function computeCoherence(
 			}
 		}
 
-		// (3) Orientation : proba et cote désignent des favoris OPPOSÉS (le cas 1).
-		if (a.orientation) {
+		// (3) RETOURNEMENT : DC modèle et 1X2 coté désignent des favoris opposés.
+		for (const d of a.flipDc) {
+			rapport.flipSuspect.n++;
+			if (rapport.flipSuspect.exemples.length < 15) {
+				rapport.flipSuspect.exemples.push({
+					fixtureId: f.id, home, away, dc: d.dc,
+					dcModele: Math.round(d.dcModele * 1000) / 1000,
+					composantesCote: Math.round(d.composantesCote * 1000) / 1000,
+					ecart: Math.round(d.ecart * 1000) / 1000,
+					commentaire: `DC modèle ${(d.dcModele * 100).toFixed(0)} % vs 1X2 coté ${(d.composantesCote * 100).toFixed(0)} % — fixture probablement inversé`
+				});
+			}
+		}
+
+		// (4) Proba et cote se contredisent sur la même ligne 1X2.
+		if (a.orientationCote) {
 			rapport.orientationSuspecte.n++;
 			if (rapport.orientationSuspecte.exemples.length < 15) {
-				const favProba = a.orientation.favProba === 'home' ? home : away;
-				const favCote = a.orientation.favCote === 'home' ? home : away;
+				const favProba = a.orientationCote.favProba === 'home' ? home : away;
+				const favCote = a.orientationCote.favCote === 'home' ? home : away;
 				rapport.orientationSuspecte.exemples.push({
 					fixtureId: f.id, home, away,
 					probWinHome: winHome as number, coteWinHome: cote('WIN_HOME') as number,
