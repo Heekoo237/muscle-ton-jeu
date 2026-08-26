@@ -4,6 +4,34 @@
 
 ---
 
+> ## ⚠️ État de fiabilité (revu 2026-08) — lis ceci d'abord
+>
+> Ce document a été écrit AVANT l'implémentation. Ses **principes** tiennent toujours ;
+> ses **détails** (schéma, fournisseur, fenêtres, seuils) ont divergé du code réel après
+> 26 migrations et l'ajout du régime cote seule. **En cas de doute, `CLAUDE.md` et le code
+> priment sur ce brief.**
+>
+> **On peut encore s'y fier (principes) :** la frontière « aucun nombre ne sort d'un LLM »
+> (§1), le modèle Dixon-Coles et l'obligation de backtest (§2), l'encapsulation du
+> fournisseur (§3.3), les deux usages LLM + contrôle post-génération (§4.2-4.4), « le temps
+> réel lit, ne calcule jamais » (§5.2), la mutualisation (§5.3).
+>
+> **On ne peut PLUS s'y fier (détails périmés) — voir la liste en fin de §7 :**
+> - **§3.2 fournisseur** : la prod ne tourne PAS sur football-data.org mais sur **The Odds
+>   API** (cotes) + football-data pour le backtest. Tout le régime **cote seule** (dévigeage)
+>   et la bascule cote↔modèle (`source_mode`) sont ABSENTS de ce brief.
+> - **§4.1 sortie vision** : plus un `texte_brut` plat, mais des champs structurés
+>   (`matchText`/`marketText`/`coteText`) + un `concept` de marché.
+> - **§5.1-5.2 fenêtre** : « 7 prochains jours » est devenu **21 jours** (analyse) / **60**
+>   (résolution). Le nocturne n'est plus le SEUL écrivain de `predictions` (collecteur en
+>   intérim + comblement à la demande).
+> - **§5.2 plancher du renforcé** : « plancher 4 » est FAUX — le plancher est **1** (règle
+>   d'or n°3, l'ancien « jamais moins de 4 » a été explicitement retiré).
+> - **§7 schéma** : voir la note en fin de section (tables et colonnes manquantes,
+>   `team_strength` vestigiale, `predictions` alimentée par plusieurs écrivains).
+
+---
+
 ## 1. Le principe fondateur
 
 Le système se divise en deux moitiés séparées par une frontière stricte :
@@ -294,10 +322,18 @@ teams            id, nom, aliases[], ligue_id
 leagues          id, nom, pays, actif
 fixtures         id, date_utc, team_home_id, team_away_id, league_id,
                  statut, score_home, score_away
-team_strength    team_id, calculé_le, attaque_dom, defense_dom,
-                 attaque_ext, defense_ext
-predictions      fixture_id, marché, probabilité, confiance, calculé_le
-                 -- alimentée exclusivement par le pipeline nocturne
+team_strength    -- ⚠️ VESTIGIALE : conçue ici, JAMAIS écrite ni lue par le code.
+                 -- Les forces Dixon-Coles sont calculées EN MÉMOIRE au nocturne
+                 -- (compute.py) puis consommées pour écrire predictions. La table
+                 -- existe (schéma + RLS) mais reste vide — c'est normal. Le témoin du
+                 -- régime n'est PAS cette table, c'est predictions.source.
+predictions      fixture_id, marché, jour_calcul, probabilité, confiance,
+                 source, seuil_fragile, bookmaker, calculé_le
+                 -- source : model / odds / model_marge_excessive / repli (régime MODÈLE)
+                 --        | cote_seule / cote_derivee (régime COTE, dévigeage seul).
+                 -- Écrite par PLUSIEURS batchs déterministes : le nocturne (modèle) ET
+                 -- le collecteur (intérim cote seule), + comblement à la demande côté app.
+                 -- « exclusivement nocturne » était vrai au départ, plus aujourd'hui.
 
 -- Utilisateurs
 users            id, google_id, email, prénom, crédits, pays,
@@ -314,6 +350,16 @@ transactions     id, user_id, montant, crédits, statut, psp,
 market_map       notation_bookmaker, marché_interne, bookmaker
                  -- table stricte, enrichie manuellement
 ```
+
+> **⚠️ Ce schéma est un croquis d'origine, en retard sur la base réelle (26 migrations).**
+> Il manque des COLONNES (ex. `selections` porte aussi `raison, match_label, libelle_fr,
+> candidates, etat_resolution, ordre, equipe_dom_id, equipe_ext_id` ; `tickets` porte
+> `resultat, resultat_originale, nb_fragiles, nb_retirees, empreinte, supprime_le`) et des
+> TABLES entières : `odds_snapshots`, `league_catalog`, `predictions` (colonnes ci-dessus),
+> `ondemand_calls`, `vision_stats`, `vision_refus`, `notifications_sent`,
+> `push_subscriptions`, `shares`, `offered_devices`, `rate_limits`, `correction_queue`,
+> `pipeline_runs`, `recharges`. **La source de vérité du schéma est
+> `packages/db/schema_manifest.json` + les migrations, jamais ce croquis.**
 
 ### 7.1 Les deux actifs propriétaires
 
