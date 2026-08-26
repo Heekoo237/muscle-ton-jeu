@@ -140,7 +140,16 @@ C'est le point de départ des semaines 1 et 2. Aucune intégration, aucun coût.
 | Sportmonks | ~29 €+ | Tarification par nombre de ligues. xG, cotes et historique profond sont des add-ons séparés — la facture réelle peut monter très au-dessus du prix affiché |
 | TheStatsAPI | ~50 $ | Annonce cotes + xG + historique en tarif unique |
 
-**Recommandation : démarrer sur le gratuit de football-data.org.** Les 8 à 12 ligues majeures suffisent au marché cible. Passer au payant quand des utilisateurs payants existent.
+**⚠️ CE QUI A ÉTÉ FAIT (≠ recommandation d'origine).** La prod ne tourne PAS sur
+football-data.org. Deux fournisseurs, deux rôles :
+- **backtest / backfill** : football-data (CSV + officiel) — l'historique calibré ;
+- **production (cotes)** : **The Odds API** — le collecteur relève les cotes, dévigées en
+  probabilités « cote seule » pour tout championnat que le fournisseur price, et fusionnées
+  au modèle sur les 11 championnats backtestés.
+
+La frontière de couverture, c'est le catalogue The Odds API (~44 compétitions football
+actives). API-Football reste un secours tiède, non branché. Voir `CLAUDE.md` (« Univers de
+couverture ») et `packages/model/README.md`.
 
 ### 3.3 Contrainte d'architecture
 
@@ -170,18 +179,22 @@ Deux usages, deux exigences opposées. **Deux fonctions séparées, deux configu
 - Choix : un modèle rapide et bon marché avec capacité vision
 - Sortie attendue : JSON brut, une entrée par ligne lue
 
-Ce que le modèle rend :
+Ce que le modèle rend (⚠️ contrat RÉEL : champs STRUCTURÉS par ligne, plus un `texte_brut`
+plat) — match, marché et cote séparés, plus un `concept` de marché tiré d'une LISTE FERMÉE :
 ```json
 {
   "lignes": [
-    { "texte_brut": "Man Utd - Tottenham  1X  1.42" },
-    { "texte_brut": "Arsenal - Liverpool  TB 2.5  1.85" }
-  ],
-  "cote_totale_lue": "24.50"
+    { "matchText": "Man Utd - Tottenham", "marketText": "1X", "coteText": "1.42",
+      "concept": { "famille": "DOUBLE_CHANCE", "composantes": ["1", "X"] } },
+    { "matchText": "Arsenal - Liverpool", "marketText": "+2.5 buts", "coteText": "1.85",
+      "concept": { "famille": "PLUS_MOINS", "direction": "PLUS", "seuil": 2.5 } }
+  ]
 }
 ```
 
-Le modèle **ne résout pas** les matchs ni les marchés. Il extrait du texte.
+Le modèle **ne résout pas** les matchs ni les marchés — il extrait, et NOMME un concept
+dans une liste fermée que le CODE vérifie. Le côté domicile/extérieur et le seuil final
+sont toujours tranchés par le code depuis la base, jamais depuis l'ordre du texte.
 
 ### 4.2 Rédaction de l'analyse
 
@@ -217,21 +230,25 @@ Vérifier également l'absence des termes interdits dans le texte généré : ga
 Tourne une fois par jour, vers 4 h du matin. Aucun utilisateur connecté.
 
 ```
-1. Récupérer les résultats de la veille           → base
-2. Récupérer le calendrier des 7 prochains jours  → base
-3. Recalculer les forces d'équipes                → base
+1. Récupérer les résultats de la veille              → base
+2. Récupérer le calendrier de la fenêtre (21 jours)  → base   (⚠️ pas 7)
+3. Recalculer les forces d'équipes                   → EN MÉMOIRE (jamais persistées)
 4. Pour CHAQUE match à venir :
      λ_domicile, λ_extérieur
      → matrice de Poisson 7×7
      → probabilité de chaque marché couvert
-     → écrire dans la table predictions
+     → écrire dans la table predictions  (source « model »/« odds »…)
 5. Comparer aux cotes du marché
      → alerte si dérive anormale
 6. Mettre à jour les résultats des tickets utilisateurs terminés
      → déclencher les notifications de suivi
 ```
 
-À la fin du traitement, **toutes les probabilités des 300 prochains matchs sont calculées et stockées**.
+⚠️ **Le nocturne n'est PAS le seul écrivain de `predictions`.** Le collecteur (toutes les
+6 h) écrit un **intérim cote seule** pour les matchs qu'il vient de coter — dévigeage
+déterministe, sans jamais écraser une proba modèle. Et le chemin temps réel comble à la
+demande les cotes manquantes d'un ticket. Tous écrivent par la même fonction ; le temps
+réel **lit** toujours, il ne calcule pas. Voir `CLAUDE.md` (« Pourquoi deux écrivains »).
 
 ### 5.2 Pipeline B — temps réel
 
@@ -245,8 +262,8 @@ Captures reçues (1 à 3)
 [LLM vision]  Extraction du texte → JSON brut
   ↓
 [code]  Résolution des matchs
-            fuzzy matching sur noms + table d'alias
-            restreint aux fixtures des 7 prochains jours
+            appariement par PAIRE (les deux équipes sur un même fixture) + alias
+            restreint à la fenêtre de résolution (21 j analysés, 60 j pour diagnostiquer)
   ↓
 [code]  Résolution des marchés
             table market_map stricte
@@ -263,7 +280,7 @@ Captures reçues (1 à 3)
   ↓
 [code]  Probabilité du ticket = produit des sélections
 [code]  Marquage des lignes fragiles (seuil calibré)
-[code]  Construction du ticket renforcé (retrait uniquement, plancher 4)
+[code]  Construction du ticket renforcé (retrait uniquement, PLANCHER 1 — ⚠️ pas 4)
   ↓
 [LLM rédaction]  JSON de chiffres → texte français
   ↓
