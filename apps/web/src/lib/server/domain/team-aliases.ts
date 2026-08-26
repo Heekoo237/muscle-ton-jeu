@@ -35,7 +35,14 @@ export const TEAM_ALIASES: Record<string, string> = {
 	// « seville » et « sevilla » ne partagent aucun mot entier → alias requis. (Même
 	// motif possible pour d'autres exonymes : Cologne/Köln, Naples/Napoli, etc. — on
 	// n'ajoute QUE ce que les logs prouvent, jamais au jugé.)
-	seville: 'sevilla'
+	seville: 'sevilla',
+	// EXONYME confirmé par un vrai ticket (« Inter Milan vs SSC Naples ») : le bookmaker
+	// écrit « SSC Naples », la base (Odds API, Serie A) écrit « Napoli ». teamSimilarity
+	// ≈ 0,31 (< seuil paire) et aucun token commun → ni matchTeam ni la paire ne
+	// rattrapent : alias indispensable. UNE seule clé (ce que le log prouve) — le guard
+	// anti-fusion interdit deux clés vers la même cible ; « Naples » nu s'ajoutera si un
+	// ticket le montre.
+	'ssc naples': 'napoli'
 };
 
 /** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */
