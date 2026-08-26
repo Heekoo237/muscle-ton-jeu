@@ -29,6 +29,32 @@ from .provider import NullProvider, get_provider
 from .version import print_banner
 
 
+# Indices LARGES de compétition FÉMININE ou de SÉLECTION NATIONALE. Sert à ALERTER
+# quand une NOUVELLE compétition arrive : le garde de réconciliation (club_grouping)
+# sépare H/F et sélection/club par des MOTIFS ; si le fournisseur ajoute une compétition
+# avec une graphie non prévue (ex. une Liga féminine, une Women's Super League), il faut
+# le VÉRIFIER avant la prochaine réconciliation — sinon on risque de re-fusionner une
+# équipe féminine avec son homologue masculine. Plus large que les motifs du garde
+# EXPRÈS : ici, mieux vaut une alerte de trop qu'un angle mort.
+INDICES_A_VERIFIER = (
+    "women", "womens", "woman", "femin", "fémin", "frauen", "dames", "ladies", "nwsl",
+    "feminine", "w_league", "w-league",
+    "nations_league", "nations", "world_cup", "european_championship", "copa_america",
+    "africa_cup", "afcon", "asian_cup", "gold_cup", "friendlies", "friendly",
+)
+
+
+def competitions_a_verifier(inserts: list[str], titre_par_cle: dict[str, str]) -> list[str]:
+    """Parmi les compétitions NOUVELLES, celles dont la clé/le titre suggère féminin ou
+    sélection nationale → à confronter aux listes de `club_grouping`. PURE (testable)."""
+    out = []
+    for k in inserts:
+        blob = (k + " " + (titre_par_cle.get(k) or "")).lower()
+        if any(h in blob for h in INDICES_A_VERIFIER):
+            out.append(k)
+    return out
+
+
 def plan_sync(active_keys: set[str], existing: dict[str, str]) -> dict[str, list[str]]:
     """Décision PURE (testable sans base). `existing` = clé The Odds API → fd_code
     déjà en base. Renvoie ce qu'il faut insérer (nouvelles), activer (connues et
@@ -90,6 +116,20 @@ def sync_catalogue() -> dict:
             cur.execute(
                 "update leagues set actif = false where provider_ref = any(%s)", (plan["deactivate"],)
             )
+
+    # ALERTE proactive : une nouvelle compétition à graphie féminine/sélection ? On le
+    # dit (et on envoie l'email best-effort) pour VÉRIFIER les listes de club_grouping
+    # AVANT la prochaine réconciliation — la liste de motifs doit suivre le catalogue.
+    a_verifier = competitions_a_verifier(
+        plan["insert"], {k: active_by_key[k].get("title") for k in plan["insert"]}
+    )
+    if a_verifier:
+        msg = ("catalogue : nouvelle(s) compétition(s) FÉMININE/SÉLECTION à vérifier avant "
+               "la prochaine réconciliation club_id — " + ", ".join(a_verifier) +
+               " — confronte GENRE_FEMININ / MARQUEURS_SELECTION / PAYS_CONNUS (club_grouping.py).")
+        print("⚠ " + msg)
+        from .alerts_email import envoyer_alerte
+        envoyer_alerte([msg])
 
     modele = sum(1 for k in active_keys if classify(k) == "modele")
     eligible = sum(1 for k in active_keys if classify(k) == "eligible")
