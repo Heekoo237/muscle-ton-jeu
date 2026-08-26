@@ -9,6 +9,7 @@
 import type { PredictionsService } from './index';
 import type { Market, Prediction } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 
 interface Row {
 	fixture_id: number;
@@ -48,16 +49,22 @@ export class SupabasePredictions implements PredictionsService {
 	}
 
 	async forFixture(fixtureId: number): Promise<Prediction[]> {
-		const { data, error } = await supabaseAdmin()
-			.from('predictions')
-			.select(COLS)
-			.eq('fixture_id', fixtureId)
-			.order('jour_calcul', { ascending: false });
-		if (error) throw error;
+		// PAGINÉ : `predictions` porte UNE ligne par (match, marché, JOUR) — un match coté
+		// sur des semaines dépasse le plafond de 1000 de PostgREST, et la lecture tronquée
+		// affichait « pas encore de données » à tort (la ligne récente tombait hors des 1000).
+		// Ordre TOTAL (jour desc, marché) : la clé (fixture_id, marché, jour) est unique.
+		const rows = await selectAll<Row>(() =>
+			supabaseAdmin()
+				.from('predictions')
+				.select(COLS)
+				.eq('fixture_id', fixtureId)
+				.order('jour_calcul', { ascending: false })
+				.order('marche', { ascending: true })
+		);
 		// Plusieurs jours possibles par marché : on garde la ligne la plus récente.
 		const seen = new Set<Market>();
 		const out: Prediction[] = [];
-		for (const r of (data ?? []) as Row[]) {
+		for (const r of rows) {
 			if (seen.has(r.marche)) continue;
 			seen.add(r.marche);
 			out.push(toPrediction(r));
@@ -68,16 +75,21 @@ export class SupabasePredictions implements PredictionsService {
 	async forFixtures(fixtureIds: number[]): Promise<Map<number, Prediction[]>> {
 		const out = new Map<number, Prediction[]>();
 		if (fixtureIds.length === 0) return out;
-		// UNE requête pour tous les matchs demandés (au lieu d'une par match). Tri par
-		// jour décroissant : on garde la ligne la plus récente par (match, marché).
-		const { data, error } = await supabaseAdmin()
-			.from('predictions')
-			.select(COLS)
-			.in('fixture_id', fixtureIds)
-			.order('jour_calcul', { ascending: false });
-		if (error) throw error;
+		// PAGINÉ (voir forFixture) : 7 matchs × ~10 marchés × ~21 jours dépasse 1000 lignes.
+		// La lecture tronquée faisait afficher « pas encore de données » sur l'écran de
+		// validation ; le clic (lecture ciblée `get`) contournait le plafond → « clique pour
+		// passer au vert ». Ordre TOTAL pour une pagination stable (clé unique triple).
+		const rows = await selectAll<Row>(() =>
+			supabaseAdmin()
+				.from('predictions')
+				.select(COLS)
+				.in('fixture_id', fixtureIds)
+				.order('jour_calcul', { ascending: false })
+				.order('fixture_id', { ascending: true })
+				.order('marche', { ascending: true })
+		);
 		const seen = new Map<number, Set<Market>>();
-		for (const r of (data ?? []) as Row[]) {
+		for (const r of rows) {
 			const fid = Number(r.fixture_id);
 			let marches = seen.get(fid);
 			if (!marches) {

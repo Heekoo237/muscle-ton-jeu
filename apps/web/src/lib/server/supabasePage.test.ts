@@ -34,7 +34,9 @@ const ALLOWLIST: Record<string, string> = {
 	// — Bornées par UNE entité (un ticket, un utilisateur, un fixture) —
 	'lib/server/fixtures/ticketStore.ts::tickets': "un seul ticket (.eq id) ou un seul utilisateur (.eq user_id)",
 	'lib/server/fixtures/ticketStore.ts::selections': "les lignes d'UN seul ticket (.eq ticket_id) — quelques dizaines",
-	'lib/server/services/predictions/supabase.ts::predictions': "les marchés d'un ou quelques fixtures d'un ticket (.eq/.in fixture_id)",
+	// predictions/supabase.ts : PLUS d'allowlist — forFixture/forFixtures sont paginés
+	// (selectAll), get est borné (.limit(1)). L'ancienne excuse « borné par les fixtures
+	// d'un ticket » était FAUSSE : elle oubliait la dimension jour_calcul (1 ligne/jour).
 	'lib/server/services/notifications/webpush.ts::push_subscriptions': "les abonnements d'UN utilisateur (.eq user_id)",
 	'lib/server/services/stats/supabase.ts::fixtures': "bornée par les équipes d'un ticket (.in id / .or team_id)",
 	'lib/server/services/stats/supabase.ts::teams': "les équipes d'un ticket (.in id) — quelques-unes",

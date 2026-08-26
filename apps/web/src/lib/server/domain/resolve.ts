@@ -442,8 +442,17 @@ function resolveConcept(
 	away: Team
 ): MarketResolution {
 	switch (concept.famille) {
-		case 'NON_COUVERT':
+		case 'NON_COUVERT': {
+			// FILET : la vision N'EST PAS déterministe et déclare parfois NON_COUVERT un
+			// marché en fait COUVERT (ex. « Total: (1.5) Plus de » = plus de 1,5 but). Le
+			// TEXTE est la vérité, le concept un simple avis. Si la table de secours résout
+			// le texte AVEC CERTITUDE (elle a son propre recoupement de seuil, règle d'or
+			// n°1), le texte prime ; sinon on garde non_couvert. On ne fabrique aucun
+			// nombre : on lit le marché depuis le texte, jamais depuis l'avis de la vision.
+			const secours = resolveMarketForFixture(rawMarketText, home, away);
+			if (secours.state === 'certain') return secours;
 			return { state: 'inconnu', market: null, raison: 'non_couvert' };
+		}
 		case 'INCONNU':
 			return INCONNU;
 		case 'RESULTAT_1X2': {

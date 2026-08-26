@@ -82,6 +82,26 @@ describe('resolveTicket — chemin temps réel, résolution par code', () => {
 		expect(s.etatResolution).toBe('certain');
 		expect(s.marche).toBe('OVER_2_5');
 	});
+
+	// FILET #3 : la vision (non déterministe) déclare parfois NON_COUVERT un marché COUVERT.
+	// Le TEXTE prime : si la table de secours le résout avec certitude, on ne croit pas la
+	// vision sur parole.
+	it('ignore un concept NON_COUVERT quand le texte résout un marché couvert', () => {
+		const ligne: RawTicketRead = {
+			lignes: [
+				{
+					texteBrut: 'Arsenal - Liverpool  Plus de 1,5 buts  1.20',
+					matchText: 'Arsenal - Liverpool',
+					marketText: 'Plus de 1,5 buts',
+					coteText: '1.20',
+					concept: { famille: 'NON_COUVERT' }
+				}
+			]
+		};
+		const [s] = resolveTicket(ligne, fixtures, teams);
+		expect(s.etatResolution).toBe('certain');
+		expect(s.marche).toBe('OVER_1_5');
+	});
 });
 
 /* ---- Notations « CHOIX + TYPE » (Betclic : « Paris SG Résultat du match ») ---- */
