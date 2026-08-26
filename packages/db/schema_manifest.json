@@ -1,35 +1,131 @@
 {
   "_doc": "Contrat de schéma : objets base que le CODE DÉPLOYÉ exige pour ne pas tomber en 500. Source de vérité UNIQUE, lue par l'endpoint /api/health/schema (app) ET par la surveillance health.py (cron 6 h → email). RÈGLE : toute migration qui ajoute une table/colonne/fonction lue par le code AJOUTE sa ligne ici, dans le même commit. Voir CLAUDE.md.",
   "columns": [
-    { "table": "users", "column": "analyses_offertes_utilisees", "migration": "0014" },
-    { "table": "tickets", "column": "resultat_originale", "migration": "0018" },
-    { "table": "tickets", "column": "nb_fragiles", "migration": "0002" },
-    { "table": "tickets", "column": "nb_retirees", "migration": "0002" },
-    { "table": "selections", "column": "raison", "migration": "0002" },
-    { "table": "selections", "column": "match_label", "migration": "0002" },
-    { "table": "selections", "column": "libelle_fr", "migration": "0002" },
-    { "table": "transactions", "column": "reference", "migration": "0013" },
-    { "table": "ondemand_calls", "column": "raison", "migration": "0021" },
-    { "table": "vision_stats", "column": "uploads_essai2", "migration": "0023" },
-    { "table": "vision_stats", "column": "uploads_essai2_echec", "migration": "0023" },
-    { "table": "tickets", "column": "supprime_le", "migration": "0024" },
-    { "table": "selections", "column": "equipe_dom_id", "migration": "0025" },
-    { "table": "selections", "column": "equipe_ext_id", "migration": "0025" }
+    {
+      "table": "users",
+      "column": "analyses_offertes_utilisees",
+      "migration": "0014"
+    },
+    {
+      "table": "tickets",
+      "column": "resultat_originale",
+      "migration": "0018"
+    },
+    {
+      "table": "tickets",
+      "column": "nb_fragiles",
+      "migration": "0002"
+    },
+    {
+      "table": "tickets",
+      "column": "nb_retirees",
+      "migration": "0002"
+    },
+    {
+      "table": "selections",
+      "column": "raison",
+      "migration": "0002"
+    },
+    {
+      "table": "selections",
+      "column": "match_label",
+      "migration": "0002"
+    },
+    {
+      "table": "selections",
+      "column": "libelle_fr",
+      "migration": "0002"
+    },
+    {
+      "table": "transactions",
+      "column": "reference",
+      "migration": "0013"
+    },
+    {
+      "table": "ondemand_calls",
+      "column": "raison",
+      "migration": "0021"
+    },
+    {
+      "table": "vision_stats",
+      "column": "uploads_essai2",
+      "migration": "0023"
+    },
+    {
+      "table": "vision_stats",
+      "column": "uploads_essai2_echec",
+      "migration": "0023"
+    },
+    {
+      "table": "tickets",
+      "column": "supprime_le",
+      "migration": "0024"
+    },
+    {
+      "table": "selections",
+      "column": "equipe_dom_id",
+      "migration": "0025"
+    },
+    {
+      "table": "selections",
+      "column": "equipe_ext_id",
+      "migration": "0025"
+    }
   ],
   "tables": [
-    { "table": "rate_limits", "migration": "0015" },
-    { "table": "ondemand_calls", "migration": "0020" },
-    { "table": "vision_refus", "migration": "0022" }
+    {
+      "table": "rate_limits",
+      "migration": "0015"
+    },
+    {
+      "table": "ondemand_calls",
+      "migration": "0020"
+    },
+    {
+      "table": "vision_refus",
+      "migration": "0022"
+    },
+    {
+      "table": "club_reconcile_backup",
+      "migration": "0026"
+    }
   ],
   "functions": [
-    { "name": "confirmer_recharge", "migration": "0013" },
-    { "name": "consommer_analyse_offerte", "migration": "0014" },
-    { "name": "hit_rate_limit", "migration": "0015" },
-    { "name": "debiter_credits", "migration": "0017" },
-    { "name": "record_vision_read", "migration": "0011" },
-    { "name": "record_vision_refus", "migration": "0022" },
-    { "name": "record_upload_retry", "migration": "0023" },
-    { "name": "reserver_notification", "migration": "0012" },
-    { "name": "ondemand_circuit_ouvert", "migration": "0020" }
+    {
+      "name": "confirmer_recharge",
+      "migration": "0013"
+    },
+    {
+      "name": "consommer_analyse_offerte",
+      "migration": "0014"
+    },
+    {
+      "name": "hit_rate_limit",
+      "migration": "0015"
+    },
+    {
+      "name": "debiter_credits",
+      "migration": "0017"
+    },
+    {
+      "name": "record_vision_read",
+      "migration": "0011"
+    },
+    {
+      "name": "record_vision_refus",
+      "migration": "0022"
+    },
+    {
+      "name": "record_upload_retry",
+      "migration": "0023"
+    },
+    {
+      "name": "reserver_notification",
+      "migration": "0012"
+    },
+    {
+      "name": "ondemand_circuit_ouvert",
+      "migration": "0020"
+    }
   ]
 }

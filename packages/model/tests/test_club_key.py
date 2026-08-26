@@ -25,3 +25,22 @@ def test_jamais_vide():
     # Un nom entièrement fait d'affixes retombe sur la clé canonique, pas sur "".
     assert club_key("FC") != ""
     assert club_key("Stade") != ""
+
+
+def test_compose_la_carte_curee_pour_le_regroupement_inter_competitions():
+    # Le trou des coupes : un club éclaté championnat/coupe sous deux graphies que la
+    # carte curée connaît DOIT recevoir le même club_id. club_key part de canonical_key,
+    # donc la carte curée alimente le regroupement inter-compétitions (pas juste la
+    # dédup dans une ligue).
+    assert club_key("Paris SG") == club_key("Paris Saint Germain")
+    assert club_key("Reims") == club_key("Stade de Reims")
+    assert club_key("Torino") == club_key("Torino FC")
+    # Le cas du matin, championnat + coupe : même club, même clé.
+    assert club_key("Sheffield Wednesday") == club_key("Sheffield Wednesday")
+
+
+def test_composition_ne_cree_pas_de_fausse_fusion():
+    # La carte curée est vérifiée : composer ne rapproche AUCUNE paire distincte de plus.
+    assert club_key("Paris FC") != club_key("Paris SG")
+    assert club_key("Club Brugge") != club_key("Cercle Brugge")
+    assert club_key("Inter Milan") != club_key("AC Milan")

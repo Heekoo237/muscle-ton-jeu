@@ -29,8 +29,10 @@ VOLUME_ALERT_ENTITES = 5
 def reconcile() -> dict:
     with connect() as con:
         with con.cursor() as cur:
-            cur.execute("select id, nom from teams")
-            teams = [(int(i), nom) for i, nom in cur.fetchall()]
+            cur.execute("select id, nom, club_id, club_key from teams")
+            rows = cur.fetchall()
+            teams = [(int(i), nom) for i, nom, _, _ in rows]
+            avant = {int(i): (int(c) if c is not None else None, k) for i, _, c, k in rows}
             cur.execute(
                 "select team_home_id, team_away_id from fixtures "
                 "where team_home_id is not null and team_away_id is not null"
@@ -51,11 +53,33 @@ def reconcile() -> dict:
                 for tid in ids:
                     club_of[tid] = tid if ck in colliding else shared
 
+            # POINT DE RETOUR : on photographie l'état AVANT d'écrire (un seul point à la
+            # fois — on vide puis on réécrit). `reconcile_rollback` restaure ça tel quel.
+            cur.execute("delete from club_reconcile_backup")
+            cur.executemany(
+                "insert into club_reconcile_backup (team_id, club_id_avant, club_key_avant) values (%s, %s, %s)",
+                [(tid, avant[tid][0], avant[tid][1]) for tid, _ in teams],
+            )
+
             for tid, _ in teams:
                 cur.execute(
                     "update teams set club_key = %s, club_id = %s where id = %s",
                     (key[tid], club_of[tid], tid),
                 )
+
+            # JOURNAL des changements : combien d'équipes changent de club_id, et un
+            # échantillon des plus gros regroupements (quelles graphies fusionnent).
+            changes = [(tid, avant[tid][0], club_of[tid]) for tid, _ in teams if avant[tid][0] != club_of[tid]]
+            nom_de = {tid: nom for tid, nom in teams}
+            fusions = sorted(
+                ((ck, [nom_de[t] for t in ids]) for ck, ids in groups.items()
+                 if len({club_of[t] for t in ids}) == 1 and len(ids) > 1 and ck not in colliding),
+                key=lambda x: -len(x[1]),
+            )
+            print(f"\nCHANGEMENTS : {len(changes)} entité(s) changent de club_id "
+                  f"(point de retour sauvegardé — {len(teams)} lignes).")
+            for ck, noms in fusions[:15]:
+                print(f"  regroupé « {ck} » : {' · '.join(sorted(set(noms)))}")
 
             # RELECTURE de l'état final (on teste ce qui est ÉCRIT, pas ce qu'on croit).
             cur.execute("select id, club_id from teams")

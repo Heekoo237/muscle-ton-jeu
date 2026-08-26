@@ -36,6 +36,7 @@ on:
           - diag-books            # part des prédictions issues d'un exchange (Betfair…) vs bookmaker classique (lecture)
           - reconcilier-dryrun    # RAPPORT réconciliation club_id : intra-modèle + groupes + collisions (lecture)
           - reconcilier           # APPLIQUE club_id (écrit) : groupes − collisions, puis re-teste sur l'état final
+          - reconcilier-rollback  # REVIENT EN ARRIÈRE : restaure club_id/club_key d'avant la dernière réconciliation
           - redress-orientation-dryrun # LISTE les fixtures retournés + avant/après (lecture seule, rien écrit)
           - redress-orientation   # SOLDE les fixtures retournés (écrit) : ré-ancre sur le dernier relevé + efface les predictions périmées
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
@@ -160,6 +161,10 @@ jobs:
       - name: Appliquer la réconciliation club_id (écrit, re-teste l'état final)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier'
         run: python -m mtj_model.pipeline.reconcile
+
+      - name: Revenir en arrière sur la réconciliation (restaure club_id/club_key d'avant)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier-rollback'
+        run: python -m mtj_model.pipeline.reconcile_rollback
 
       - name: Redressement orientation — dry-run, avant/après (lecture seule)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'redress-orientation-dryrun'

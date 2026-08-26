@@ -119,8 +119,15 @@ def club_key(nom: str) -> str:
 
     JAMAIS vide : un nom entièrement fait d'affixes/bruit (« FC », « Stade »)
     retomberait sur "" et ferait collisionner tous ces cas. On replie alors sur la
-    clé canonique, puis sur une normalisation basique (minuscule + accents/ponct)."""
-    base = normalize_team_name(nom)  # retire déjà le bruit (fc, cf, de, club…)
+    clé canonique, puis sur une normalisation basique (minuscule + accents/ponct).
+
+    PART DE `canonical_key`, PAS de `normalize_team_name` : la carte curée (qui sait
+    « Paris SG » = « Paris Saint Germain », « Nott'm » = « Nottingham »…) doit alimenter
+    le regroupement club_id INTER-compétitions, pas seulement la dédup DANS une ligue.
+    Sans ça, un club éclaté championnat/coupe sous deux graphies gardait deux club_id —
+    le trou silencieux des coupes. La carte est VÉRIFIÉE : aucune fusion nouvelle non
+    voulue (mesuré, pair-calibration + tests club_key)."""
+    base = canonical_key(nom)  # normalisation + carte curée (retire déjà fc, cf, de, club…)
     toks = [CLUB_EXPAND.get(t, t) for t in base.split()]
     toks = [t for t in toks if t not in CLUB_AFFIXES]
     key = " ".join(toks)
