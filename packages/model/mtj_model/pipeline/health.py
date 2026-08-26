@@ -404,27 +404,43 @@ FLIP_ECART = 0.25
 # Un retournement isolé peut apparaître le temps d'un relevé fournisseur incohérent ;
 # on n'alerte qu'au-delà d'une poignée, pour ne pas crier sur un transitoire.
 FLIP_ALERT_MIN = 3
+# Fraîcheur de la double chance modèle. Le nocturne tourne 1×/jour : une DC recalculée
+# il y a moins de ~26 h a « vu » l'orientation courante. Au-delà, elle est PÉRIMÉE
+# (calculée avant une correction d'orientation, pas encore rejouée) — pas un bug en
+# cours, une dette que le prochain nocturne solde.
+FLIP_FRESH_HEURES = 26
 
 
-def orientation_flip_alert(n: int, seuil: int = FLIP_ALERT_MIN) -> str | None:
-    """Message d'alerte si trop de fixtures sont retournés. PURE (testable sans base)."""
-    if n < seuil:
+# POURQUOI TROIS SEAUX, PAS UN. L'écart DC modèle vs 1X2 coté ne détecte PAS une
+# inversion « statique » : si le fixture est à l'envers, le modèle ET les cotes le
+# lisent à l'envers ENSEMBLE — ils s'accordent, aucun écart. L'écart n'apparaît que
+# sur une divergence TEMPORELLE : une DC modèle périmée (orientation d'AVANT) face à
+# des cotes fraîches (orientation d'APRÈS). D'où trois cas, un seul grave :
+#   - ACTIF  : match à venir, DC FRAÎCHE (le nocturne l'a vue) et pourtant en écart →
+#              anomalie réelle (orientation ou modèle) → ALERTE.
+#   - PÉRIMÉ : match à venir, DC vieille → le nocturne n'a pas encore rejoué → INFO.
+#   - PASSÉ  : match déjà joué → réglé au score, pas montré → IGNORÉ.
+def orientation_flip_alert(n_actif: int, seuil: int = FLIP_ALERT_MIN) -> str | None:
+    """Message d'alerte pour les fixtures RÉELLEMENT retournés (actifs). PURE."""
+    if n_actif < seuil:
         return None
     return (
-        f"orientation : {n} fixture(s) RETOURNÉ(s) — double chance modèle et 1X2 coté "
-        f"désignent des favoris opposés (écart ≥ {FLIP_ECART}). Le fixture home/away est "
-        f"à l'envers des cotes (« favori affiché perdant »). Vérifie le dégel de l'upsert "
-        f"et /api/health/coherence."
+        f"orientation : {n_actif} fixture(s) RÉELLEMENT retourné(s) — à venir, double "
+        f"chance modèle FRAÎCHE et 1X2 coté désignent des favoris opposés (écart ≥ "
+        f"{FLIP_ECART}, « favori affiché perdant »). Ce n'est pas une DC périmée. "
+        f"Vérifie le dégel de l'upsert et /api/health/coherence."
     )
 
 
 def _orientation_flip(cur, alerts: list[str]) -> None:
-    """Compte les fixtures (fenêtre -7 j / +14 j) dont la DC modèle contredit le 1X2 coté."""
+    """Trie les fixtures en écart DC/1X2 en trois seaux (actif / périmé / passé).
+    Seuls les ACTIFS (à venir, DC fraîche) alertent ; les périmés/passés sont de
+    l'info — pour ne plus crier sur une dette que le nocturne solde tout seul."""
     cur.execute(
         """
         with latest as (
             select distinct on (fixture_id, marche)
-                   fixture_id, marche, probabilite, source
+                   fixture_id, marche, probabilite, source, calcule_le
               from predictions
              where marche in ('WIN_HOME','DRAW','DC_HOME_DRAW')
              order by fixture_id, marche, jour_calcul desc
@@ -434,23 +450,40 @@ def _orientation_flip(cur, alerts: list[str]) -> None:
                    max(probabilite) filter (where marche='WIN_HOME')      as wh,
                    max(probabilite) filter (where marche='DRAW')          as dr,
                    max(probabilite) filter (where marche='DC_HOME_DRAW')  as dc,
-                   max(source::text) filter (where marche='DC_HOME_DRAW') as dc_src
+                   max(source::text) filter (where marche='DC_HOME_DRAW') as dc_src,
+                   max(calcule_le)  filter (where marche='DC_HOME_DRAW')  as dc_calc
               from latest group by fixture_id
+        ),
+        flips as (
+            select f.date_utc,
+                   f.date_utc > now()                              as futur,
+                   piv.dc_calc >= now() - (%s * interval '1 hour') as frais
+              from piv join fixtures f on f.id = piv.fixture_id
+             where f.date_utc between now() - (7 * interval '1 day')
+                                  and now() + (14 * interval '1 day')
+               and piv.dc_src = 'model'
+               and piv.wh is not null and piv.dr is not null and piv.dc is not null
+               and abs(piv.dc - (piv.wh + piv.dr)) >= %s
         )
-        select count(*)
-          from piv join fixtures f on f.id = piv.fixture_id
-         where f.date_utc between now() - interval '7 days' and now() + interval '14 days'
-           and dc_src = 'model' and wh is not null and dr is not null and dc is not null
-           and abs(dc - (wh + dr)) >= %s
+        select
+            count(*) filter (where futur and frais)         as actifs,
+            count(*) filter (where futur and not frais)     as perimees,
+            count(*) filter (where not futur)               as passes
+          from flips
         """,
-        (FLIP_ECART,),
+        (FLIP_FRESH_HEURES, FLIP_ECART),
     )
-    n = int(cur.fetchone()[0] or 0)
-    msg = orientation_flip_alert(n)
+    actifs, perimees, passes = (int(x or 0) for x in cur.fetchone())
+    msg = orientation_flip_alert(actifs)
     if msg:
         alerts.append(msg)
     else:
-        print(f"orientation OK — {n} fixture(s) retourné(s) (seuil d'alerte {FLIP_ALERT_MIN})")
+        print(f"orientation OK — {actifs} réellement retourné(s) (seuil {FLIP_ALERT_MIN})")
+    # Info, jamais une alerte : la dette résiduelle que le nocturne rattrape, et les
+    # matchs passés (réglés au score). On les DIT, sans lever exit 1 pour eux.
+    if perimees or passes:
+        print(f"  (info orientation : {perimees} DC périmée(s) à venir — nocturne rattrape ; "
+              f"{passes} match(s) passé(s) ignoré(s).)")
 
 
 def _scores_refresh_failures(cur, alerts: list[str]) -> None:

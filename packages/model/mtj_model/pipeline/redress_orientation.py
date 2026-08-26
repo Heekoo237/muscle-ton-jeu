@@ -177,18 +177,28 @@ def decider(fx: FixtureRetourne, carte: dict[str, tuple[str, str]]) -> Decision:
 
 
 def _appliquer(con, d: Decision) -> None:
-    """Écrit UNE décision. 'reoriente' inverse team_home/away ; les deux cas qui
-    touchent l'orientation OU la stale effacent les predictions du fixture (le
-    collecteur/nocturne les réécrivent, orientation cohérente). Transaction par
-    fixture : ce qui échoue est annulé seul."""
+    """Écrit UNE décision, chirurgicalement. Transaction par fixture (ce qui échoue
+    est annulé seul).
+
+    - `reoriente` : on inverse team_home/away, puis on efface TOUTES les predictions
+      du fixture — cote ET modèle sont à réécrire après un changement d'orientation.
+    - `deja_aligne` : l'orientation est BONNE, seule la double chance MODÈLE est
+      périmée (calculée avant la correction). On n'efface QUE les lignes de source
+      'model' (DC, plus/moins 1,5 et 3,5 déduits du modèle) — les lignes cotées sont
+      justes, on les garde pour ne pas creuser un trou inutile. Le nocturne réécrit
+      le modèle propre ; entre-temps le collecteur pose un intérim cote seule."""
     with con.transaction(), con.cursor() as cur:
         if d.kind == "reoriente":
             cur.execute(
                 "update fixtures set team_home_id = %s, team_away_id = %s where id = %s",
                 (d.fx.away_id, d.fx.home_id, d.fx.fixture_id),
             )
-        if d.kind in ("reoriente", "deja_aligne"):
             cur.execute("delete from predictions where fixture_id = %s", (d.fx.fixture_id,))
+        elif d.kind == "deja_aligne":
+            cur.execute(
+                "delete from predictions where fixture_id = %s and source = 'model'",
+                (d.fx.fixture_id,),
+            )
 
 
 def _ligne_journal(d: Decision) -> str:
@@ -197,7 +207,7 @@ def _ligne_journal(d: Decision) -> str:
     if d.kind == "reoriente":
         apres = f"{d.home_cible} (dom) – {d.away_cible} (ext)  [INVERSÉ, predictions effacées]"
     elif d.kind == "deja_aligne":
-        apres = "orientation OK, DC modèle périmée → predictions effacées (nocturne refait)"
+        apres = "orientation OK, double chance modèle périmée → lignes 'model' effacées (nocturne refait ; cotes gardées)"
     elif d.kind == "non_reancrable":
         apres = "fournisseur ne porte plus ce match au dernier relevé → NON redressé"
     else:  # noms_divergent

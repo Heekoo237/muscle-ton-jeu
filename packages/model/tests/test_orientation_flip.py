@@ -15,10 +15,18 @@ def test_alerte_des_le_seuil_et_cite_le_nombre():
     msg = orientation_flip_alert(FLIP_ALERT_MIN)
     assert msg is not None
     assert str(FLIP_ALERT_MIN) in msg
-    assert "RETOURNÉ" in msg
+    assert "retourné" in msg
 
 
-def test_alerte_sur_un_un_sur_cinq():
-    # 16 retournés (le cas réel) : doit crier, et donner le compte exact.
-    msg = orientation_flip_alert(16)
-    assert msg is not None and "16" in msg
+def test_alerte_cite_le_compte_des_actifs():
+    # 5 RÉELLEMENT retournés (actifs) : doit crier, et donner le compte exact.
+    msg = orientation_flip_alert(5)
+    assert msg is not None and "5" in msg
+
+
+def test_alerte_dit_actif_pas_perime():
+    # L'alerte doit dire que ce sont des inversions RÉELLES, pas une DC périmée :
+    # c'est toute la distinction qui a coûté deux jours.
+    msg = orientation_flip_alert(FLIP_ALERT_MIN)
+    assert "RÉELLEMENT" in msg
+    assert "périmée" in msg  # « Ce n'est pas une DC périmée. »
