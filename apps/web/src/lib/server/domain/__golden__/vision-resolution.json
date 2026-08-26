@@ -786,6 +786,368 @@
           "fixtureId": 101
         }
       ]
+    },
+    {
+      "nom": "Bookmaker « vs » — capture réelle (Liga/Serie A), libellés tels quels",
+      "note": "Le cas terrain : ce bookmaker écrit « A vs B », pas « A - B ». Toutes les lignes tombaient en INCONNU (fixture_id null) faute de découpage. Le séparateur tolérant les lit.",
+      "teams": [
+        {
+          "id": 700,
+          "nom": "Real Madrid",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 701,
+          "nom": "Real Sociedad",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 702,
+          "nom": "Barcelone",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 703,
+          "nom": "Athletic Bilbao",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 704,
+          "nom": "Celta de Vigo",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 705,
+          "nom": "Osasuna",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 706,
+          "nom": "Fiorentina",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 707,
+          "nom": "Torino",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 708,
+          "nom": "Racing de Santander",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 709,
+          "nom": "Elche",
+          "aliases": [],
+          "leagueId": 20
+        }
+      ],
+      "fixtures": [
+        {
+          "id": 700,
+          "dateUtc": "",
+          "teamHome": "Real Madrid",
+          "teamAway": "Real Sociedad",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        },
+        {
+          "id": 701,
+          "dateUtc": "",
+          "teamHome": "Barcelone",
+          "teamAway": "Athletic Bilbao",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        },
+        {
+          "id": 702,
+          "dateUtc": "",
+          "teamHome": "Celta de Vigo",
+          "teamAway": "Osasuna",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        },
+        {
+          "id": 703,
+          "dateUtc": "",
+          "teamHome": "Fiorentina",
+          "teamAway": "Torino",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        },
+        {
+          "id": 704,
+          "dateUtc": "",
+          "teamHome": "Racing de Santander",
+          "teamAway": "Elche",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        }
+      ],
+      "lignes": [
+        {
+          "matchText": "Real Madrid vs Real Sociedad",
+          "marketText": "V1",
+          "coteText": "1,80",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Real Madrid"
+          }
+        },
+        {
+          "matchText": "Barcelone vs Athletic Bilbao",
+          "marketText": "V1",
+          "coteText": "1,40",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Barcelone"
+          }
+        },
+        {
+          "matchText": "Celta de Vigo vs Osasuna",
+          "marketText": "V2",
+          "coteText": "3,10",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Osasuna"
+          }
+        },
+        {
+          "matchText": "Fiorentina vs Torino",
+          "marketText": "V1",
+          "coteText": "1,84",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Fiorentina"
+          }
+        },
+        {
+          "matchText": "Racing de Santander vs Elche",
+          "marketText": "V1",
+          "coteText": "2,05",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Racing de Santander"
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 700,
+          "coteSaisie": 1.8
+        },
+        {
+          "ordre": 2,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 701,
+          "coteSaisie": 1.4
+        },
+        {
+          "ordre": 3,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 702,
+          "coteSaisie": 3.1
+        },
+        {
+          "ordre": 4,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 703,
+          "coteSaisie": 1.84
+        },
+        {
+          "ordre": 5,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 704,
+          "coteSaisie": 2.05
+        }
+      ]
+    },
+    {
+      "nom": "Séparateurs variés — cadratin, barre oblique, « v », « VS » (autres bookmakers)",
+      "note": "Un même découpage doit lire toutes ces notations, pas seulement le tiret.",
+      "lignes": [
+        {
+          "matchText": "Alverca — CF Estrela",
+          "marketText": "1",
+          "coteText": "2,0",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Alverca"
+          }
+        },
+        {
+          "matchText": "Rio Ave / FC Porto",
+          "marketText": "2",
+          "coteText": "1,7",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "FC Porto"
+          }
+        },
+        {
+          "matchText": "Casa Pia v Benfica",
+          "marketText": "2",
+          "coteText": "1,5",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Benfica"
+          }
+        },
+        {
+          "matchText": "Alverca VS CF Estrela",
+          "marketText": "1",
+          "coteText": "2,1",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Alverca"
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 101,
+          "coteSaisie": 2.0
+        },
+        {
+          "ordre": 2,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 102,
+          "coteSaisie": 1.7
+        },
+        {
+          "ordre": 3,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 103,
+          "coteSaisie": 1.5
+        },
+        {
+          "ordre": 4,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 101,
+          "coteSaisie": 2.1
+        }
+      ]
+    },
+    {
+      "nom": "Faux positif — nom d'équipe avec tiret/point collé, jamais coupé",
+      "note": "« Saint-Étienne », « 1. FC Köln » ont leur tiret/point COLLÉ. Le séparateur exige des espaces : on coupe sur le « - » isolé, pas dans le nom.",
+      "teams": [
+        {
+          "id": 720,
+          "nom": "Saint-Étienne",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 721,
+          "nom": "Lyon",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 722,
+          "nom": "1. FC Köln",
+          "aliases": [],
+          "leagueId": 20
+        },
+        {
+          "id": 723,
+          "nom": "Mayence",
+          "aliases": [],
+          "leagueId": 20
+        }
+      ],
+      "fixtures": [
+        {
+          "id": 720,
+          "dateUtc": "",
+          "teamHome": "Saint-Étienne",
+          "teamAway": "Lyon",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        },
+        {
+          "id": 721,
+          "dateUtc": "",
+          "teamHome": "1. FC Köln",
+          "teamAway": "Mayence",
+          "leagueId": 20,
+          "statut": "scheduled",
+          "scoreHome": null,
+          "scoreAway": null
+        }
+      ],
+      "lignes": [
+        {
+          "matchText": "Saint-Étienne - Lyon",
+          "marketText": "1",
+          "coteText": "2,2",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Saint-Étienne"
+          }
+        },
+        {
+          "matchText": "1. FC Köln - Mayence",
+          "marketText": "1",
+          "coteText": "1,9",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "1. FC Köln"
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 720,
+          "coteSaisie": 2.2
+        },
+        {
+          "ordre": 2,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 721,
+          "coteSaisie": 1.9
+        }
+      ]
     }
   ]
 }

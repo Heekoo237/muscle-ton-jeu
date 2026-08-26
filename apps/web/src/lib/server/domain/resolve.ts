@@ -164,6 +164,23 @@ function windowDiag(fixture: Fixture, home: Team, away: Team, matchText: string)
 	return { kind: 'ok', fixture, homeTeam: home, awayTeam: away };
 }
 
+/**
+ * Séparateur « équipe domicile / équipe extérieur » d'un libellé de match, tolérant
+ * aux notations des différents bookmakers — c'est la SEULE façon de lire « A ___ B ».
+ * Reconnus : tiret court/long/cadratin (- – —), « vs » / « v » / « v. » / « vs. »
+ * (anglais), barre oblique, point médian.
+ *
+ * DEUX garde-fous contre le faux positif (un séparateur qui coupe un NOM) :
+ *  1. ESPACES OBLIGATOIRES autour — « Saint-Étienne », « PSV », « 1. FC Köln » ont
+ *     leur tiret/point COLLÉ, jamais entouré d'espaces : ils ne sont donc jamais
+ *     coupés. Seul un séparateur isolé compte.
+ *  2. PREMIÈRE occurrence, home non gourmand (`.+?`) — « A vs B » → « A » | « B », un
+ *     seul point de coupe, jamais un émiettement en trois.
+ * Filet ultime : si la coupe désigne deux équipes qui n'existent pas, on retombe en
+ * `non_resolu` (pas retrouvé), jamais sur une fausse analyse — le pire cas est honnête.
+ */
+const SEP_EQUIPES = /^(.+?)\s+(?:[-–—]|vs?\.?|\/|·)\s+(.+)$/i;
+
 function diagnoseMatch(
 	matchText: string,
 	fixtures: Fixture[],
@@ -171,9 +188,11 @@ function diagnoseMatch(
 	clubByName: Map<string, number>,
 	teamByName: Map<string, Team>
 ): MatchDiag {
-	const sides = matchText.split(/\s+[-–]\s+/).map((s) => s.trim());
-	if (sides.filter((s) => s.length >= 2).length < 2) return { kind: 'illisible' };
-	const [rawHome, rawAway] = sides;
+	const m = matchText.match(SEP_EQUIPES);
+	if (!m) return { kind: 'illisible' };
+	const rawHome = m[1].trim();
+	const rawAway = m[2].trim();
+	if (rawHome.length < 2 || rawAway.length < 2) return { kind: 'illisible' };
 	const homeTeam = matchTeam(rawHome, teams);
 	const awayTeam = matchTeam(rawAway, teams);
 
