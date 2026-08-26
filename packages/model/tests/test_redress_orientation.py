@@ -4,8 +4,21 @@
 et tranche : réoriente / déjà aligné (DC périmée) / non ré-ancrable / noms divergents.
 On la teste sans base ni fournisseur (c'est là qu'est le risque : re-retourner un
 fixture correct). L'objet d'email (motif en tête) est testé à côté."""
+import inspect
+
 from mtj_model.pipeline.alerts_email import sujet_depuis_alertes
+from mtj_model.pipeline import redress_orientation
 from mtj_model.pipeline.redress_orientation import Decision, FixtureRetourne, decider
+
+
+def test_fenetre_ne_parametre_jamais_un_interval_literal():
+    """Garde-fou contre le bug qui a fait diverger les deux outils : psycopg rend
+    `interval '%s days'` en `interval '$1 days'` — le nombre reste DANS la chaîne,
+    Postgres lit « 0 jour », la fenêtre se réduit à un instant → 0 ligne, sans erreur.
+    On EXIGE l'idiome qui bind vraiment (`%s * interval '1 day'`), comme le nocturne."""
+    src = inspect.getsource(redress_orientation.fixtures_retournes)
+    assert "interval '%s" not in src, "placeholder DANS un literal interval → fenêtre morte"
+    assert "* interval '1 day'" in src, "utiliser (%s * interval '1 day') pour paramétrer les jours"
 
 
 def _fx(home="Rennes", away="Paris SG", ref="evt1"):

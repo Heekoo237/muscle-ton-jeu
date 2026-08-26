@@ -95,7 +95,8 @@ def fixtures_retournes(con) -> list[FixtureRetourne]:
           join fixtures f on f.id = piv.fixture_id
           join teams    th on th.id = f.team_home_id
           join teams    ta on ta.id = f.team_away_id
-         where f.date_utc between now() - interval '%s days' and now() + interval '%s days'
+         where f.date_utc between now() - (%s * interval '1 day')
+                              and now() + (%s * interval '1 day')
            and piv.dc_src = 'model'
            and piv.wh is not null and piv.dr is not null and piv.dc is not null
            and abs(piv.dc - (piv.wh + piv.dr)) >= %s
