@@ -9,10 +9,58 @@ import {
 	remplirCotesManquantes,
 	remplirMatchsNonResolus,
 	nouveauBudget,
-	type PickCible
+	type PickCible,
+	type PhaseOndemand
 } from '$lib/server/odds/ondemand';
 import type { Market, Selection } from '$lib/types';
 import { COVERED_MARKETS } from '$lib/types';
+
+// Fenêtre d'exécution : le chargement de la validation lance désormais l'à-la-demande
+// (borné < 2 s par le budget dur). On garde une marge large au-dessus du budget pour
+// ne jamais être coupé par la valeur par défaut de la plateforme avant nos garde-fous.
+export const config = { maxDuration: 30 };
+
+/**
+ * COMBLE le ticket à la demande — la MÊME opération aux DEUX moments : au CHARGEMENT
+ * de la validation (pour que l'aperçu « Analyser N sur M » soit juste) ET au
+ * « finaliser ». Deux passes, un seul budget DUR partagé : cotes manquantes des
+ * marchés joués (dont BTTS/±1,5/±3,5, jamais écrits par le pipeline), puis matchs
+ * non résolus. Écrit dans `predictions` (effet partagé) ; la dédup (`revendiquer`,
+ * 15 min + marchés déjà connus) fait que la phase suivante NE RAPPELLE PAS le
+ * fournisseur pour ce qui est déjà demandé — d'où le tag `phase` au journal.
+ * Ne lève jamais ; un échec retombe sur « pas encore de données ».
+ */
+async function comblerTicket(
+	selections: Selection[],
+	budget: ReturnType<typeof nouveauBudget>,
+	phase: PhaseOndemand
+): Promise<{ selections: Selection[]; appels: number; credits: number }> {
+	const picks: PickCible[] = selections
+		.filter((s) => s.fixtureId !== null && s.marche !== null)
+		.map((s) => ({ fixtureId: s.fixtureId as number, marche: s.marche as Market }));
+	const j1 = await remplirCotesManquantes(picks, budget, phase);
+
+	let out =
+		j1.nonCotes.size > 0
+			? selections.map((s) =>
+					s.fixtureId !== null && j1.nonCotes.has(s.fixtureId)
+						? { ...s, raison: 'non_cote' as const }
+						: s
+				)
+			: selections;
+
+	let appels = j1.appels;
+	let credits = j1.credits;
+	if (out.some((s) => s.raison === 'non_resolu' && s.fixtureId === null)) {
+		const [fixtures, teams] = await Promise.all([sports.resolutionFixtures(), sports.teams()]);
+		const j2 = await remplirMatchsNonResolus(out, teams, fixtures, budget, phase);
+		out = j2.selections;
+		appels += j2.journal.appels;
+		credits += j2.journal.credits;
+	}
+	console.log(`[${phase}] à-la-demande : ${appels} appel(s) fournisseur, ${credits} crédit(s)`);
+	return { selections: out, appels, credits };
+}
 
 /**
  * Analysable EN BASE : on lit la probabilité de la ligne, puis on tranche avec la
@@ -52,15 +100,25 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	const id = cookies.get('ticketId');
 	const ticket = id ? await getTicket(id) : undefined;
 	if (!ticket) redirect(303, '/analyser');
+
+	// PRÉ-REMPLISSAGE à la demande DÈS LE CHARGEMENT : les marchés événement (BTTS,
+	// ±1,5, ±3,5) ne sont JAMAIS écrits par le pipeline — seule cette récupération les
+	// pose. Sans elle, une ligne jouée sur ces marchés affichait « pas encore de
+	// données » à tort et faussait le « Analyser N sur M » — le PREMIER chiffre que
+	// l'utilisateur regarde. On comble donc ici (budget DUR < 2 s ; en cas de dépassement
+	// on retombe simplement sur « pas encore de données », jamais d'écran figé). La dédup
+	// (15 min) fait que le « finaliser » ne rappellera PAS le fournisseur pour ça.
+	const { selections: base } = await comblerTicket(ticket.selections, nouveauBudget(), 'validation');
+
 	// Disponibilité de la probabilité vérifiée EN AMONT, en UNE requête pour tout le
 	// ticket (avant : une lecture predictions PAR ligne = N+1, lent sur 3G). On lit le
 	// lot, puis on tranche par ligne avec la règle UNIQUE `isAnalysable`.
 	const fixtureIds = [
-		...new Set(ticket.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
+		...new Set(base.map((s) => s.fixtureId).filter((x): x is number => x !== null))
 	];
 	const preds = await predictions.forFixtures(fixtureIds);
 	const flags = await Promise.all(
-		ticket.selections.map(async (s) => {
+		base.map(async (s) => {
 			if (s.fixtureId === null || s.marche === null) return false;
 			const dansLot = (preds.get(s.fixtureId) ?? []).find((pr) => pr.marche === s.marche) ?? null;
 			if (isAnalysable({ ...s, probabilite: dansLot?.probabilite ?? null })) return true;
@@ -97,7 +155,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	);
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
-	const selections: ValidationLineVM[] = ticket.selections.map((s, i) => {
+	const selections: ValidationLineVM[] = base.map((s, i) => {
 		const [home, away] = teamsOf(s.matchLabel);
 		return {
 			...s,
@@ -193,49 +251,17 @@ export const actions: Actions = {
 	},
 
 	// Valide la lecture : le ticket passe en « valide », direction le résultat.
-	// AVANT de valider (chemin d'ÉCRITURE), on comble à la demande les cotes
-	// manquantes : une ligne résolue mais sans probabilité déclenche un appel
-	// The Odds API pour son championnat, un dévigeage déterministe et une écriture
-	// dans `predictions`. /resultat LIT ensuite normalement (règle d'archi n°2). La
-	// récupération ne lève jamais et est bornée < 2 s ; en cas d'échec on retombe
-	// simplement sur « pas encore de données ».
+	// On RE-COMBLE à la demande (même helper que le chargement) : la dédup (15 min)
+	// fait que ce qui a déjà été demandé au chargement ne rappelle PAS le fournisseur
+	// (phase=finaliser tombe à ~0 appel) ; ce qui restait (correction de dernière
+	// seconde, ticket rouvert au-delà de 15 min) est comblé ici. /resultat LIT ensuite
+	// (règle d'archi n°2). Budget DUR < 2 s ; échec → « pas encore de données ».
 	finaliser: async ({ cookies }) => {
 		const id = cookies.get('ticketId');
 		const ticket = id ? await getTicket(id) : undefined;
 		if (!ticket) redirect(303, '/analyser');
 
-		// UN SEUL budget de temps DUR partagé par les deux passes (cotes manquantes +
-		// matchs non résolus) : le total reste < 2 s même si les deux tournent.
-		const budget = nouveauBudget();
-
-		// Ciblage PAR MARCHÉ JOUÉ : on ne comble que le pari réellement posé (« Boca
-		// gagne » ne va pas chercher les plus/moins). Une ligne résolue = (fixture, marché).
-		const picks: PickCible[] = ticket.selections
-			.filter((s) => s.fixtureId !== null && s.marche !== null)
-			.map((s) => ({ fixtureId: s.fixtureId as number, marche: s.marche as Market }));
-		const journal = await remplirCotesManquantes(picks, budget);
-
-		// Les matchs INTERROGÉS mais que le fournisseur ne price pas portent le message
-		// honnête « pas encore coté » (distinct du transitoire « pas encore de données »).
-		let selections =
-			journal.nonCotes.size > 0
-				? ticket.selections.map((s) =>
-						s.fixtureId !== null && journal.nonCotes.has(s.fixtureId)
-							? { ...s, raison: 'non_cote' as const }
-							: s
-					)
-				: ticket.selections;
-
-		// Lignes NON RÉSOLUES (match pas encore en base) : si les deux équipes sont
-		// reconnues et partagent une ligue du catalogue, on interroge la ligue en
-		// direct — le match peut avoir été listé depuis la dernière collecte (trou de
-		// fraîcheur). Trouvé → on crée le fixture et on re-résout ; absent → « pas
-		// encore coté ». Même budget partagé, jamais bloquant.
-		if (selections.some((s) => s.raison === 'non_resolu' && s.fixtureId === null)) {
-			const [fixtures, teams] = await Promise.all([sports.resolutionFixtures(), sports.teams()]);
-			selections = (await remplirMatchsNonResolus(selections, teams, fixtures, budget)).selections;
-		}
-
+		const { selections } = await comblerTicket(ticket.selections, nouveauBudget(), 'finaliser');
 		await updateTicket(ticket.id, { selections, statut: 'valide' });
 		redirect(303, '/resultat');
 	}

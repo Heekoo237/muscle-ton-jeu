@@ -19,6 +19,13 @@ export interface OndemandRapport {
 	/** Répartition des ABANDONS par raison (plus jamais un silence). Ex. `{ budget: 3,
 	 *  deja_connu: 12, non_apparie: 1 }`. Un abandon = une cible non comblée + pourquoi. */
 	abandons: Record<string, number>;
+	/**
+	 * Écart AVANT/APRÈS le pré-remplissage à la validation : appels + crédits fournisseur
+	 * par phase émettrice. Attendu après déploiement : l'essentiel bascule sur `validation`,
+	 * `finaliser` tombe à ~0 (la dédup 15 min empêche le second appel). `lignes` = nombre
+	 * de lignes de journal par phase — un proxy du NOMBRE de validations vs finalisers
+	 * (chaque passe écrit au moins une ligne), donc de l'abandon à cette étape. */
+	parPhase: Record<string, { appels: number; credits: number; lignes: number }>;
 }
 
 /** Journal agrégé des appels depuis `depuisIso` (null = tout). */
@@ -32,7 +39,8 @@ export async function computeOndemand(depuisIso: string | null): Promise<Ondeman
 		matchsEcrits: 0,
 		tauxEchec: 0,
 		parKind: { league: 0, event: 0 },
-		abandons: {}
+		abandons: {},
+		parPhase: {}
 	};
 	if (!isSupabaseConfigured()) return vide;
 	// Agrégat sur une fenêtre : il faut TOUTES les lignes, pas 1000. Paginé (le
@@ -41,7 +49,7 @@ export async function computeOndemand(depuisIso: string | null): Promise<Ondeman
 	const data = await selectAll<Record<string, unknown>>(() => {
 		const q = supabaseAdmin()
 			.from('ondemand_calls')
-			.select('kind, ok, credits, matchs_ecrits, raison, cree_le')
+			.select('kind, ok, credits, matchs_ecrits, raison, phase, cree_le')
 			.order('id', { ascending: true });
 		return depuisIso ? q.gte('cree_le', depuisIso) : q;
 	});
@@ -51,15 +59,23 @@ export async function computeOndemand(depuisIso: string | null): Promise<Ondeman
 		credits: number;
 		matchs_ecrits: number;
 		raison: string | null;
+		phase: string | null;
 	}[];
-	const r: OndemandRapport = { ...vide, parKind: { league: 0, event: 0 }, abandons: {} };
+	const r: OndemandRapport = { ...vide, parKind: { league: 0, event: 0 }, abandons: {}, parPhase: {} };
 	for (const row of rows) {
+		// Écart par phase : toute ligne compte (une passe écrit au moins une ligne, donc
+		// `lignes` est un proxy du nombre de validations vs finalisers → l'abandon).
+		const ph = row.phase ?? 'inconnu';
+		const pp = (r.parPhase[ph] ??= { appels: 0, credits: 0, lignes: 0 });
+		pp.lignes++;
 		// Un 'skip' n'est PAS un appel fournisseur : c'est un abandon (aucun crédit).
 		if (row.kind === 'skip') {
 			const cause = row.raison ?? 'inconnu';
 			r.abandons[cause] = (r.abandons[cause] ?? 0) + 1;
 			continue;
 		}
+		pp.appels++;
+		pp.credits += row.credits ?? 0;
 		r.appels++;
 		if (row.ok) r.succes++;
 		else r.echecs++;

@@ -57,6 +57,11 @@
       "migration": "0021"
     },
     {
+      "table": "ondemand_calls",
+      "column": "phase",
+      "migration": "0027"
+    },
+    {
       "table": "vision_stats",
       "column": "uploads_essai2",
       "migration": "0023"

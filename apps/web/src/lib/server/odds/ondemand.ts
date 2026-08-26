@@ -115,6 +115,15 @@ export interface JournalOndemand {
 
 const journalVide = (): JournalOndemand => ({ ecrits: 0, appels: 0, credits: 0, nonCotes: new Set() });
 
+/**
+ * D'OÙ part l'appel à la demande. La MÊME récupération tourne au chargement de
+ * l'écran de validation (aperçu juste) ET au « finaliser » ; la dédup fait que le
+ * finaliser ne rappelle jamais le fournisseur pour ce que la validation a déjà
+ * demandé. On tag chaque ligne de journal de sa phase pour VOIR l'écart (colonne
+ * `ondemand_calls.phase`, migration 0027).
+ */
+export type PhaseOndemand = 'validation' | 'finaliser';
+
 type Ligne = ReturnType<typeof versLignes>[number];
 /** Raison d'un abandon (persistée, agrégée dans /api/health/ondemand). */
 type Raison =
@@ -135,15 +144,16 @@ type NoteRow = {
 	matchs_ecrits: number;
 	raison: string | null;
 	erreur: string | null;
+	phase: PhaseOndemand;
 };
-function creerJournalDb() {
+function creerJournalDb(phase: PhaseOndemand) {
 	const rows: NoteRow[] = [];
 	return {
 		appel(cle: string, kind: 'league' | 'event', ok: boolean, credits: number, ecrits: number, erreur?: string) {
-			rows.push({ cle, kind, ok, credits, matchs_ecrits: ecrits, raison: null, erreur: erreur ?? null });
+			rows.push({ cle, kind, ok, credits, matchs_ecrits: ecrits, raison: null, erreur: erreur ?? null, phase });
 		},
 		skip(cle: string, raison: Raison) {
-			rows.push({ cle, kind: 'skip', ok: true, credits: 0, matchs_ecrits: 0, raison, erreur: null });
+			rows.push({ cle, kind: 'skip', ok: true, credits: 0, matchs_ecrits: 0, raison, erreur: null, phase });
 		},
 		async flush() {
 			if (rows.length === 0) return;
@@ -256,11 +266,12 @@ async function ecrirePredictions(lignes: Ligne[]): Promise<number> {
  */
 export async function remplirCotesManquantes(
 	picks: PickCible[],
-	budget: Budget = nouveauBudget()
+	budget: Budget = nouveauBudget(),
+	phase: PhaseOndemand = 'finaliser'
 ): Promise<JournalOndemand> {
 	const journal = journalVide();
 	if (!providerConfigured() || !isSupabaseConfigured() || picks.length === 0) return journal;
-	const jdb = creerJournalDb();
+	const jdb = creerJournalDb(phase);
 	try {
 		if (await circuitOuvert()) return journal; // repli collecteur seul (surveillance alerte)
 
@@ -525,12 +536,13 @@ export async function remplirMatchsNonResolus(
 	selections: Selection[],
 	teams: Team[],
 	fixtures: Fixture[],
-	budget: Budget = nouveauBudget()
+	budget: Budget = nouveauBudget(),
+	phase: PhaseOndemand = 'finaliser'
 ): Promise<ResultatNonResolus> {
 	const journal = journalVide();
 	const inchange: ResultatNonResolus = { selections, journal };
 	if (!providerConfigured() || !isSupabaseConfigured()) return inchange;
-	const jdb = creerJournalDb();
+	const jdb = creerJournalDb(phase);
 	try {
 		// Candidates : ligne non_resolu, DEUX équipes reconnues, MÊME ligue.
 		const cibles: CibleNonResolue[] = [];
