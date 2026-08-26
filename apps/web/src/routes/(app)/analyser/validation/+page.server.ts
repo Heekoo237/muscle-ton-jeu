@@ -59,11 +59,42 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		...new Set(ticket.selections.map((s) => s.fixtureId).filter((x): x is number => x !== null))
 	];
 	const preds = await predictions.forFixtures(fixtureIds);
-	const flags = ticket.selections.map((s) => {
-		if (s.fixtureId === null || s.marche === null) return false;
-		const p = (preds.get(s.fixtureId) ?? []).find((pr) => pr.marche === s.marche) ?? null;
-		return isAnalysable({ ...s, probabilite: p?.probabilite ?? null });
-	});
+	const flags = await Promise.all(
+		ticket.selections.map(async (s) => {
+			if (s.fixtureId === null || s.marche === null) return false;
+			const dansLot = (preds.get(s.fixtureId) ?? []).find((pr) => pr.marche === s.marche) ?? null;
+			if (isAnalysable({ ...s, probabilite: dansLot?.probabilite ?? null })) return true;
+
+			// TROU APPARENT : le lot (forFixtures) n'a pas renvoyé de proba pour cette ligne
+			// résolue. Deux causes possibles, qu'on TRANCHE ici plutôt que de deviner —
+			// c'est le symptôme « pas encore de données qui passe au vert au clic ». On
+			// refait la lecture CIBLÉE (get, comme le fait le clic) UNIQUEMENT sur les trous
+			// (0-2 lignes en général, coût négligeable) :
+			//  - si `get` trouve la proba que le lot n'avait pas → INCOHÉRENCE lot/ciblé :
+			//    une lecture de collection tronque encore (écriture concurrente pendant la
+			//    pagination, ou « Max Rows » abaissé sous PAGE). On JOURNALISE fort ET on
+			//    soigne (on affiche le vrai état, plus de faux « pas encore de données ») ;
+			//  - si `get` ne trouve rien non plus → le marché LU n'a réellement pas de ligne
+			//    (régime cote seule : l'intérim n'écrit qu'un sous-ensemble de marchés).
+			//    C'est ce que la récupération à la demande comble au « finaliser ». On le dit.
+			const ciblee = s.marche !== null ? await predictions.get(s.fixtureId, s.marche) : null;
+			const marchesDuLot = (preds.get(s.fixtureId) ?? []).map((pr) => pr.marche);
+			if (ciblee && typeof ciblee.probabilite === 'number') {
+				console.warn(
+					`[validation] INCOHÉRENCE lot/ciblé — fixture=${s.fixtureId} marché=${s.marche} : ` +
+						`le lot forFixtures n'a PAS renvoyé la proba (marchés vus: ${JSON.stringify(marchesDuLot)}), ` +
+						`mais get la trouve (p=${ciblee.probabilite}). Lecture de collection tronquée ?`
+				);
+				return isAnalysable({ ...s, probabilite: ciblee.probabilite });
+			}
+			console.log(
+				`[validation] TROU RÉEL — fixture=${s.fixtureId} marché=${s.marche} : aucune proba ` +
+					`(ni lot ni get). Marchés présents pour ce match: ${JSON.stringify(marchesDuLot)}. ` +
+					`Comblé au « finaliser » (récupération à la demande) si le fournisseur price ce marché.`
+			);
+			return false;
+		})
+	);
 	// Chaque ligne est corrigeable : on précalcule tous les marchés couverts,
 	// libellés en français avec les noms d'équipes, pour la feuille de correction.
 	const selections: ValidationLineVM[] = ticket.selections.map((s, i) => {
