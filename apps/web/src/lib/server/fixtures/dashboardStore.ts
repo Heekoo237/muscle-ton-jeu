@@ -14,6 +14,7 @@ import {
 	type FinalScore
 } from '$lib/server/domain/settle';
 import { sports } from '$lib/server/services';
+import { MATCH_DUREE_MS } from '$lib/server/domain/window';
 import type { Fixture, Market } from '$lib/types';
 
 export interface DashboardStats {
@@ -126,20 +127,33 @@ export function dashboardStats(data: DashboardData): DashboardStats {
  * déjà lues (voir loadDashboardData).
  */
 export function ticketsEnCours(data: DashboardData): TicketEnCours[] {
-	const { analysed, upcoming, finished } = data;
+	const { analysed, upcoming, finished, datesReglables } = data;
+	// Dates de coup d'envoi, toutes sources confondues : terminés + réglables (passés,
+	// sans score) + à venir. Le plus « frais » (à venir) écrit en dernier. Sans les
+	// matchs passés ici, un ticket joué mais non réglé n'aurait aucune date connue et
+	// resterait « en cours » à vie.
 	const dateOf = new Map<number, number>();
+	for (const f of finished) dateOf.set(f.id, Date.parse(f.dateUtc));
+	for (const [id, ms] of datesReglables) dateOf.set(id, ms);
 	for (const f of upcoming) dateOf.set(f.id, Date.parse(f.dateUtc));
 
 	const finishedIds = new Set(finished.map((f) => f.id));
+	const now = Date.now();
 
 	const out: TicketEnCours[] = [];
 	for (const t of analysed) {
 		const analysables = t.selections.filter((s) => s.etatResolution === 'certain');
 		const fixtureIds = analysables.map((s) => s.fixtureId).filter((id): id is number => id !== null);
-		const tousTermines = fixtureIds.length > 0 && fixtureIds.every((id) => finishedIds.has(id));
-		if (tousTermines) continue; // ticket clos : il ira dans l'historique
+		if (fixtureIds.length === 0) continue;
+		const tousTermines = fixtureIds.every((id) => finishedIds.has(id));
+		// « Joué » à l'heure : tous les coups d'envoi connus ET passés depuis la durée d'un
+		// match. Un ticket joué QUITTE « en cours » (même sans score encore) — il apparaît
+		// dans l'historique en « Terminé », au lieu de traîner ici en « En attente ».
+		const horairesTous = fixtureIds.map((id) => dateOf.get(id));
+		const tousJoues = horairesTous.every((ms) => ms != null && ms + MATCH_DUREE_MS < now);
+		if (tousTermines || tousJoues) continue; // ticket clos : il ira dans l'historique
 
-		const horaires = fixtureIds.map((id) => dateOf.get(id)).filter((d): d is number => d != null);
+		const horaires = horairesTous.filter((d): d is number => d != null);
 		out.push({
 			id: t.id,
 			dateMs: t.creeLeMs,

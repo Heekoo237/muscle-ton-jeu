@@ -30,3 +30,12 @@ export const RESOLUTION_HORIZON_DAYS = 60;
  * et la résolution dit à tort « on n'a pas retrouvé ce match ».
  */
 export const RESOLUTION_LOOKBACK_HOURS = 48;
+
+/**
+ * Durée après laquelle un match est SÛREMENT terminé, coup d'envoi compris. Sert à
+ * l'AFFICHAGE du statut (« tous les matchs sont joués ») quand le score n'est pas
+ * encore en base : on ne devine pas un résultat, on constate juste que l'heure de fin
+ * est passée. 90 min de jeu + mi-temps + arrêts + marge de retard → 3 h, généreux
+ * exprès (mieux vaut « en attente » une heure de trop que « terminé » trop tôt).
+ */
+export const MATCH_DUREE_MS = 3 * 3600_000;

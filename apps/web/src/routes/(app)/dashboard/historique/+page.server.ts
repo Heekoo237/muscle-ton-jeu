@@ -8,6 +8,7 @@ import {
 	resultatIntrouvable,
 	type FinalScore
 } from '$lib/server/domain/settle';
+import { MATCH_DUREE_MS } from '$lib/server/domain/window';
 import { sports } from '$lib/server/services';
 import { DEMO_MODE, demoHistoLignes } from '$lib/server/demo';
 
@@ -17,10 +18,12 @@ export interface HistoLine {
 	nbMatchs: number;
 	nbFragiles: number;
 	/**
+	 * `joue` : tous les matchs sont JOUÉS (coup d'envoi passé depuis la durée d'un match)
+	 *   mais le verdict n'est pas encore posé — « Terminé » plutôt que « En attente ».
 	 * `sans_reglement` : aucune sélection réglable — rien qu'un score puisse décider.
 	 * `indisponible` : match(s) réglable(s) passé(s) depuis longtemps, score jamais arrivé.
 	 */
-	statut: 'attente' | 'passe' | 'tombe' | 'sans_reglement' | 'indisponible';
+	statut: 'attente' | 'joue' | 'passe' | 'tombe' | 'sans_reglement' | 'indisponible';
 	/** Premier coup d'envoi (état « en attente »). */
 	kickoffMs: number | null;
 	/** Date à laquelle le ticket a été réglé (dernier match terminé), état passé/tombé. */
@@ -117,9 +120,31 @@ export const load: PageServerLoad = async (event) => {
 				};
 			}
 
-			const horaires = analysables
-				.map((s) => (s.fixtureId != null ? dateOf.get(s.fixtureId) : undefined))
-				.filter((d): d is number => d != null);
+			// TOUS les matchs sont JOUÉS (coup d'envoi passé + durée d'un match) mais le
+			// verdict n'est pas encore posé → « Terminé », pas « En attente ». On ne devine
+			// aucun résultat : on constate juste que l'heure de fin est passée. Le score
+			// arrivera avec le règlement ; d'ici là, le joueur voit un ticket clos, pas un
+			// ticket qui « attend » un match déjà joué depuis des jours.
+			const horairesTous = analysables.map((s) =>
+				s.fixtureId != null ? dateOf.get(s.fixtureId) : undefined
+			);
+			const tousConnus = horairesTous.every((d): d is number => d != null);
+			const tousJoues = tousConnus && horairesTous.every((d) => (d as number) + MATCH_DUREE_MS < Date.now());
+			if (tousJoues) {
+				return {
+					id: t.id,
+					dateMs: t.creeLeMs,
+					nbMatchs,
+					nbFragiles,
+					statut: 'joue',
+					kickoffMs: null,
+					verdictDateMs: Math.max(...(horairesTous as number[])),
+					tombeSur: null,
+					verdictRenforce: false
+				};
+			}
+
+			const horaires = horairesTous.filter((d): d is number => d != null);
 			return {
 				id: t.id,
 				dateMs: t.creeLeMs,

@@ -12,6 +12,7 @@
  */
 import type { StoredTicket } from './fixtures/ticketStore';
 import { ANTON_B64, GEIST_B64, MONO_B64 } from './fonts.b64';
+import { multiplicateurRetrait } from './domain/resultDisplay';
 
 const CANVAS = '#F8F1E4';
 const PAPER = '#FDFAF3';
@@ -155,6 +156,22 @@ export function renderShareSvg(vm: ShareVM, standalone = true): string {
 	const retraits =
 		vm.nbRetirees <= 1 ? `${vm.nbRetirees} match retiré` : `${vm.nbRetirees} matchs retirés`;
 
+	// Multiplicateur d'effet du retrait — MÊME calcul que l'écran de résultat
+	// (resultDisplay.multiplicateurRetrait), jamais un nombre écrit à la main (règle
+	// d'or n°1). N'apparaît QUE s'il y a eu un retrait ET un effet visible ; les DEUX
+	// pourcentages restent toujours affichés (jamais le multiplicateur seul). Rendu en
+	// INK, pas en accent : le seul accent de marque reste le % de droite (règle du
+	// gabarit) — on le fait frapper par la TAILLE, pas par une seconde couleur.
+	const mult = multiplicateurRetrait(vm.probaTotalePct / 100, vm.probaRenforceePct / 100, vm.nbRetirees > 0);
+	const pcts = `<tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan>`;
+	// Sans multiplicateur : une seule ligne, comme avant. Avec : les pourcentages
+	// montent d'un cran et le multiplicateur passe dessous, plus gros — c'est lui qu'on
+	// retient d'un coup d'œil dans une conversation.
+	const legende = mult
+		? `<text x="540" y="880" text-anchor="middle" font-family="${GEIST}" font-weight="400" font-size="38" fill="${INK}">${esc(retraits)}. ${pcts}</text>
+  <text x="540" y="940" text-anchor="middle" font-family="${GEIST}" font-weight="700" font-size="48" fill="${INK}">${esc(mult)}</text>`
+		: `<text x="540" y="905" text-anchor="middle" font-family="${GEIST}" font-weight="400" font-size="40" fill="${INK}">${esc(retraits)}. ${pcts}</text>`;
+
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
   ${standalone ? FONT_STYLE : ''}
   <rect width="1080" height="1350" fill="${CANVAS}"/>
@@ -164,7 +181,7 @@ export function renderShareSvg(vm: ShareVM, standalone = true): string {
   ${ticket(60, 'left', vm)}
   ${ticket(570, 'right', vm)}
 
-  <text x="540" y="905" text-anchor="middle" font-family="${GEIST}" font-weight="400" font-size="40" fill="${INK}">${esc(retraits)}. <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan></text>
+  ${legende}
 
   <line x1="90" y1="970" x2="990" y2="970" stroke="${LINE}" stroke-width="1"/>
 

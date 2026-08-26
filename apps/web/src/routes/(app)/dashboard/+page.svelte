@@ -65,7 +65,7 @@
 					<span class="sur">/ {data.stats.ticketsRegles + data.stats.ticketsEnAttente}</span>
 				</span>
 				<span class="lbl t-small">
-					réglé{data.stats.ticketsRegles > 1 ? 's' : ''} · {data.stats.ticketsEnAttente} en attente
+					terminé{data.stats.ticketsRegles > 1 ? 's' : ''} · {data.stats.ticketsEnAttente} en attente
 				</span>
 			</div>
 		{/if}

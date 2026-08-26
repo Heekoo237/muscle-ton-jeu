@@ -20,10 +20,15 @@
 	{:else}
 		<div class="liste">
 			{#each data.lignes as l (l.id)}
-				<a class="card" href={`/dashboard/historique/${l.id}`}>
+				<a
+					class="card"
+					class:termine={l.statut === 'passe' || l.statut === 'tombe' || l.statut === 'joue'}
+					href={`/dashboard/historique/${l.id}`}
+				>
 					<div class="l1">
 						<span class="t-h3">{jour.format(new Date(l.dateMs))} · {l.nbMatchs} match{l.nbMatchs > 1 ? 's' : ''}</span>
 						{#if l.statut === 'attente'}<span class="badge">En attente</span>{/if}
+						{#if l.statut === 'joue' || l.statut === 'passe' || l.statut === 'tombe'}<span class="badge fait">Terminé</span>{/if}
 						{#if l.statut === 'sans_reglement'}<span class="badge">Rien à régler</span>{/if}
 						{#if l.statut === 'indisponible'}<span class="badge">Résultat indisponible</span>{/if}
 					</div>
@@ -40,6 +45,11 @@
 						{#if l.kickoffMs != null}
 							<span class="passe t-body">Coup d'envoi {kickoff(l.kickoffMs)}</span>
 						{/if}
+					{:else if l.statut === 'joue'}
+						<span class="passe t-body">Tous les matchs sont joués</span>
+						{#if l.verdictDateMs != null}
+							<span class="dit t-small">Terminé le {jour.format(new Date(l.verdictDateMs))}</span>
+						{/if}
 					{:else if l.statut === 'sans_reglement'}
 						<span class="dit t-body">Aucun match à vérifier ici.</span>
 					{:else if l.statut === 'indisponible'}
@@ -50,7 +60,7 @@
 					{:else if l.statut === 'passe'}
 						<span class="passe t-body">Ton ticket est passé</span>
 						{#if l.verdictDateMs != null}
-							<span class="dit t-small">Réglé le {jour.format(new Date(l.verdictDateMs))}</span>
+							<span class="dit t-small">Terminé le {jour.format(new Date(l.verdictDateMs))}</span>
 						{/if}
 					{:else}
 						<span class="passe t-body">Tombé{l.tombeSur ? ` sur ${l.tombeSur}` : ''}</span>
@@ -58,7 +68,7 @@
 							<span class="verdict t-small">La version renforcée serait passée</span>
 						{/if}
 						{#if l.verdictDateMs != null}
-							<span class="dit t-small">Réglé le {jour.format(new Date(l.verdictDateMs))}</span>
+							<span class="dit t-small">Terminé le {jour.format(new Date(l.verdictDateMs))}</span>
 						{/if}
 					{/if}
 				</a>
@@ -102,6 +112,10 @@
 	.card:active {
 		transform: scale(0.99);
 	}
+	/* Un ticket terminé se distingue au premier coup d'œil : liseré sombre à gauche. */
+	.card.termine {
+		border-left: 4px solid var(--c-ink);
+	}
 	.l1 {
 		display: flex;
 		align-items: center;
@@ -127,5 +141,11 @@
 		background: var(--c-canvas-sunk);
 		color: var(--c-ink-3);
 		font-size: 14px;
+	}
+	/* « Terminé » : badge PLEIN, pour trancher d'un coup d'œil sur « En attente » (creux). */
+	.badge.fait {
+		background: var(--c-ink);
+		color: var(--c-ink-inverse);
+		font-weight: 600;
 	}
 </style>

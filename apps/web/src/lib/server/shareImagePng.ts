@@ -102,12 +102,13 @@ function assertFontsRenderable(): void {
 	fontsOk = true;
 }
 
-/** Rend l'image de partage en PNG 1080 × 1350. Lève si les polices ne rendent pas. */
-export function renderSharePng(vm: ShareVM): Uint8Array {
+/** Rend l'image de partage en PNG (largeur 1080 par défaut ; le gabarit garde son
+ *  ratio 1080 × 1350). Lève si les polices ne rendent pas. */
+export function renderSharePng(vm: ShareVM, width = 1080): Uint8Array {
 	assertFontsRenderable(); // garde-fou : jamais d'image sans texte
 	const svg = renderShareSvg(vm, false); // resvg compose avec les fichiers TTF fournis
 	const options: ResvgRenderOptions = {
-		fitTo: { mode: 'width', value: 1080 },
+		fitTo: { mode: 'width', value: width },
 		font: fontOptions()
 	};
 	return new Resvg(svg, options).render().asPng() as unknown as Uint8Array;
