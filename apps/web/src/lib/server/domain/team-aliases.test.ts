@@ -23,7 +23,20 @@ describe('team-aliases — carte curée, aucune fusion automatique', () => {
 
 	it('aliasFor renvoie la cible connue, sinon le nom inchangé', () => {
 		expect(aliasFor('paris sg')).toBe('paris saint germain');
-		expect(aliasFor('seville')).toBe('sevilla'); // exonyme français → nom Odds API
 		expect(aliasFor('arsenal')).toBe('arsenal');
+	});
+
+	// EXONYMES traduits par TOKEN : mordent quel que soit l'habillage du nom. C'est ce qui
+	// a supprimé l'intermittence Inter–Napoli (« SSC Naples » un coup, « Naples » nu l'autre).
+	it('un exonyme est traduit par token, seul ou noyé dans un nom composé', () => {
+		expect(aliasFor('seville')).toBe('sevilla'); // exonyme FR seul → nom Odds API
+		expect(aliasFor('naples')).toBe('napoli'); // « Naples » nu → « Napoli »
+		expect(aliasFor('ssc naples')).toBe('ssc napoli'); // habillage bookmaker → token traduit
+		expect(aliasFor('fc naples')).toBe('fc napoli');
+	});
+
+	it('un nom sans exonyme ni alias reste rigoureusement inchangé', () => {
+		expect(aliasFor('inter milan')).toBe('inter milan');
+		expect(aliasFor('napoli')).toBe('napoli'); // déjà le nom de base, pas de double-traduction
 	});
 });

@@ -30,22 +30,47 @@ export const TEAM_ALIASES: Record<string, string> = {
 	'corum belediyespor': 'corum fk',
 	// Vitória SC = Vitória de Guimarães : Betclic dit « Guimaraes », Odds API « SC ».
 	// La contenance par mot ne peut pas rapprocher « guimaraes » et « sc » — alias requis.
-	'vitoria guimaraes': 'vitoria sc',
-	// EXONYME FRANÇAIS : le bookmaker écrit « Séville », la base (Odds API) « Sevilla ».
-	// « seville » et « sevilla » ne partagent aucun mot entier → alias requis. (Même
-	// motif possible pour d'autres exonymes : Cologne/Köln, Naples/Napoli, etc. — on
-	// n'ajoute QUE ce que les logs prouvent, jamais au jugé.)
-	seville: 'sevilla',
-	// EXONYME confirmé par un vrai ticket (« Inter Milan vs SSC Naples ») : le bookmaker
-	// écrit « SSC Naples », la base (Odds API, Serie A) écrit « Napoli ». teamSimilarity
-	// ≈ 0,31 (< seuil paire) et aucun token commun → ni matchTeam ni la paire ne
-	// rattrapent : alias indispensable. UNE seule clé (ce que le log prouve) — le guard
-	// anti-fusion interdit deux clés vers la même cible ; « Naples » nu s'ajoutera si un
-	// ticket le montre.
-	'ssc naples': 'napoli'
+	'vitoria guimaraes': 'vitoria sc'
+	// Les EXONYMES (Séville→Sevilla, Naples→Napoli) sont traités par token plus bas, PAS ici.
 };
 
-/** Nom de référence pour une clé bookmaker normalisée, ou la clé inchangée. */
+/**
+ * EXONYMES — traduction d'un MOT de nom propre, appliquée TOKEN par TOKEN.
+ *
+ * Un exonyme (« Séville » pour Sevilla, « Naples » pour Napoli) est le MÊME club sous
+ * un nom traduit ; il apparaît sous plusieurs habillages selon le bookmaker et la
+ * vision (« Naples », « SSC Naples », « FC Naples »…). Le mettre dans TEAM_ALIASES
+ * imposerait une entrée par habillage — et se heurterait au garde-fou anti-fusion, qui
+ * interdit deux clés (« naples », « ssc naples ») pointant vers la même cible « napoli ».
+ *
+ * On traduit donc le TOKEN, une fois, et il mord quel que soit l'habillage. Contrainte
+ * de sûreté : la clé doit être un mot qui NE désigne QUE ce club (pas un mot générique
+ * comme « fc » ou « united »), sinon on renommerait à tort. « naples »/« seville » sont
+ * des noms propres de ville non ambigus dans notre univers de couverture.
+ *
+ * Terrain (2026-08) : la vision renvoyait tantôt « SSC Naples », tantôt « Naples » nu —
+ * l'alias plein « ssc naples » ne mordait que la première forme, d'où un « championnat
+ * non couvert » INTERMITTENT sur l'Inter–Napoli. La traduction par token supprime
+ * l'intermittence : toute forme contenant « naples » devient « napoli ».
+ */
+const EXONYMES: Record<string, string> = {
+	// « Séville » (bookmaker/vision FR) → « Sevilla » (base, Odds API).
+	seville: 'sevilla',
+	// « Naples » (bookmaker/vision FR, seul ou dans « SSC Naples ») → « Napoli » (base).
+	naples: 'napoli'
+};
+
+/**
+ * Nom de référence pour un nom bookmaker normalisé, ou le nom inchangé.
+ *
+ * Deux étages : (1) on traduit chaque TOKEN via EXONYMES (« ssc naples » → « ssc napoli »,
+ * « naples » → « napoli »), puis (2) on applique la carte plein-nom TEAM_ALIASES sur le
+ * résultat. Une entrée plein-nom l'emporte donc toujours sur la somme des tokens.
+ */
 export function aliasFor(normalizedName: string): string {
-	return TEAM_ALIASES[normalizedName] ?? normalizedName;
+	const traduit = normalizedName
+		.split(' ')
+		.map((token) => EXONYMES[token] ?? token)
+		.join(' ');
+	return TEAM_ALIASES[traduit] ?? traduit;
 }
