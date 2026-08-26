@@ -1148,6 +1148,142 @@
           "coteSaisie": 1.9
         }
       ]
+    },
+    {
+      "nom": "Sans séparateur reconnu (« contre », « : », rien) — rattrapage par paire",
+      "note": "On ne liste pas les séparateurs un par un. Quand le découpage échoue, on cherche deux équipes de la base qui se rencontrent dans le texte. Le côté vient du fixture.",
+      "lignes": [
+        {
+          "matchText": "Alverca contre CF Estrela",
+          "marketText": "1",
+          "coteText": "2,0",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Alverca"
+          }
+        },
+        {
+          "matchText": "Rio Ave FC Porto",
+          "marketText": "2",
+          "coteText": "1,3",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "FC Porto"
+          }
+        },
+        {
+          "matchText": "Casa Pia : Benfica",
+          "marketText": "2",
+          "coteText": "1,5",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Benfica"
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 101,
+          "coteSaisie": 2.0
+        },
+        {
+          "ordre": 2,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 102,
+          "coteSaisie": 1.3
+        },
+        {
+          "ordre": 3,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 103,
+          "coteSaisie": 1.5
+        }
+      ]
+    },
+    {
+      "nom": "Sans séparateur — une seule équipe dans le texte → illisible, jamais deviné",
+      "note": "Le rattrapage par paire exige DEUX équipes présentes (MIN des côtés). Une seule → aucun candidat, on ne devine pas.",
+      "lignes": [
+        {
+          "matchText": "Alverca et je ne sais quoi",
+          "marketText": "1",
+          "coteText": "2,0",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "Alverca"
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "inconnu",
+          "raison": "inconnu",
+          "fixtureId": null
+        }
+      ]
+    },
+    {
+      "nom": "Filet positionnel — vision rend « V1 »/« 2 »/« 1X » (côté lu sur le fixture)",
+      "note": "Le prompt interdit le positionnel, mais s'il désobéit on ne refuse pas en silence : liste fermée, côté du fixture, jamais de l'ordre du texte.",
+      "lignes": [
+        {
+          "matchText": "Alverca - CF Estrela",
+          "marketText": "1X2: V1",
+          "coteText": "2,0",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "V1"
+          }
+        },
+        {
+          "matchText": "Rio Ave - FC Porto",
+          "marketText": "1X2: V2",
+          "coteText": "1,3",
+          "concept": {
+            "famille": "RESULTAT_1X2",
+            "choix": "2"
+          }
+        },
+        {
+          "matchText": "Casa Pia - Benfica",
+          "marketText": "Double chance: 1X",
+          "coteText": "1,2",
+          "concept": {
+            "famille": "DOUBLE_CHANCE",
+            "choix": "1X",
+            "composantes": []
+          }
+        }
+      ],
+      "attendu": [
+        {
+          "ordre": 1,
+          "etatResolution": "certain",
+          "marche": "WIN_HOME",
+          "fixtureId": 101,
+          "coteSaisie": 2.0
+        },
+        {
+          "ordre": 2,
+          "etatResolution": "certain",
+          "marche": "WIN_AWAY",
+          "fixtureId": 102,
+          "coteSaisie": 1.3
+        },
+        {
+          "ordre": 3,
+          "etatResolution": "certain",
+          "marche": "DC_HOME_DRAW",
+          "fixtureId": 103,
+          "coteSaisie": 1.2
+        }
+      ]
     }
   ]
 }

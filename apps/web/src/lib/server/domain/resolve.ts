@@ -20,7 +20,7 @@ import {
 } from './market-map';
 import { aliasFor } from './team-aliases';
 import { ANALYSIS_WINDOW_DAYS } from './window';
-import { pairMatchFixture, TAU_PAIRE, MARGE_PAIRE } from './pair-match';
+import { pairMatchFixture, pairMatchNoSep, TAU_PAIRE, MARGE_PAIRE } from './pair-match';
 import { teamSimilarity } from './similarity';
 
 function normalize(s: string): string {
@@ -189,10 +189,31 @@ function diagnoseMatch(
 	teamByName: Map<string, Team>
 ): MatchDiag {
 	const m = matchText.match(SEP_EQUIPES);
-	if (!m) return { kind: 'illisible' };
-	const rawHome = m[1].trim();
-	const rawAway = m[2].trim();
-	if (rawHome.length < 2 || rawAway.length < 2) return { kind: 'illisible' };
+	const rawHome = m ? m[1].trim() : '';
+	const rawAway = m ? m[2].trim() : '';
+	// Séparateur ABSENT ou inconnu (« A contre B », « A : B », « A B ») → on ne bloque
+	// pas : rattrapage SANS séparateur — on cherche deux équipes de la base qui se
+	// rencontrent dans le texte. C'est ce qui rend la lecture robuste à TOUT bookmaker,
+	// pas seulement à ceux dont on a listé le séparateur. Le côté vient du fixture.
+	if (!m || rawHome.length < 2 || rawAway.length < 2) {
+		const sansSep = pairMatchNoSep(matchText, fixtures);
+		if (sansSep.decision === 'ok') {
+			const ph = teamByName.get(normalize(sansSep.fixture.teamHome));
+			const pa = teamByName.get(normalize(sansSep.fixture.teamAway));
+			if (ph && pa) {
+				console.warn(
+					`[résolution] RÉSOLU SANS SÉPARATEUR « ${matchText} » → ${sansSep.fixture.teamHome} - ` +
+						`${sansSep.fixture.teamAway} (fixture ${sansSep.fixture.id}, score ${sansSep.score.toFixed(2)})`
+				);
+				return windowDiag(sansSep.fixture, ph, pa, matchText);
+			}
+		}
+		if (sansSep.decision === 'ambigu') {
+			console.warn(`[résolution] SANS SÉPARATEUR AMBIGU « ${matchText} » — deux paires proches, on ne devine pas`);
+			return { kind: 'non_resolu' };
+		}
+		return { kind: 'illisible' };
+	}
 	const homeTeam = matchTeam(rawHome, teams);
 	const awayTeam = matchTeam(rawAway, teams);
 
@@ -292,6 +313,32 @@ function diagnoseMatch(
 
 const DRAW_WORDS = new Set(['nul', 'match nul', 'draw', 'x', 'egalite']);
 
+// FILET POSITIONNEL (défense en profondeur). La vision a l'ordre STRICT de rendre un
+// NOM d'équipe, jamais « 1 »/« V1 »/« domicile » (prompt). Mais un prompt n'est pas une
+// garantie : si la vision désobéit, on ne veut pas un refus muet « on n'a pas pu lire ».
+// On interprète alors une liste FERMÉE de codes positionnels — et le côté vient TOUJOURS
+// du FIXTURE (home/away de la base), JAMAIS de l'ordre du texte : la règle d'or tient.
+// N'est consulté qu'en DERNIER, après échec de la résolution par nom (jamais un « 1 »
+// avalé dans un nom d'équipe). Un code hors liste → INCONNU, comme avant.
+const POS_HOME = new Set(['1', 'v1', 'p1', 'victoire 1', 'vic 1', 'domicile', 'dom', 'home', 'local', 'equipe 1', 'eq1']);
+const POS_AWAY = new Set(['2', 'v2', 'p2', 'victoire 2', 'vic 2', 'exterieur', 'ext', 'away', 'visiteur', 'equipe 2', 'eq2']);
+/** Code positionnel → côté, ou null si ce n'en est pas un. PURE, liste fermée. */
+function positionnel1x2(c: string): 'home' | 'away' | null {
+	if (POS_HOME.has(c)) return 'home';
+	if (POS_AWAY.has(c)) return 'away';
+	return null;
+}
+/** Double chance positionnelle (1X / X2 / 12, et variantes 1N / N2). Ensemble de côtés. */
+function positionnelDc(c: string): Set<string> | null {
+	const map: Record<string, [string, string]> = {
+		'1x': ['home', 'draw'], '1n': ['home', 'draw'], 'x1': ['home', 'draw'], 'n1': ['home', 'draw'],
+		x2: ['draw', 'away'], n2: ['draw', 'away'], '2x': ['draw', 'away'], '2n': ['draw', 'away'],
+		'12': ['home', 'away'], '21': ['home', 'away']
+	};
+	const hit = map[c.replace(/\s+/g, '')];
+	return hit ? new Set(hit) : null;
+}
+
 /**
  * À quel camp du match correspond ce choix ? Exact/alias d'abord ; à défaut, repli
  * par RESSEMBLANCE — nécessaire quand le fixture a été résolu par paire (nom flou
@@ -385,16 +432,32 @@ function resolveConcept(
 			const side = whichSide(concept.choix ?? '', home, away);
 			if (side === 'home') return { state: 'certain', market: 'WIN_HOME' };
 			if (side === 'away') return { state: 'certain', market: 'WIN_AWAY' };
-			return INCONNU; // choix ne correspond à aucune équipe ni « Nul »
+			// FILET : le nom n'a pas résolu. La vision a-t-elle rendu un positionnel
+			// (« V1 »/« 1 »/« domicile ») malgré le prompt ? Côté lu sur le fixture, pas le texte.
+			const pos = positionnel1x2(c);
+			if (pos) {
+				console.warn(`[résolution] FILET POSITIONNEL 1X2 « ${concept.choix} » → ${pos} (côté du fixture) — la vision a rendu un positionnel malgré le prompt`);
+				return { state: 'certain', market: pos === 'home' ? 'WIN_HOME' : 'WIN_AWAY' };
+			}
+			return INCONNU; // choix ne correspond à aucune équipe, ni « Nul », ni un positionnel connu
 		}
 		case 'DOUBLE_CHANCE': {
 			const parts = concept.composantes ?? [];
-			const sides = new Set<string>();
+			let sides = new Set<string>();
 			for (const p of parts) {
 				if (DRAW_WORDS.has(normalize(p))) sides.add('draw');
 				else {
 					const s = whichSide(p, home, away);
 					if (s) sides.add(s);
+				}
+			}
+			// FILET : composantes non résolues par nom → la vision a-t-elle rendu une
+			// notation positionnelle « 1X »/« 12 »/« X2 » ? Côté toujours lu sur le fixture.
+			if (sides.size < 2) {
+				const pos = positionnelDc(normalize(concept.choix ?? parts.join(' ')));
+				if (pos) {
+					console.warn(`[résolution] FILET POSITIONNEL double chance « ${concept.choix ?? parts.join(' ')} » → ${[...pos].join('+')}`);
+					sides = pos;
 				}
 			}
 			if (sides.has('home') && sides.has('draw')) return { state: 'certain', market: 'DC_HOME_DRAW' };

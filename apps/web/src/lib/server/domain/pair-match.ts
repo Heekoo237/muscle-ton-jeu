@@ -63,3 +63,44 @@ export function pairMatchFixture(rawHome: string, rawAway: string, fixtures: Fix
 	if (bestScore - secondScore < MARGE_PAIRE) return { decision: 'ambigu', score: bestScore, second: secondScore };
 	return { decision: 'ok', fixture: best, score: bestScore, second: secondScore };
 }
+
+/**
+ * Rattrapage SANS SÉPARATEUR — quand le libellé du match n'offre aucun « - » / « vs »
+ * reconnu (un bookmaker qui écrit « contre », « : », ou rien). Au lieu d'allonger la
+ * liste des séparateurs bookmaker par bookmaker, on renverse le problème : on cherche
+ * DEUX équipes de notre base qui se rencontrent DANS le texte.
+ *
+ * Comment, sans deviner : on essaie CHAQUE coupure du texte en deux moitiés et on
+ * réutilise `pairMatchFixture` — donc les MÊMES garde-fous mesurés (MIN des deux côtés,
+ * seuil TAU, marge sur le second). Un mot de liaison (« vs », « contre », « : ») tombe
+ * d'un côté et n'abaisse QUE la similarité de ce côté — ça rend la fausse paire plus
+ * dure, jamais plus facile. On n'accepte que si UN SEUL fixture ressort franchement ;
+ * deux fixtures proches (à des coupures différentes) → AMBIGU, on ne résout pas.
+ *
+ * Le côté domicile/extérieur vient du FIXTURE trouvé, jamais de l'ordre du texte —
+ * comme partout ailleurs. On ne peut résoudre que vers un VRAI match en base : jamais
+ * une paire inventée.
+ */
+export function pairMatchNoSep(matchText: string, fixtures: Fixture[]): PairMatch {
+	const toks = matchText.split(/\s+/).filter((t) => t.length > 0);
+	if (toks.length < 2 || fixtures.length === 0) return { decision: 'aucun', score: 0 };
+	let best: { f: Fixture; score: number } | null = null;
+	let rivalDifferent = 0; // meilleur score atteint par un AUTRE fixture (à une autre coupure)
+	for (let i = 1; i < toks.length; i++) {
+		const m = pairMatchFixture(toks.slice(0, i).join(' '), toks.slice(i).join(' '), fixtures);
+		if (m.decision !== 'ok') continue;
+		if (!best || m.score > best.score) {
+			if (best && best.f.id !== m.fixture.id) rivalDifferent = Math.max(rivalDifferent, best.score);
+			best = { f: m.fixture, score: m.score };
+		} else if (m.fixture.id !== best.f.id) {
+			rivalDifferent = Math.max(rivalDifferent, m.score);
+		}
+	}
+	if (!best) return { decision: 'aucun', score: 0 };
+	// Deux fixtures DIFFÉRENTS trop proches (l'un à une coupure, l'autre à une autre) →
+	// on ne devine pas quel match c'est. Même discipline que pairMatchFixture.
+	if (best.score - rivalDifferent < MARGE_PAIRE) {
+		return { decision: 'ambigu', score: best.score, second: rivalDifferent };
+	}
+	return { decision: 'ok', fixture: best.f, score: best.score, second: rivalDifferent };
+}
