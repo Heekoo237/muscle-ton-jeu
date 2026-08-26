@@ -9,7 +9,9 @@
  * build). Le moteur d'introspection est la fonction SQL `verifier_schema` (migration
  * 0019) — l'app parle à la base via PostgREST, qui n'expose ni information_schema ni
  * pg_proc, d'où l'encapsulation en base. La MÊME fonction et le MÊME manifeste
- * alimentent la surveillance Python (health.py → email 6 h).
+ * alimentent la surveillance Python (health.py, toutes les 6 h). Cette surveillance
+ * alerte par DEUX canaux : la sortie en code 1 (→ email d'échec GitHub, générique) et,
+ * si MTJ_ALERT_EMAIL_* est configuré, un email avec le motif en objet (alerts_email.py).
  */
 import { supabaseAdmin } from '$lib/server/supabase';
 import manifest from '../../../../../packages/db/schema_manifest.json';

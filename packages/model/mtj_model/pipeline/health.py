@@ -4,7 +4,13 @@ probabilités périmées servies aux utilisateurs.
     MTJ_DATABASE_URL=… python -m mtj_model.pipeline.health
 
 Sort en code 1 (et imprime ALERTE) si un job n'a pas réussi depuis > 36 h.
-Branche cette sortie sur ton système d'alerte (cron qui mail/push si code ≠ 0).
+
+DEUX canaux d'alerte, l'un ne remplace pas l'autre :
+  1. sortie en code 1 → GitHub envoie un email « Run failed » (filet de sécurité,
+     mais générique : il ne dit jamais QUOI a échoué) ;
+  2. `alerts_email.envoyer_alerte` → email best-effort avec le MOTIF en objet
+     (« orientation : 18 fixtures retournées »), si MTJ_ALERT_EMAIL_* est configuré.
+     Absent → on saute proprement, le canal 1 reste.
 """
 from __future__ import annotations
 
@@ -500,6 +506,10 @@ def main() -> None:
         print("\nALERTE — pipeline potentiellement mort :", file=sys.stderr)
         for a in alerts:
             print("  - " + a, file=sys.stderr)
+        # Canal 2 : email avec le MOTIF en objet (best-effort, ne lève jamais). Le
+        # code 1 ci-dessous déclenche de toute façon l'email GitHub (canal 1).
+        from .alerts_email import envoyer_alerte
+        envoyer_alerte(alerts)
         sys.exit(1)
     print("\nTous les jobs sont frais.")
 

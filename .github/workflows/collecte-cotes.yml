@@ -36,6 +36,8 @@ on:
           - diag-books            # part des prédictions issues d'un exchange (Betfair…) vs bookmaker classique (lecture)
           - reconcilier-dryrun    # RAPPORT réconciliation club_id : intra-modèle + groupes + collisions (lecture)
           - reconcilier           # APPLIQUE club_id (écrit) : groupes − collisions, puis re-teste sur l'état final
+          - redress-orientation-dryrun # LISTE les fixtures retournés + avant/après (lecture seule, rien écrit)
+          - redress-orientation   # SOLDE les fixtures retournés (écrit) : ré-ancre sur le dernier relevé + efface les predictions périmées
           - dryrun-affixes        # SIMULE la neutralisation d'affixes : fusions + collisions (lecture seule)
           - compter-backfill      # compte les lignes fd: à supprimer (lecture seule)
           - reset-backfill        # purge fd: puis recharge (destructif, borné à fd:)
@@ -65,6 +67,11 @@ jobs:
       # Déclenchement des jobs de notification côté app (règlement + matin).
       MTJ_APP_URL: ${{ secrets.MTJ_APP_URL }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # Alerte email avec le MOTIF en objet (health.py). Facultatif : si ces secrets
+      # sont absents, la surveillance retombe sur l'email d'échec générique de GitHub.
+      MTJ_ALERT_EMAIL_KEY: ${{ secrets.MTJ_ALERT_EMAIL_KEY }}
+      MTJ_ALERT_EMAIL_TO: ${{ secrets.MTJ_ALERT_EMAIL_TO }}
+      MTJ_ALERT_EMAIL_FROM: ${{ secrets.MTJ_ALERT_EMAIL_FROM }}
     steps:
       - uses: actions/checkout@v4
 
@@ -153,6 +160,14 @@ jobs:
       - name: Appliquer la réconciliation club_id (écrit, re-teste l'état final)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'reconcilier'
         run: python -m mtj_model.pipeline.reconcile
+
+      - name: Redressement orientation — dry-run, avant/après (lecture seule)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'redress-orientation-dryrun'
+        run: python -m mtj_model.pipeline.redress_orientation
+
+      - name: Redressement orientation — SOLDE le lot retourné (écrit)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'redress-orientation'
+        run: python -m mtj_model.pipeline.redress_orientation --apply
 
       - name: Compter les lignes du backfill (lecture)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'compter-backfill'
