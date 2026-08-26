@@ -663,6 +663,20 @@ fragile que la discipline qu'il remplace. **LEÇON (garde-fous, bis) :** on auto
 où le garde est net (cohérence, fonctions) ; on ne fabrique pas un faux garde exhaustif
 qui recréerait la discipline sous un autre nom.
 
+**LEÇON (garde-fous, ter) — lire le BON témoin.** La migration 0016 est restée
+**non-appliquée des mois, invisible** : ses 8 tables de référence étaient lisibles ET
+écrivables avec la clé publique. Deux raisons cumulées :
+1. Le **mauvais témoin diagnostique**. Compter les policies (`pg_policies`) ne prouve
+   RIEN sur l'état RLS : *0 policy = deny-all SI la RLS est active, grand ouvert SINON* —
+   les deux rendent zéro ligne. Le seul témoin fiable est **`pg_tables.rowsecurity` /
+   `pg_class.relrowsecurity`**, celui que lit `verify_schema.rls_manquantes`.
+2. La RLS est l'**unique artefact qu'aucun chemin légitime n'exerce** : le pipeline
+   (`postgres`) et l'app (`service_role`) la **bypassent** tous les deux ; seul un
+   attaquant en clé anon l'aurait touchée. Tout le reste s'auto-prouve en tournant (une
+   contrainte `ON CONFLICT` ou une fonction manquante fait planter un job / une page,
+   tout de suite) — la RLS, non. D'où le contrôle dédié qui la lit **sans attendre que
+   quelqu'un l'exerce**. Un garde-fou n'est fiable que s'il lit le bon témoin.
+
 #### Résolution du ticket : d'abord l'alias, puis la PAIRE, sinon INCONNU
 
 Côté app (`apps/web/src/lib/server/domain/`), un nom de bookmaker se résout dans
