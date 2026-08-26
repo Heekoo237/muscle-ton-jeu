@@ -577,19 +577,41 @@ l'onboarding d'un championnat modèle** (alias + co-occurrence + volume) :
 1. `reconcilier-dryrun` (lecture seule) — **rapport à relire avant d'écrire** :
    - SECTION 1 : doublons **intra-championnat modèle** (bug de force d'équipe s'il
      y en a — historique coupé) ; doit être vide.
-   - SECTION 2 : regroupements proposés (club → entités → clé de club).
+   - SECTION 2 : regroupements **sains** (club → entités → clé de club).
+   - SECTION 2 bis : **faux regroupements ÉVITÉS** par le garde de population (même
+     nom, mais clubs différents) — nommés, pour vérifier qu'aucun VRAI club n'y est.
    - SECTION 3 : **co-occurrence bloquante** — deux adversaires ne partagent jamais
-     une clé ; les collisions sont refusées, jamais fusionnées.
+     une clé ; les collisions sont dissoutes, jamais fusionnées.
    - SECTION 4 : volume (repère une fusion abusive).
-2. `reconcilier` (écrit) — applique la SECTION 2 **moins** les collisions SECTION 3,
-   puis **re-teste sur l'état écrit** : co-occurrence (lève et annule si violée) +
-   volume. Idempotent.
+2. `reconcilier` (écrit) — même code de regroupement que le dry-run (il le PRÉDIT),
+   **réversible** (`club_reconcile_backup`, migration 0026 → `reconcilier-rollback`
+   restaure l'état d'avant) et journalisé, puis **re-teste sur l'état écrit** :
+   co-occurrence (lève et annule si violée) + volume. Idempotent.
 
-La clé de club (`sync.club_key`) = clé canonique + expansion (`st`→`saint`) +
-retrait d'affixes de club (`stade`, `usl`…). Jeu validé au dry-run. `upsert_team`
-assigne le `club_id` **dès la création** d'une nouvelle entité : le problème ne se
-reproduit donc pas à chaque nouvelle compétition. La résolution (app) cherche le
-match **par club_id**, quelle que soit l'entité (compétition) qui le porte.
+**Garde de population — la RÈGLE générale (`club_grouping.py`).** Deux entités ne
+fusionnent que si **un même club réel pourrait jouer dans les deux compétitions**. Le
+garde de co-occurrence est **nécessaire mais pas suffisant** : il répond à « sont-ils
+adversaires », pas à « sont-ils le même club » — deux entités qui ne se rencontrent
+jamais peuvent être différentes (Bayern **masculin** vs Bayern **féminin** ; **Andorre
+sélection** vs **Andorra CF** club ; **Vitória** Brésil vs **Vitória SC** Portugal).
+On compare donc une **signature de population** `(genre, sélection ?, pays domestique)`
+et deux signatures incompatibles ⇒ clubs différents ; une coupe continentale (sans
+pays) reste compatible avec le championnat + les coupes domestiques.
+
+> ⚠️ **Listes de mots-clés À MAINTENIR** (le fournisseur n'expose pas d'attribut
+> structuré) : `GENRE_FEMININ`, `MARQUEURS_SELECTION`, `PAYS_CONNUS` dans
+> `club_grouping.py`. Un genre féminin **non détecté fusionnerait à tort** (dangereux) ;
+> un pays non reconnu = « pas de pays » (au pire un regroupement manqué, bénin). À
+> compléter quand le fournisseur ajoute des compétitions.
+
+La clé de club (`sync.club_key`) part de `canonical_key` (**carte curée d'abord** :
+`Paris SG` = `Paris Saint Germain`), puis expansion + retrait d'affixes de club. La
+résolution (app) cherche le match **par club_id**, quelle que soit l'entité qui le porte.
+
+**LEÇON (garde-fous).** *Un garde-fou qui vérifie UNE condition ne prouve pas l'absence
+d'erreur* — le garde de co-occurrence répond à « adversaires ? », pas à « même club ? ».
+La **relecture du dry-run avant toute écriture de masse reste OBLIGATOIRE** : c'est elle
+qui a attrapé la fusion Bayern H/F que ni la co-occurrence ni le volume n'avaient vue.
 
 > `predictions` et `odds_snapshots` sont indexés par `fixture_id`, jamais par
 > `team_id` : la réconciliation `club_id` ne touche donc NI les probabilités NI

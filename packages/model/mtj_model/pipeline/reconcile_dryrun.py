@@ -1,75 +1,45 @@
 """
 reconcile_dryrun.py — RAPPORT de réconciliation club_id, EN LECTURE SEULE.
 
-N'écrit RIEN. Produit ce qu'il faut relire AVANT toute migration :
+N'écrit RIEN. Utilise EXACTEMENT le même regroupement que `reconcile` (club_grouping.
+regrouper), donc ce rapport PRÉDIT l'écriture. À relire AVANT toute migration —
+la relecture est le filet OBLIGATOIRE (elle a déjà attrapé la fusion Bayern H/F).
 
-  SECTION 1 — DOUBLONS INTRA-CHAMPIONNAT MODÈLE (le point prioritaire) : deux
-    entités d'un même club DANS un même championnat backtesté (E0, F1, …). Ça, ce
-    n'est PAS le doublon inter-compétitions bénin — c'est un historique coupé en
-    deux et une force d'équipe FAUSSE. Doit être vide ; sinon, liste.
+  SECTION 1 — DOUBLONS INTRA-CHAMPIONNAT MODÈLE (prioritaire) : deux entités d'un même
+    club DANS un même championnat backtesté (E0, F1…) — historique coupé, force
+    faussée. Doit être VIDE.
 
-  SECTION 2 — REGROUPEMENTS PROPOSÉS : club → entités → clé. Ce que la migration
-    fusionnerait sous un club_id commun. À relire comme la carte d'alias.
+  SECTION 2 — REGROUPEMENTS SAINS : ce que la migration fusionnerait sous un club_id.
 
-  SECTION 3 — CO-OCCURRENCE (garde-fou BLOQUANT) : deux adversaires d'un même match
-    qui tomberaient sur la même clé. INTERDIT — ces groupes sont refusés, jamais
-    fusionnés. Doit être vide.
+  SECTION 2 bis — FAUX REGROUPEMENTS ÉVITÉS (garde population) : même nom, mais que la
+    signature (genre / sélection / pays) SÉPARE en clubs distincts. Nommés, pour
+    vérifier qu'on n'exclut pas de VRAIS regroupements.
 
-  SECTION 4 — VOLUME : clubs regroupant le plus d'entités / de matchs, pour repérer
-    à l'œil une fusion abusive (second garde-fou du backfill).
+  SECTION 3 — CO-OCCURRENCE (garde BLOQUANT) : deux adversaires qui tomberaient sur la
+    même clé → dissous, jamais fusionnés. Doit être VIDE.
 
-Clé de club = clé canonique (normalize_team_name, retire déjà fc/cf/sc/de/…) +
-expansion d'abréviations (st→saint) + retrait d'affixes de club (stade, usl, …).
-C'est le mécanisme sensible : la SECTION 3 est là pour l'attraper s'il fusionne
-trop. Affixes/expansions surchargeables : MTJ_AFFIXES=… MTJ_EXPAND=st:saint,…
+  SECTION 4 — VOLUME : clubs regroupant le plus d'entités / de matchs (fusion abusive ?).
 """
 from __future__ import annotations
 
-import os
 from collections import defaultdict
 
+from .club_grouping import population_signature, regrouper
 from .db import connect
-from .sync import normalize_team_name
+from .sync import club_key
 
 MODEL_LEAGUES = {"E0", "F1", "SP1", "I1", "D1", "P1", "B1", "N1", "T1", "G1", "SC0"}
 
-# Affixes de club à retirer EN PLUS du bruit déjà géré par normalize_team_name.
-DEFAULT_AFFIXES = {"stade", "olympique", "racing", "us", "usl", "cs", "sk", "jk",
-                   "fk", "ks", "nk", "calcio", "ssd", "ssc", "asd"}
-DEFAULT_EXPAND = {"st": "saint"}
-
-
-def _affixes() -> set[str]:
-    raw = os.environ.get("MTJ_AFFIXES", "").strip()
-    return {x.strip().lower() for x in raw.split(",") if x.strip()} if raw else DEFAULT_AFFIXES
-
-
-def _expand() -> dict[str, str]:
-    raw = os.environ.get("MTJ_EXPAND", "").strip()
-    if not raw:
-        return DEFAULT_EXPAND
-    out = {}
-    for pair in raw.split(","):
-        if ":" in pair:
-            k, v = pair.split(":", 1)
-            out[k.strip()] = v.strip()
-    return out
-
-
-def club_key(nom: str, affixes: set[str], expand: dict[str, str]) -> str:
-    base = normalize_team_name(nom)  # retire déjà le bruit (fc, cf, de, club…)
-    toks = [expand.get(t, t) for t in base.split()]
-    toks = [t for t in toks if t not in affixes]
-    return " ".join(toks) or base  # jamais vide : repli sur la clé canonique
-
 
 def main() -> None:
-    affixes, expand = _affixes(), _expand()
     with connect() as con, con.cursor() as cur:
         cur.execute(
-            "select t.id, t.nom, l.provider_ref from teams t join leagues l on l.id = t.league_id"
+            "select t.id, t.nom, l.provider_ref, coalesce(c.odds_api_key, l.provider_ref) "
+            "  from teams t "
+            "  left join leagues l on l.id = t.league_id "
+            "  left join league_catalog c on c.fd_code = l.provider_ref"
         )
-        teams = [(int(i), nom, pref) for i, nom, pref in cur.fetchall()]
+        rows = [(int(i), nom, pref, sk) for i, nom, pref, sk in cur.fetchall()]
         cur.execute("select team_home_id, team_away_id from fixtures")
         pairs = [(int(h), int(a)) for h, a in cur.fetchall() if h and a]
         cur.execute(
@@ -81,70 +51,75 @@ def main() -> None:
             if tid is not None:
                 matchs[int(tid)] += int(n)
 
-    nom_by_id = {tid: nom for tid, nom, _ in teams}
-    key_by_id = {tid: club_key(nom, affixes, expand) for tid, nom, _ in teams}
-    print(f"Affixes retirés : {', '.join(sorted(affixes))}")
-    print(f"Expansions : {expand}\n")
+    entities = [{"id": i, "nom": nom, "club_key": club_key(nom), "sig": population_signature(sk)}
+                for i, nom, _, sk in rows]
+    pref_by_id = {i: pref for i, _, pref, _ in rows}
+    _club_of, rapport = regrouper(entities, pairs)
 
-    # SECTION 1 — doublons intra-championnat modèle (PRIORITAIRE).
+    # SECTION 1 — doublons intra-championnat modèle.
     intra: dict[tuple, list] = defaultdict(list)
-    for tid, nom, pref in teams:
-        if pref in MODEL_LEAGUES:
-            intra[(pref, key_by_id[tid])].append((tid, nom))
+    for e in entities:
+        if pref_by_id[e["id"]] in MODEL_LEAGUES:
+            intra[(pref_by_id[e["id"]], e["club_key"])].append((e["id"], e["nom"]))
     intra_dups = {k: v for k, v in intra.items() if len({t[0] for t in v}) > 1}
     print("=" * 70)
     print(f"SECTION 1 — DOUBLONS INTRA-CHAMPIONNAT MODÈLE : {len(intra_dups)} (doit être 0)")
     print("=" * 70)
     if not intra_dups:
-        print("  ✓ AUCUN. Les forces d'équipe des 11 championnats modèle ne sont PAS")
-        print("    coupées en deux — pas de bug de modèle de ce côté.")
+        print("  ✓ AUCUN — les forces des 11 championnats modèle ne sont pas coupées en deux.")
     else:
-        print("  ⛔ BUG DE MODÈLE — historique coupé, force faussée. À corriger en priorité :")
         for (pref, k), v in sorted(intra_dups.items()):
-            print(f"    [{pref}] « {k} » → " + " · ".join(f"id{t} « {n} »" for t, n in v))
+            print(f"  ⛔ [{pref}] « {k} » → " + " · ".join(f"id{t} « {n} »" for t, n in v))
 
-    # SECTION 2 — regroupements proposés (toutes ligues), club_key multi-entités.
-    groups: dict[str, list] = defaultdict(list)
-    for tid, nom, pref in teams:
-        groups[key_by_id[tid]].append((tid, nom, pref))
-    multi = {k: v for k, v in groups.items() if len({t[0] for t in v}) > 1}
+    # SECTION 2 — regroupements sains.
     print("\n" + "=" * 70)
-    print(f"SECTION 2 — REGROUPEMENTS PROPOSÉS : {len(multi)} clubs (relis avant écriture)")
+    print(f"SECTION 2 — REGROUPEMENTS SAINS : {len(rapport['fusions'])} clubs")
     print("=" * 70)
-    for k, v in sorted(multi.items()):
-        print(f"  « {k} » → " + " · ".join(f"id{t} « {n} » [{p}]" for t, n, p in v))
+    for f in sorted(rapport["fusions"], key=lambda x: x["cle"]):
+        membres = " · ".join(f"id{m['id']} « {m['nom']} »" for m in f["membres"])
+        print(f"  « {f['cle']} » → {membres}")
 
-    # SECTION 3 — co-occurrence bloquante.
-    collisions = {}
-    for h, a in pairs:
-        kh, ka = key_by_id.get(h), key_by_id.get(a)
-        if kh and kh == ka:
-            collisions[(kh, min(h, a), max(h, a))] = (nom_by_id.get(h), nom_by_id.get(a))
+    # SECTION 2 bis — FAUX regroupements évités (le garde de population).
     print("\n" + "=" * 70)
-    print(f"SECTION 3 — COLLISIONS DE CO-OCCURRENCE : {len(collisions)} (doit être 0)")
+    print(f"SECTION 2 bis — FAUX REGROUPEMENTS ÉVITÉS : {len(rapport['ecartes'])} "
+          "(vérifie qu'aucun VRAI regroupement n'est ici)")
     print("=" * 70)
-    if not collisions:
+    if not rapport["ecartes"]:
+        print("  (aucun)")
+    for ec in sorted(rapport["ecartes"], key=lambda x: x["cle"]):
+        print(f"  « {ec['cle']} » — SÉPARÉ ({ec['raison']}) :")
+        for grp in ec["sous_clubs"]:
+            g, n, p = grp[0]["sig"]
+            tag = f"{'F' if g == 'F' else 'H'}{' · sélection' if n else ''}{' · ' + p if p else ''}"
+            print(f"      [{tag}] " + " · ".join(f"id{m['id']} « {m['nom']} »" for m in grp))
+
+    # SECTION 3 — co-occurrence.
+    print("\n" + "=" * 70)
+    print(f"SECTION 3 — COLLISIONS DE CO-OCCURRENCE : {len(rapport['cooccurrence'])} (doit être 0)")
+    print("=" * 70)
+    if not rapport["cooccurrence"]:
         print("  ✓ AUCUNE : aucun couple d'adversaires ne partage une clé.")
     else:
-        print("  ⛔ REFUSÉ — ces groupes fusionneraient deux clubs adversaires :")
-        for (k, _, _), (nh, na) in collisions.items():
-            print(f"    « {k} » : « {nh} » vs « {na} »")
+        for k in rapport["cooccurrence"]:
+            print(f"  ⛔ « {k} » : deux adversaires — dissous (chacun son id).")
 
-    # SECTION 4 — volume (fusion abusive ?).
+    # SECTION 4 — volume.
     print("\n" + "=" * 70)
     print("SECTION 4 — VOLUME : clubs regroupés, par nb d'entités puis de matchs")
     print("=" * 70)
     vol = sorted(
-        ((k, len({t[0] for t in v}), sum(matchs.get(t[0], 0) for t in v)) for k, v in multi.items()),
+        ((f["cle"], len(f["membres"]), sum(matchs.get(m["id"], 0) for m in f["membres"]))
+         for f in rapport["fusions"]),
         key=lambda x: (-x[1], -x[2]),
     )
     for k, n_ent, n_matchs in vol[:25]:
         flag = "  ⚠ à vérifier" if n_ent >= 4 else ""
         print(f"  « {k:<28} » {n_ent} entités · {n_matchs} matchs{flag}")
 
-    print("\nRIEN n'a été écrit. Relis les sections 1 et 3 en priorité : elles doivent")
-    print("être vides. La migration club_id n'appliquera que la section 2, MOINS toute")
-    print("collision de la section 3, et signalera les volumes anormaux de la section 4.")
+    print(f"\nRIEN n'a été écrit. RÉSUMÉ : {len(rapport['fusions'])} regroupements sains, "
+          f"{len(rapport['ecartes'])} faux regroupements évités, "
+          f"{len(rapport['cooccurrence'])} co-occurrences dissoutes.")
+    print("Relis les sections 1 et 3 (doivent être vides) et la 2 bis (aucun vrai club).")
 
 
 if __name__ == "__main__":
