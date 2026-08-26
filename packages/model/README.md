@@ -617,6 +617,52 @@ qui a attrapé la fusion Bayern H/F que ni la co-occurrence ni le volume n'avaie
 > `team_id` : la réconciliation `club_id` ne touche donc NI les probabilités NI
 > l'historique. Aucun recalcul nocturne nécessaire après réconciliation.
 
+### Migrations & contrat de schéma (`schema_manifest.json`)
+
+**Les migrations s'appliquent À LA MAIN dans Supabase** (éditeur SQL), une par une,
+dans l'ordre. Il n'y a **pas** de migration automatique en CI — l'ancienne étape
+`migrer-base` avait une liste FIGÉE à 0011 : elle « réussissait » en étant quinze
+migrations en retard, sans que personne ne le voie. **Une étape qui migre à moitié
+ment.** On ne migre donc plus en CI, on VÉRIFIE.
+
+**Convention (obligatoire) :** quand tu pousses du code qui dépend d'une migration,
+dis-le en **PREMIÈRE LIGNE** de la réponse (« ⚠️ dépend de la migration 00NN à
+appliquer avant déploiement »). Après l'avoir appliquée, ouvre **`/api/health/schema`**
+pour confirmer l'alignement (liste vide = base à jour).
+
+**Trois consommateurs, une source de vérité unique (`packages/db/schema_manifest.json`) :**
+
+| Consommateur | Quand | Ce qu'il fait |
+|---|---|---|
+| `/api/health/schema` (app) | à la demande, après une migration | objets manquants via `verifier_schema` (0019) |
+| `health.py` (cron 6 h → email) | en continu | objets manquants **+ RLS des tables de référence** |
+| action CI `verifier-schema` | bouton « Run workflow » | idem, **lecture seule, échoue si décalage** (`verify_schema.py`) |
+
+La **RLS** (section `rls` du manifeste, les 8 tables de référence de la 0016) est
+vérifiée côté pipeline en lisant directement `pg_class` : sans elle, la clé publique
+lit/écrit `fixtures`, `teams`, `market_map`… et **aucun contrôle « objet présent » ne
+le verrait**. Le pipeline se connecte en direct (psycopg) et lit le catalogue ;
+l'app, via PostgREST, ne le peut pas — d'où le moteur SQL pour les objets et
+l'introspection directe pour la RLS.
+
+**Le manifeste est CURÉ, pas exhaustif** — il liste les objets dont l'absence casse le
+produit (3 tables sur ~25), pas tout ce que le code touche. La règle d'architecture n°8
+(inscrire au manifeste tout objet lu par le code) reste donc en partie une discipline.
+Ce que `tests/test_schema_manifest.py` en **automatise** :
+
+- **Cohérence** — chaque entrée du manifeste cite une migration qui existe et crée
+  vraiment l'objet (catch : numéro faux, objet renommé, entrée fantôme).
+- **Fonctions** — toute fonction créée par une migration est au manifeste (allowlist
+  d'**une** entrée : `verifier_schema`, le moteur lui-même). Une fonction manquante = 500
+  garanti dès que le chemin s'exécute ; le test rend l'omission BRUYANTE.
+
+Ce qui **reste humain** : colonnes et tables. « Cet objet est-il lu par le code au point
+de faire un 500 ? » est sémantique — un scan SQL ne le sait pas, et un test « tout objet
+créé doit être au manifeste » exigerait une allowlist de ~40 objets non-critiques, aussi
+fragile que la discipline qu'il remplace. **LEÇON (garde-fous, bis) :** on automatise là
+où le garde est net (cohérence, fonctions) ; on ne fabrique pas un faux garde exhaustif
+qui recréerait la discipline sous un autre nom.
+
 #### Résolution du ticket : d'abord l'alias, puis la PAIRE, sinon INCONNU
 
 Côté app (`apps/web/src/lib/server/domain/`), un nom de bookmaker se résout dans

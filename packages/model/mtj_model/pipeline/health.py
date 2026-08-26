@@ -347,6 +347,28 @@ def _schema_manifest_path() -> Path:
     return Path(__file__).resolve().parents[3] / "db" / "schema_manifest.json"
 
 
+def _rls_reference(cur, alerts: list[str]) -> None:
+    """Alerte si une table de référence a PERDU sa RLS (migration 0016 non appliquée,
+    ou RLS désactivée). Sans RLS, la clé publique lit/écrit fixtures, teams, market_map…
+    — et aucun contrôle de schéma « objet présent » ne le verrait. On lit la liste
+    attendue dans le manifeste (source unique) et l'état réel dans pg_class."""
+    from .verify_schema import rls_attendues, rls_manquantes
+    try:
+        manifest = json.loads(_schema_manifest_path().read_text(encoding="utf-8"))
+    except OSError:
+        return
+    attendues = rls_attendues(manifest)
+    manquantes = rls_manquantes(cur, attendues)
+    if manquantes:
+        detail = ", ".join(f"{t} (migration {m})" for t, m in manquantes)
+        alerts.append(
+            f"sécurité : RLS INACTIVE sur {detail} — table(s) de référence exposée(s) "
+            f"à la clé publique (lecture/écriture). Applique 0016."
+        )
+    elif attendues:
+        print(f"RLS         OK — {len(attendues)} tables de référence protégées")
+
+
 def _schema_drift(alerts: list[str]) -> None:
     """Décalage code/base : un objet que le code EXIGE mais que la base n'a pas =
     une migration non appliquée → 500 côté app, découvert par l'utilisateur. On lit
@@ -527,6 +549,7 @@ def check() -> list[str]:
         _orientation_flip(cur, alerts)
         _vision_incomplete_rate(cur, alerts)
         _vision_refus_rate(cur, alerts)
+        _rls_reference(cur, alerts)
     # Contrôle de schéma en DERNIER, connexion isolée (moteur potentiellement absent).
     _schema_drift(alerts)
     return alerts

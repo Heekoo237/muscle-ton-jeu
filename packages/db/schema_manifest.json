@@ -1,5 +1,15 @@
 {
-  "_doc": "Contrat de schéma : objets base que le CODE DÉPLOYÉ exige pour ne pas tomber en 500. Source de vérité UNIQUE, lue par l'endpoint /api/health/schema (app) ET par la surveillance health.py (cron 6 h → email). RÈGLE : toute migration qui ajoute une table/colonne/fonction lue par le code AJOUTE sa ligne ici, dans le même commit. Voir CLAUDE.md.",
+  "_doc": "Contrat de schéma : objets base que le CODE DÉPLOYÉ exige pour ne pas tomber en 500. Source de vérité UNIQUE, lue par l'endpoint /api/health/schema (app), la surveillance health.py (cron 6 h → email) ET l'étape CI verifier-schema. RÈGLE : toute migration qui ajoute une table/colonne/fonction lue par le code AJOUTE sa ligne ici, dans le même commit. La section 'rls' liste les tables qui DOIVENT porter la row-level security (une table de référence sans RLS est lisible/écrivable par la clé publique). Voir CLAUDE.md.",
+  "rls": [
+    { "table": "leagues", "migration": "0016" },
+    { "table": "teams", "migration": "0016" },
+    { "table": "fixtures", "migration": "0016" },
+    { "table": "team_strength", "migration": "0016" },
+    { "table": "market_map", "migration": "0016" },
+    { "table": "correction_queue", "migration": "0016" },
+    { "table": "league_catalog", "migration": "0016" },
+    { "table": "vision_stats", "migration": "0016" }
+  ],
   "columns": [
     {
       "table": "users",

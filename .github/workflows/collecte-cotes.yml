@@ -24,7 +24,7 @@ on:
           - sonder-marches         # sonde double_chance/btts/1,5/3,5 sur un échantillon (crédits bornés)
           - verifier-couverture   # confirme les 11 ligues chez le fournisseur (gratuit)
           - synchro-catalogue     # (dés)active les compétitions selon le catalogue (gratuit)
-          - migrer-base           # crée/complète les tables dans Supabase
+          - verifier-schema       # LECTURE SEULE : la base a-t-elle les objets + la RLS que le code exige ? (échoue si décalage)
           - backfill-historique   # charge 3 saisons football-data (une fois)
           - verifier-carte        # TEST 1 co-occurrence de la carte d'alias (lecture)
           - lister-equipes        # dump des équipes en base (lecture seule)
@@ -99,16 +99,12 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-couverture'
         run: python -m mtj_model.pipeline.verify
 
-      - name: Créer / compléter les tables (migrations)
-        if: github.event_name == 'workflow_dispatch' && inputs.action == 'migrer-base'
-        run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-client
-          # Retire tout espace/retour à la ligne parasite de la chaîne collée.
-          DBURL="${MTJ_DATABASE_URL//[$'\t\r\n ']/}"
-          for f in 0000_schema_idempotent 0005_predictions_pipeline 0006_league_catalog 0007_prediction_bookmaker 0008_source_mode 0009_regime_cote_seule 0010_team_club_id 0011_vision_stats; do
-            echo "== migration $f =="
-            psql "$DBURL" -v ON_ERROR_STOP=1 -f ../db/migrations/$f.sql
-          done
+      - name: Vérifier le schéma (objets + RLS, lecture seule ; échoue si décalage)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'verifier-schema'
+        # Les migrations s'appliquent À LA MAIN dans Supabase (voir packages/model/README).
+        # Cette étape ne migre RIEN : elle refuse explicitement si la base est en retard
+        # sur ce que le code exige — un décalage vu ici, pas par un 500 utilisateur.
+        run: python -m mtj_model.pipeline.verify_schema
 
       - name: Charger l'historique football-data (backfill)
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'backfill-historique'
