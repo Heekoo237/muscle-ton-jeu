@@ -112,6 +112,29 @@ describe('resolveMarket — notations « plus/moins de buts » complètes (Betcl
 		// « nombre total de buts » sans 1,5/2,5/3,5 ne doit pas inventer un seuil.
 		expect(resolveMarket('nombre total de buts')).not.toMatchObject({ market: 'OVER_1_5' });
 	});
+
+	// Notation « Total: (1.5) Plus de » — le bookmaker écrit « Total » sans jamais dire
+	// « buts ». Vrai ticket (Racing–Elche) : la ligne ressortait non_couvert à tort.
+	it('« Total: (1.5) Plus de » (sans le mot « buts ») → OVER_1_5', () => {
+		expect(resolveMarket('Total: (1.5) Plus de')).toMatchObject({
+			state: 'certain',
+			market: 'OVER_1_5'
+		});
+	});
+	it('« Total: (2.5) Moins de » → UNDER_2_5', () => {
+		expect(resolveMarket('Total: (2.5) Moins de')).toMatchObject({
+			state: 'certain',
+			market: 'UNDER_2_5'
+		});
+	});
+	it('« Total » ne fait PAS passer un total NON-buts pour un total de buts', () => {
+		// Corners : filtré non-couvert en amont → jamais un total de buts (market null).
+		expect(resolveMarket('Total corners (9.5) Plus de').market).toBeNull();
+		// Mi-temps : « Total » présent + seuil couvert, mais mi-temps filtré AVANT parseTotals.
+		expect(resolveMarket('1ère mi-temps, Total: (1.5) Plus de')).toMatchObject({
+			raison: 'non_couvert'
+		});
+	});
 });
 
 describe('marketLabelFr — jamais de notation bookmaker', () => {

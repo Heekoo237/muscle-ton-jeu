@@ -202,7 +202,13 @@ export function uncoveredFamily(notation: string): UncoveredFamily | null {
  * on reste INCONNU, jamais deviné (règle d'archi n°3).
  */
 function parseTotals(n: string): Market | null {
-	if (!/\bbuts?\b/.test(n) && !/nombre total/.test(n)) return null;
+	// Contexte « buts » : le mot « buts », « nombre total », OU le mot « total » seul —
+	// certains bookmakers écrivent « Total: (1.5) Plus de » sans jamais dire « buts ». Sûr
+	// ici : les totaux NON couverts (corners, cartons, tirs, mi-temps) sont déjà retirés
+	// par `matchesUncovered` EN TÊTE de `resolveMarket`, et le seuil est borné à 1,5/2,5/3,5
+	// (les lignes de corners/cartons sont ailleurs). On lit le seuil et la direction DANS
+	// le texte — aucun nombre inventé (règle d'or n°1).
+	if (!/\bbuts?\b/.test(n) && !/nombre total/.test(n) && !/\btotal\b/.test(n)) return null;
 	const seuil = n.match(/([123])[.,]5\b/);
 	if (!seuil) return null;
 	const over = /\bplus\b/.test(n) || /(^|\s)\+\s*de\b/.test(n) || /\bover\b/.test(n);
