@@ -29,6 +29,20 @@ from .sync import club_key
 VOLUME_ALERT_MATCHS = 200  # au-delà, on regarde à l'œil (le dry-run plafonnait à ~116)
 VOLUME_ALERT_ENTITES = 5
 
+# DDL du point de retour. `reconcile` et `reconcile_rollback` l'assurent EUX-MÊMES
+# (create if not exists) : c'est une table INTERNE au pipeline (jamais lue par l'app),
+# pas un objet du contrat de schéma. On ne dépend donc pas de l'ordre d'application des
+# migrations — la 0026 reste la DDL canonique, mais le job se suffit à lui-même.
+BACKUP_DDL = """
+    create table if not exists club_reconcile_backup (
+        id bigint generated always as identity primary key,
+        run_le timestamptz not null default now(),
+        team_id bigint not null,
+        club_id_avant bigint,
+        club_key_avant text
+    )
+"""
+
 
 def _charger(cur):
     """Entités avec leur CLÉ FOURNISSEUR (odds_api_key), pour la signature de population.
@@ -64,6 +78,7 @@ def reconcile() -> dict:
 
             # POINT DE RETOUR : on photographie l'état AVANT d'écrire (un seul point à la
             # fois — on vide puis on réécrit). `reconcile_rollback` restaure ça tel quel.
+            cur.execute(BACKUP_DDL)
             cur.execute("delete from club_reconcile_backup")
             cur.executemany(
                 "insert into club_reconcile_backup (team_id, club_id_avant, club_key_avant) values (%s, %s, %s)",

@@ -12,6 +12,11 @@
 --
 -- Pas de FK (comme le reste du schéma dénormalisé) : de simples colonnes, pour que la
 -- restauration ne dépende de rien d'autre que d'elle-même.
+--
+-- NB : table INTERNE au pipeline (jamais lue par l'app) — hors schema_manifest. Cette
+-- migration est la DDL canonique, mais `reconcile`/`reconcile_rollback` la créent
+-- aussi en `create table if not exists` : le job ne dépend PAS de l'ordre d'application
+-- des migrations. (Cette DDL et celle du code doivent rester identiques.)
 
 CREATE TABLE IF NOT EXISTS club_reconcile_backup (
   id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

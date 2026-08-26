@@ -84,10 +84,6 @@
     {
       "table": "vision_refus",
       "migration": "0022"
-    },
-    {
-      "table": "club_reconcile_backup",
-      "migration": "0026"
     }
   ],
   "functions": [

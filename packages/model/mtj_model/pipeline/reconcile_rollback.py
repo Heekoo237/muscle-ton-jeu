@@ -13,11 +13,13 @@ l'usage. Après restauration, l'instantané reste en place (on peut re-réconcil
 from __future__ import annotations
 
 from .db import connect
+from .reconcile import BACKUP_DDL
 from .version import print_banner
 
 
 def rollback() -> dict:
     with connect() as con, con.cursor() as cur:
+        cur.execute(BACKUP_DDL)  # table interne : on l'assure (jamais de dépendance de migration)
         cur.execute("select count(*), max(run_le) from club_reconcile_backup")
         n, run_le = cur.fetchone()
         if not n:
