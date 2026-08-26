@@ -10,6 +10,7 @@
  * `publicHistory.ts`, jamais dans `ticket.ts`/`settle.ts` (garde-fou règle d'or n°1).
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 import { settleMarket } from '$lib/server/domain/settle';
 import {
 	classer,
@@ -100,23 +101,30 @@ export async function computePublicHistory(now: number = Date.now()): Promise<Pu
 	const tickets = (tk ?? []) as TicketRow[];
 	if (tickets.length === 0) return { ...vide, sousLePlancher: false, nbRegles: regles };
 
-	// Sélections de ces tickets + scores des matchs, pour régler chaque LIGNE.
+	// Sélections de ces tickets + scores des matchs, pour régler chaque LIGNE. Paginé :
+	// jusqu'à 1000 tickets × leurs lignes dépasse le plafond — une ligne manquante
+	// fausserait le règlement affiché sur la page publique.
 	const ids = tickets.map((t) => t.id);
-	const { data: sel } = await sb
-		.from('selections')
-		.select('ticket_id, ordre, match_label, libelle_fr, marche, cote_saisie, retiree_du_renforce, fixture_id, equipe_dom_id')
-		.in('ticket_id', ids);
-	const selections = (sel ?? []) as SelRow[];
+	const selections = await selectAll<SelRow>(() =>
+		sb
+			.from('selections')
+			.select('ticket_id, ordre, match_label, libelle_fr, marche, cote_saisie, retiree_du_renforce, fixture_id, equipe_dom_id')
+			.in('ticket_id', ids)
+			.order('id', { ascending: true })
+	);
 	const fixtureIds = [...new Set(selections.map((s) => s.fixture_id).filter((x): x is number => x != null))];
 	const scores = new Map<number, { h: number; a: number; homeId: number }>();
 	if (fixtureIds.length > 0) {
-		const { data: fx } = await sb
-			.from('fixtures')
-			.select('id, score_home, score_away, team_home_id')
-			.in('id', fixtureIds)
-			.not('score_home', 'is', null)
-			.not('score_away', 'is', null);
-		for (const f of (fx ?? []) as { id: number; score_home: number; score_away: number; team_home_id: number }[])
+		const fx = await selectAll<{ id: number; score_home: number; score_away: number; team_home_id: number }>(() =>
+			sb
+				.from('fixtures')
+				.select('id, score_home, score_away, team_home_id')
+				.in('id', fixtureIds)
+				.not('score_home', 'is', null)
+				.not('score_away', 'is', null)
+				.order('id', { ascending: true })
+		);
+		for (const f of fx)
 			scores.set(Number(f.id), { h: Number(f.score_home), a: Number(f.score_away), homeId: Number(f.team_home_id) });
 	}
 

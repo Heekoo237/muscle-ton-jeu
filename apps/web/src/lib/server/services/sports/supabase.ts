@@ -10,6 +10,7 @@
 import type { SportsDataService, CoverageEntry } from './index';
 import type { Fixture, Team } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 import {
 	ANALYSIS_WINDOW_DAYS,
 	RESOLUTION_HORIZON_DAYS,
@@ -37,26 +38,33 @@ interface TeamRow {
 
 export class SupabaseSportsData implements SportsDataService {
 	private async teamNames(): Promise<Map<number, string>> {
-		const { data, error } = await supabaseAdmin().from('teams').select('id, nom');
-		if (error) throw error;
-		return new Map((data ?? []).map((t) => [Number(t.id), t.nom as string]));
+		// TOUTES les équipes, paginées : la table dépasse le plafond de 1000 lignes de
+		// PostgREST. Sans ça, ~47 équipes disparaissaient de la résolution (leur match
+		// ressortait non_resolu, nom d'équipe vide). Ordre stable obligatoire (voir selectAll).
+		const rows = await selectAll<{ id: number; nom: string }>(() =>
+			supabaseAdmin().from('teams').select('id, nom').order('id', { ascending: true })
+		);
+		return new Map(rows.map((t) => [Number(t.id), t.nom]));
 	}
 
 	async upcomingFixtures(days = ANALYSIS_WINDOW_DAYS): Promise<Fixture[]> {
 		const nowIso = new Date().toISOString();
 		const horizonIso = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
-		const { data, error } = await supabaseAdmin()
-			.from('fixtures')
-			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
-			.eq('statut', 'scheduled')
-			.gte('date_utc', nowIso)
-			.lt('date_utc', horizonIso)
-			// ORDRE DÉTERMINISTE (date puis id) : sans lui, Postgres renvoie les lignes
-			// dans un ordre non garanti — d'où « fixtures[0] » arbitraire et l'analyse du
-			// jour qui sautait d'un match à l'autre à la reconnexion.
-			.order('date_utc', { ascending: true })
-			.order('id', { ascending: true });
-		if (error) throw error;
+		// Paginé : une fenêtre de plusieurs semaines sur ~44 compétitions dépasse 1000
+		// fixtures. Sans pagination, le BOUT LOINTAIN de la fenêtre était coupé — des
+		// refus qu'on mettait à tort sur le compte de l'horizon fournisseur.
+		const data = await selectAll<FixtureRow>(() =>
+			supabaseAdmin()
+				.from('fixtures')
+				.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
+				.eq('statut', 'scheduled')
+				.gte('date_utc', nowIso)
+				.lt('date_utc', horizonIso)
+				// ORDRE DÉTERMINISTE (date puis id) : nécessaire à la pagination ET au
+				// « fixtures[0] » stable (sinon l'analyse du jour sautait d'un match à l'autre).
+				.order('date_utc', { ascending: true })
+				.order('id', { ascending: true })
+		);
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({
 			id: Number(r.id),
@@ -77,17 +85,20 @@ export class SupabaseSportsData implements SportsDataService {
 		const fromIso = new Date(now - RESOLUTION_LOOKBACK_HOURS * 3600 * 1000).toISOString();
 		const toIso = new Date(now + RESOLUTION_HORIZON_DAYS * 24 * 3600 * 1000).toISOString();
 		// On inclut les matchs en cours (scheduled, date passée) ET récemment terminés,
-		// pour pouvoir dire « déjà commencé » plutôt que « pas retrouvé ».
-		const { data, error } = await supabaseAdmin()
-			.from('fixtures')
-			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
-			.in('statut', ['scheduled', 'finished'])
-			.gte('date_utc', fromIso)
-			.lt('date_utc', toIso)
-			// ORDRE DÉTERMINISTE (date puis id) : Postgres ne garantit aucun ordre sans lui.
-			.order('date_utc', { ascending: true })
-			.order('id', { ascending: true });
-		if (error) throw error;
+		// pour pouvoir dire « déjà commencé » plutôt que « pas retrouvé ». Paginé : la
+		// fenêtre de 60 j sur ~44 compétitions dépasse 1000 fixtures — le match résolu
+		// pouvait être hors des 1000 renvoyées (bug du fixture qui n'arrive jamais).
+		const data = await selectAll<FixtureRow>(() =>
+			supabaseAdmin()
+				.from('fixtures')
+				.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
+				.in('statut', ['scheduled', 'finished'])
+				.gte('date_utc', fromIso)
+				.lt('date_utc', toIso)
+				// ORDRE DÉTERMINISTE (date puis id) : nécessaire à la pagination.
+				.order('date_utc', { ascending: true })
+				.order('id', { ascending: true })
+		);
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({
 			id: Number(r.id),
@@ -104,11 +115,15 @@ export class SupabaseSportsData implements SportsDataService {
 	}
 
 	async teams(): Promise<Team[]> {
-		const { data, error } = await supabaseAdmin()
-			.from('teams')
-			.select('id, nom, aliases, league_id, club_id');
-		if (error) throw error;
-		return ((data ?? []) as TeamRow[]).map((t) => ({
+		// TOUTES les équipes, paginées (table > 1000 lignes) : matchTeam balaie cette
+		// liste, une équipe manquante = un nom jamais résolu.
+		const data = await selectAll<TeamRow>(() =>
+			supabaseAdmin()
+				.from('teams')
+				.select('id, nom, aliases, league_id, club_id')
+				.order('id', { ascending: true })
+		);
+		return (data as TeamRow[]).map((t) => ({
 			id: Number(t.id),
 			nom: t.nom,
 			aliases: t.aliases ?? [],
@@ -131,15 +146,19 @@ export class SupabaseSportsData implements SportsDataService {
 	}
 
 	async resultsSince(sinceIso: string): Promise<Fixture[]> {
-		const { data, error } = await supabaseAdmin()
-			.from('fixtures')
-			.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
-			.eq('statut', 'finished')
-			.gte('date_utc', sinceIso)
-			// ORDRE DÉTERMINISTE (date puis id) : Postgres ne garantit aucun ordre sans lui.
-			.order('date_utc', { ascending: true })
-			.order('id', { ascending: true });
-		if (error) throw error;
+		// Paginé : appelé avec l'époque (tous les matchs terminés JAMAIS) par le dashboard
+		// et l'historique — largement > 1000 lignes. Sans pagination, le règlement et les
+		// verdicts ne « voyaient » que 1000 matchs terminés → statuts faux sur les anciens.
+		const data = await selectAll<FixtureRow>(() =>
+			supabaseAdmin()
+				.from('fixtures')
+				.select('id, date_utc, statut, score_home, score_away, league_id, team_home_id, team_away_id')
+				.eq('statut', 'finished')
+				.gte('date_utc', sinceIso)
+				// ORDRE DÉTERMINISTE (date puis id) : nécessaire à la pagination.
+				.order('date_utc', { ascending: true })
+				.order('id', { ascending: true })
+		);
 		const names = await this.teamNames();
 		return ((data ?? []) as FixtureRow[]).map((r) => ({
 			id: Number(r.id),

@@ -11,6 +11,7 @@
  * externe). C'est la séparation (c) vs (a).
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 
 export interface CouvertureCause {
 	cause: string;
@@ -47,13 +48,17 @@ function analyseLe(r: Row): string | null {
 /** Répartition des causes pour les tickets analysés depuis `depuisIso` (null = tout). */
 export async function computeCouverture(depuisIso: string | null): Promise<CouvertureRapport> {
 	if (!isSupabaseConfigured()) return { total: 0, depuis: depuisIso, causes: [] };
-	const { data, error } = await supabaseAdmin()
-		.from('selections')
-		.select('etat_resolution, probabilite, raison, tickets(analyse_le)')
-		.limit(50000);
-	if (error) throw error;
+	// Paginé : `.limit(50000)` était TROMPEUR — PostgREST plafonnait la réponse à 1000,
+	// donc le taux non_resolu se calculait sur ~1000 sélections au lieu de toutes. Ordre
+	// stable (id) obligatoire pour la pagination.
+	const data = await selectAll<Row>(() =>
+		supabaseAdmin()
+			.from('selections')
+			.select('etat_resolution, probabilite, raison, tickets(analyse_le)')
+			.order('id', { ascending: true })
+	);
 
-	const rows = ((data ?? []) as Row[]).filter((r) => {
+	const rows = (data as Row[]).filter((r) => {
 		const a = analyseLe(r);
 		if (!a) return false; // ticket jamais analysé : hors périmètre
 		return depuisIso ? a >= depuisIso : true;

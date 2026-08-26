@@ -5,6 +5,7 @@
  * à la surveillance de quoi ALERTER si le taux d'échec monte.
  */
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 
 export interface OndemandRapport {
 	depuis: string | null;
@@ -34,13 +35,16 @@ export async function computeOndemand(depuisIso: string | null): Promise<Ondeman
 		abandons: {}
 	};
 	if (!isSupabaseConfigured()) return vide;
-	let q = supabaseAdmin()
-		.from('ondemand_calls')
-		.select('kind, ok, credits, matchs_ecrits, raison, cree_le')
-		.limit(50000);
-	if (depuisIso) q = q.gte('cree_le', depuisIso);
-	const { data, error } = await q;
-	if (error) throw error;
+	// Agrégat sur une fenêtre : il faut TOUTES les lignes, pas 1000. Paginé (le
+	// `.limit(50000)` était plafonné à 1000 par le serveur → métriques fausses). Ordre
+	// stable (id) obligatoire ; la fenêtre `.gte(cree_le)` s'applique à chaque page.
+	const data = await selectAll<Record<string, unknown>>(() => {
+		const q = supabaseAdmin()
+			.from('ondemand_calls')
+			.select('kind, ok, credits, matchs_ecrits, raison, cree_le')
+			.order('id', { ascending: true });
+		return depuisIso ? q.gte('cree_le', depuisIso) : q;
+	});
 	const rows = (data ?? []) as {
 		kind: 'league' | 'event' | 'skip';
 		ok: boolean;

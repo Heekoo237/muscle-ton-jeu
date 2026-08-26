@@ -10,6 +10,7 @@
  */
 import type { Selection, TicketResult } from '$lib/types';
 import { supabaseAdmin } from '$lib/server/supabase';
+import { selectAll } from '$lib/server/supabasePage';
 import { notifications } from '$lib/server/services';
 import { runSettlement, type SettlePorts, type TicketARegler, type SettleStats } from '$lib/server/domain/notif-settle';
 import { settleTicket, fixtureFlipSuspect } from '$lib/server/domain/settle';
@@ -82,12 +83,17 @@ async function pendingSettleTickets(nowMs: number): Promise<TicketARegler[]> {
 	if (rows.length === 0) return [];
 
 	const ids = rows.map((t) => t.id);
-	const { data: sels } = await db
-		.from('selections')
-		.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
-		.in('ticket_id', ids);
+	// Paginé : ces tickets × leurs sélections peuvent dépasser 1000 lignes — une
+	// sélection manquante fausserait le verdict de son ticket.
+	const sels = await selectAll<Record<string, unknown>>(() =>
+		db
+			.from('selections')
+			.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
+			.in('ticket_id', ids)
+			.order('id', { ascending: true })
+	);
 	const parTicket = new Map<number, Selection[]>();
-	for (const r of (sels ?? []) as Record<string, unknown>[]) {
+	for (const r of sels) {
 		const tid = Number(r.ticket_id);
 		if (!parTicket.has(tid)) parTicket.set(tid, []);
 		parTicket.get(tid)!.push(rowToSel(r));
@@ -201,24 +207,24 @@ export interface BackfillStats {
  */
 export async function runBackfillJob(nowMs: number): Promise<BackfillStats> {
 	const db = supabaseAdmin();
-	const { data: tks, error } = await db
-		.from('tickets')
-		.select('id, user_id')
-		.eq('statut', 'analyse')
-		.is('resultat', null)
-		.limit(5000);
-	if (error) throw new Error(`runBackfillJob: ${error.message}`);
-	const rows = (tks ?? []) as { id: number; user_id: number | null }[];
+	// Paginé : rattrapage sur TOUS les tickets analysés non réglés (`.limit(5000)` était
+	// trompeur — plafonné à 1000 par le serveur). Idempotent, mais on veut tout couvrir
+	// en une passe.
+	const rows = await selectAll<{ id: number; user_id: number | null }>(() =>
+		db.from('tickets').select('id, user_id').eq('statut', 'analyse').is('resultat', null).order('id', { ascending: true })
+	);
 	if (rows.length === 0) return { candidats: 0, regles: 0, enAttente: 0, sansReglable: 0 };
 
 	const ids = rows.map((t) => t.id);
-	const { data: sels } = await db
-		.from('selections')
-		.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
-		.in('ticket_id', ids)
-		.limit(30000);
+	const sels = await selectAll<Record<string, unknown>>(() =>
+		db
+			.from('selections')
+			.select('ticket_id, ordre, fixture_id, match_label, equipe_dom_id, equipe_ext_id, marche, etat_resolution, fragile, retiree_du_renforce')
+			.in('ticket_id', ids)
+			.order('id', { ascending: true })
+	);
 	const parTicket = new Map<number, Selection[]>();
-	for (const r of (sels ?? []) as Record<string, unknown>[]) {
+	for (const r of sels) {
 		const tid = Number(r.ticket_id);
 		if (!parTicket.has(tid)) parTicket.set(tid, []);
 		parTicket.get(tid)!.push(rowToSel(r));
@@ -291,13 +297,17 @@ export async function runMorningJob(origin: string, nowMs: number): Promise<Morn
 
 	// 2) Utilisateurs ACTIFS : au moins un ticket analysé dans les 30 derniers jours.
 	const cutoff = new Date(nowMs - MATIN_ACTIF_JOURS * 86_400_000).toISOString();
-	const { data: recents } = await db
-		.from('tickets')
-		.select('user_id')
-		.eq('statut', 'analyse')
-		.not('user_id', 'is', null)
-		.gte('cree_le', cutoff);
-	const actifs = new Set(((recents ?? []) as { user_id: number }[]).map((t) => t.user_id));
+	// Paginé : sur 30 jours, le nombre d'utilisateurs actifs peut dépasser 1000.
+	const recents = await selectAll<{ user_id: number }>(() =>
+		db
+			.from('tickets')
+			.select('user_id')
+			.eq('statut', 'analyse')
+			.not('user_id', 'is', null)
+			.gte('cree_le', cutoff)
+			.order('id', { ascending: true })
+	);
+	const actifs = new Set(recents.map((t) => t.user_id));
 	if (actifs.size === 0) return { matchs24h, eligibles: 0, notifies: 0 };
 
 	// 3) …ET abonnés.

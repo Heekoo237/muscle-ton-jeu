@@ -39,10 +39,15 @@ function analyseLe(r: Row): string | null {
 /** Les `n` lectures les plus récentes (texte brut ↔ marché résolu). */
 export async function computeLectures(n: number): Promise<{ n: number; lignes: LectureEchantillon[] }> {
 	if (!isSupabaseConfigured()) return { n: 0, lignes: [] };
+	// On ne veut que les `n` plus RÉCENTES : on borne à 1000 lignes récentes (id
+	// décroissant) plutôt que balayer toute la table. `.limit(20000)` était trompeur —
+	// PostgREST plafonnait à 1000 de toute façon, mais SANS ordre : on tombait sur 1000
+	// lignes ARBITRAIRES, pas les récentes. Ordre explicite + borne assumée.
 	const { data, error } = await supabaseAdmin()
 		.from('selections')
 		.select('texte_brut, match_label, marche, libelle_fr, raison, cote_saisie, tickets(analyse_le)')
-		.limit(20000);
+		.order('id', { ascending: false })
+		.limit(1000);
 	if (error) throw error;
 	const lignes = ((data ?? []) as Row[])
 		.filter((r) => analyseLe(r) !== null) // ticket réellement analysé
