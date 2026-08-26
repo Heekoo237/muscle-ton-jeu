@@ -263,12 +263,33 @@ function diagnoseMatch(
 			// équipes, à une date au-delà de la période analysée. Sinon → non_resolu.
 			return windowDiag(fixture, trueHome, trueAway, matchText);
 		}
-		// Les deux équipes sont reconnues mais elles ne jouent PAS l'une contre l'autre.
-		// On ne lance PAS le rattrapage par paire ici : rapprocher un AUTRE match par
-		// ressemblance fusionnerait deux clubs distincts (« Paris SG » n'est pas
-		// « Paris FC »). Le rattrapage est réservé aux NOMS non résolus, ci-dessous.
+		// Les deux NOMS ont résolu, mais AUCUN fixture ne les oppose par club_id. Deux causes :
+		//  - c'est vrai (ces deux clubs ne jouent pas dans la fenêtre) ;
+		//  - matchTeam a pointé la MAUVAISE entité : un alias court (« racing ») d'un AUTRE
+		//    club a happé un nom plus long (« Racing de Santander » → le Racing d'Argentine).
+		//    Le club résolu ne colle alors avec aucun fixture réel.
+		// FILET PAIRE : on tente l'appariement par paire AVANT d'abandonner. Contrairement à
+		// l'ancienne crainte, c'est SÛR : pairMatchFixture ne résout que vers un fixture dont
+		// les DEUX noms ressemblent, avec garde de marge — il ne peut pas fusionner deux clubs
+		// distincts, il ne fait que CORRIGER un mauvais nom-par-nom vers le vrai match.
+		const paire = pairMatchFixture(rawHome, rawAway, fixtures);
+		if (paire.decision === 'ok') {
+			const ph = teamByName.get(normalize(paire.fixture.teamHome));
+			const pa = teamByName.get(normalize(paire.fixture.teamAway));
+			if (ph && pa) {
+				console.warn(
+					`[résolution] PAIRE CORRIGE « ${matchText} » — nom-par-nom → ${homeTeam.nom} #${homeTeam.id} (club ${clubOf(homeTeam)}) vs ${awayTeam.nom} #${awayTeam.id} (club ${clubOf(awayTeam)}), ` +
+						`aucun match ; paire → ${paire.fixture.teamHome} - ${paire.fixture.teamAway} (fixture ${paire.fixture.id}, score ${paire.score.toFixed(2)})`
+				);
+				return windowDiag(paire.fixture, ph, pa, matchText);
+			}
+		}
+		// Toujours rien : on JOURNALISE quelles entités ont été reconnues (l'info qui manquait)
+		// — sans ça, « équipes reconnues » ne dit pas LESQUELLES.
 		console.warn(
-			`[résolution] NON RETROUVÉ « ${matchText} » — équipes reconnues, mais aucun match entre elles en base`
+			`[résolution] NON RETROUVÉ « ${matchText} » — reconnu comme ${homeTeam.nom} #${homeTeam.id} ` +
+				`(club ${clubOf(homeTeam)}) vs ${awayTeam.nom} #${awayTeam.id} (club ${clubOf(awayTeam)}), ` +
+				`aucun match entre eux, ni par paire (${paire.decision}, score ${paire.score.toFixed(2)})`
 		);
 		return { kind: 'non_resolu' };
 	}

@@ -51,6 +51,37 @@ describe('resolveTicket — chemin temps réel, résolution par code', () => {
 		const out = resolveTicket(raw('Arsenal - Liverpool  1  2.1', 'Man Utd - Tottenham  X  3.2'), fixtures, teams);
 		expect(out.map((s) => s.ordre)).toEqual([1, 2]);
 	});
+
+	// RÉGRESSION (bug réel) : un alias court d'un AUTRE club happe un nom plus long.
+	// « Racing de Santander » matche « Racing Club » (argentin, alias « racing ») par mot
+	// entier, alors que « Real Racing Club de Santander » ne matche pas (« Club » coupe la
+	// contiguïté). Les deux noms « résolvent » (vers les mauvaises entités), aucun fixture
+	// ne les oppose → autrefois non_resolu. Le FILET PAIRE doit corriger vers le vrai match.
+	it('rattrape par paire quand le nom-par-nom pointe la mauvaise entité (alias court)', () => {
+		const teamsRacing: Team[] = [
+			{ id: 30, nom: 'Real Racing Club de Santander', aliases: [], leagueId: 3, clubId: 30 },
+			{ id: 31, nom: 'Elche CF', aliases: [], leagueId: 3, clubId: 31 },
+			{ id: 32, nom: 'Racing Club', aliases: ['racing'], leagueId: 34, clubId: 32 } // décor argentin
+		];
+		const fixturesRacing: Fixture[] = [
+			{ id: 500, dateUtc: '', teamHome: 'Real Racing Club de Santander', teamAway: 'Elche CF', leagueId: 3, statut: 'scheduled', scoreHome: null, scoreAway: null, teamHomeId: 30, teamAwayId: 31 }
+		];
+		const ligne: RawTicketRead = {
+			lignes: [
+				{
+					texteBrut: 'Racing de Santander vs Elche  Plus de 2,5 buts  1.22',
+					matchText: 'Racing de Santander vs Elche',
+					marketText: 'Plus de 2,5 buts',
+					coteText: '1.22',
+					concept: { famille: 'PLUS_MOINS', direction: 'PLUS', seuil: 2.5 }
+				}
+			]
+		};
+		const [s] = resolveTicket(ligne, fixturesRacing, teamsRacing);
+		expect(s.fixtureId).toBe(500); // la paire a corrigé vers le vrai Racing de Santander
+		expect(s.etatResolution).toBe('certain');
+		expect(s.marche).toBe('OVER_2_5');
+	});
 });
 
 /* ---- Notations « CHOIX + TYPE » (Betclic : « Paris SG Résultat du match ») ---- */
