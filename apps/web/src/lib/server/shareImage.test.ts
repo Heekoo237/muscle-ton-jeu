@@ -4,6 +4,8 @@ import { renderShareSvg, type ShareVM } from './shareImage';
 const vm: ShareVM = {
 	probaTotalePct: 1.3,
 	probaRenforceePct: 7.5,
+	probaTotale: 0.013,
+	probaRenforcee: 0.075,
 	nbRetirees: 3,
 	lignes: [
 		{ matchLabel: 'ARSENAL – LIVERPOOL', libelleFr: 'Arsenal ou match nul', fragile: false, retiree: false },
@@ -40,5 +42,63 @@ describe('image de partage — règles de contenu', () => {
 		expect(svg).toContain('Pas un pronostic garanti · 18+');
 		const sansMention = svg.replace('pronostic garanti', '');
 		expect(/gagné|\bgain\b|\bmise\b|garanti/i.test(sansMention)).toBe(false);
+	});
+
+	it('affiche le multiplicateur À CÔTÉ des deux pourcentages (pas seul)', () => {
+		// vm ci-dessus : 1,3 % » 7,5 %, retrait → ratio ≈ 5,77 → « 6 fois plus de chances ».
+		expect(svg).toContain('fois plus de chances');
+		expect(svg).toContain('1,3'); // les deux pourcentages RESTENT visibles
+		expect(svg).toContain('7,5');
+	});
+});
+
+describe('image de partage — multiplicateur, mêmes règles que le résultat', () => {
+	const base = {
+		lignes: [
+			{ matchLabel: 'A – B', libelleFr: 'A gagne', fragile: true, retiree: true },
+			{ matchLabel: 'C – D', libelleFr: 'C gagne', fragile: false, retiree: false }
+		]
+	};
+
+	it('TRÈS PETITS CHIFFRES : original affiché « 0 % » → multiplicateur calculé sur la VRAIE valeur (jamais ÷0)', () => {
+		// 0,04 % affiché « 0 % », 0,14 % affiché « 0,1 % ». Ratio réel = 3,5 → « 4 fois ».
+		// Si on divisait sur l'affichage (0 %), le garde-fou proba<=0 masquerait tout.
+		const svg = renderShareSvg({
+			probaTotalePct: 0,
+			probaRenforceePct: 0.1,
+			probaTotale: 0.0004,
+			probaRenforcee: 0.0014,
+			nbRetirees: 2,
+			...base
+		});
+		expect(svg).toContain('fois plus de chances');
+		expect(svg).toContain('0,1'); // le pourcentage renforcé RESTE affiché à côté du mult
+	});
+
+	it('AUCUN retrait → aucun multiplicateur', () => {
+		const svg = renderShareSvg({
+			probaTotalePct: 5,
+			probaRenforceePct: 5,
+			probaTotale: 0.05,
+			probaRenforcee: 0.05,
+			nbRetirees: 0,
+			lignes: base.lignes.map((l) => ({ ...l, retiree: false }))
+		});
+		expect(svg).not.toContain('fois plus de chances');
+		expect(svg).not.toContain('un peu plus de chances');
+	});
+
+	it('effet invisible à l’affichage (multiplicateur ≈ 1) → aucun multiplicateur', () => {
+		// 5,00 % » 5,04 % : identiques après arrondi 1 décimale → on ne prétend à rien.
+		const svg = renderShareSvg({
+			probaTotalePct: 5,
+			probaRenforceePct: 5,
+			probaTotale: 0.05,
+			probaRenforcee: 0.0504,
+			nbRetirees: 1,
+			...base
+		});
+		expect(svg).not.toContain('fois plus de chances');
+		expect(svg).not.toContain('un peu plus de chances');
 	});
 });

@@ -53,7 +53,14 @@ export const GET: RequestHandler = async (event) => {
 		await updateTicket(created.id, {
 			statut: 'analyse',
 			billing: { gratuit: true, credits: 0 },
-			result: { probaTotalePct: 1.3, probaRenforceePct: 7.5, nbRetirees: 1, nbFragiles: 2 }
+			result: {
+				probaTotalePct: 1.3,
+				probaRenforceePct: 7.5,
+				probaTotale: 0.013,
+				probaRenforcee: 0.075,
+				nbRetirees: 1,
+				nbFragiles: 2
+			}
 		});
 		const read2 = await getTicket(created.id);
 		steps.resultRenforce = read2?.result?.probaRenforceePct ?? null;

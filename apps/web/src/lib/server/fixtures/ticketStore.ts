@@ -12,6 +12,14 @@ import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
 export interface StoredResult {
 	probaTotalePct: number;
 	probaRenforceePct: number;
+	/**
+	 * Probabilités RÉELLES (fractions 0..1), NON arrondies. Le multiplicateur de l'image
+	 * de partage se calcule dessus, jamais sur les pourcentages affichés : un original
+	 * arrondi à « 0 % » (ex. 0,04 %) donnerait sinon une division par ~0 et masquerait le
+	 * multiplicateur. Les pourcentages restent pour l'affichage ; ces deux-là pour le calcul.
+	 */
+	probaTotale: number;
+	probaRenforcee: number;
 	nbRetirees: number;
 	nbFragiles: number;
 }
@@ -154,6 +162,8 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 		? {
 				probaTotalePct: Math.round(num(t.proba_totale) * 100 * 10) / 10,
 				probaRenforceePct: Math.round(num(t.proba_renforcee) * 100 * 10) / 10,
+				probaTotale: num(t.proba_totale),
+				probaRenforcee: num(t.proba_renforcee),
 				nbRetirees: num(t.nb_retirees),
 				nbFragiles: num(t.nb_fragiles)
 			}
@@ -240,8 +250,11 @@ export async function updateTicket(
 	if (patch.userId !== undefined) upd.user_id = patch.userId;
 	if (patch.billing) upd.cout_credits = patch.billing.credits;
 	if (patch.result) {
-		upd.proba_totale = patch.result.probaTotalePct / 100;
-		upd.proba_renforcee = patch.result.probaRenforceePct / 100;
+		// On stocke la probabilité RÉELLE (fraction non arrondie), pas le pourcentage
+		// affiché ÷ 100 : sinon un original arrondi à « 0 % » deviendrait 0 en base, et le
+		// multiplicateur de l'image de partage (renforcé ÷ original) diviserait par zéro.
+		upd.proba_totale = patch.result.probaTotale;
+		upd.proba_renforcee = patch.result.probaRenforcee;
 		upd.nb_fragiles = patch.result.nbFragiles;
 		upd.nb_retirees = patch.result.nbRetirees;
 		upd.analyse_le = new Date().toISOString();

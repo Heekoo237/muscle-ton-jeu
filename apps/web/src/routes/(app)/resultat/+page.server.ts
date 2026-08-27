@@ -301,7 +301,16 @@ export const load: PageServerLoad = async (event) => {
 			// l'historique et l'image de partage relisent CES drapeaux. Sans ça, le
 			// ticket renforcé s'affichait sans aucune ligne barrée (rien de persisté).
 			selections: r.selections,
-			result: { probaTotalePct, probaRenforceePct, nbRetirees, nbFragiles }
+			result: {
+				probaTotalePct,
+				probaRenforceePct,
+				// Fractions RÉELLES (non arrondies) pour le multiplicateur de l'image de
+				// partage : calcul sur la vraie valeur, jamais sur le pourcentage affiché.
+				probaTotale: r.probaTotale,
+				probaRenforcee: r.probaRenforcee,
+				nbRetirees,
+				nbFragiles
+			}
 		});
 	}
 

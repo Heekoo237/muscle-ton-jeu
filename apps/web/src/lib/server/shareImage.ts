@@ -36,6 +36,10 @@ export interface ShareLine {
 export interface ShareVM {
 	probaTotalePct: number;
 	probaRenforceePct: number;
+	/** Fractions RÉELLES (0..1, non arrondies) — SEULE base du multiplicateur (un original
+	 *  affiché « 0 % » vaut en réalité 0,04 % : diviser sur l'affichage donnerait ÷0). */
+	probaTotale: number;
+	probaRenforcee: number;
 	nbRetirees: number;
 	lignes: ShareLine[]; // sélections analysables uniquement
 }
@@ -64,6 +68,8 @@ export function shareVMFromTicket(ticket: StoredTicket): ShareVM | null {
 	return {
 		probaTotalePct: ticket.result.probaTotalePct,
 		probaRenforceePct: ticket.result.probaRenforceePct,
+		probaTotale: ticket.result.probaTotale,
+		probaRenforcee: ticket.result.probaRenforcee,
 		nbRetirees: ticket.result.nbRetirees,
 		lignes
 	};
@@ -162,7 +168,9 @@ export function renderShareSvg(vm: ShareVM, standalone = true): string {
 	// pourcentages restent toujours affichés (jamais le multiplicateur seul). Rendu en
 	// INK, pas en accent : le seul accent de marque reste le % de droite (règle du
 	// gabarit) — on le fait frapper par la TAILLE, pas par une seconde couleur.
-	const mult = multiplicateurRetrait(vm.probaTotalePct / 100, vm.probaRenforceePct / 100, vm.nbRetirees > 0);
+	// Sur les VRAIES fractions, jamais sur les pourcentages affichés : un original arrondi
+	// à « 0 % » (0,04 % réel) diviserait sinon par ~0 et masquerait le multiplicateur.
+	const mult = multiplicateurRetrait(vm.probaTotale, vm.probaRenforcee, vm.nbRetirees > 0);
 	const pcts = `<tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan>`;
 	// Sans multiplicateur : une seule ligne, comme avant. Avec : les pourcentages
 	// montent d'un cran et le multiplicateur passe dessous, plus gros — c'est lui qu'on

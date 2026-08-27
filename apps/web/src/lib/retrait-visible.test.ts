@@ -88,6 +88,8 @@ describe('chemin 3 — image de partage', () => {
 			{
 				probaTotalePct: 4.2,
 				probaRenforceePct: 9.1,
+				probaTotale: 0.042,
+				probaRenforcee: 0.091,
 				nbRetirees: 1,
 				lignes: [
 					{ matchLabel: 'LENS – NICE', libelleFr: 'Plus de 2,5 buts', fragile: true, retiree: true },
