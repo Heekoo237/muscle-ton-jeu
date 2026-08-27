@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { pctHonnete } from '$lib/format';
 import {
 	getTicket,
 	updateTicket,
@@ -35,10 +36,12 @@ import { multiplicateurRetrait, autresIssuesParRetrait } from '$lib/server/domai
 // donc 60 s n'est jamais approché en régime normal — c'est une borne, pas un budget.
 export const config = { maxDuration: 60 };
 
-/** Arrondi au dixième de pour-cent, cohérent avec l'affichage et les garde-fous. */
-function pct1(prob: number): number {
-	return Math.round(prob * 100 * 10) / 10;
-}
+/**
+ * Pourcentage d'affichage HONNÊTE (1 décimale, mais JAMAIS « 0 % » pour une proba
+ * positive : 0,04 % s'affiche « 0,04 % », pas « 0 » — « 0 % » voudrait dire impossible).
+ * Cohérent avec l'affichage ET les garde-fous (mêmes nombres autorisés au rédacteur).
+ */
+const pct1 = pctHonnete;
 
 /**
  * Raison PRÉCISE de non-analyse d'une ligne, pour l'affichage honnête (jamais une

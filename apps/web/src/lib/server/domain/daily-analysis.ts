@@ -17,6 +17,7 @@
  */
 import type { Market } from '$lib/types';
 import { marketLabelFr } from './market-map';
+import { pctHonnete } from '$lib/format';
 
 export type FamilleJour = 'favori' | 'nul' | 'buts';
 /** Rotation : une famille par jour. Jamais double chance, jamais BTTS. */
@@ -188,7 +189,7 @@ export function choisirAnalyseDuJour(candidats: CandidatJour[], dayKey: string):
 		dateMs: c.dateMs,
 		marche: choix.marche,
 		libelleFr: marketLabelFr(choix.marche, c.teamHome, c.teamAway),
-		probabilitePct: Math.round(choix.proba * 100 * 10) / 10,
+		probabilitePct: pctHonnete(choix.proba),
 		famille,
 		horizon
 	};

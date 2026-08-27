@@ -8,6 +8,7 @@
  */
 import type { Market, Selection, TicketResult, TicketStatus } from '$lib/types';
 import { isSupabaseConfigured, supabaseAdmin } from '$lib/server/supabase';
+import { pctHonnete } from '$lib/format';
 
 export interface StoredResult {
 	probaTotalePct: number;
@@ -160,8 +161,10 @@ function rowToTicket(t: Row, sels: Row[]): StoredTicket {
 	const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
 	const result: StoredResult | undefined = analyse
 		? {
-				probaTotalePct: Math.round(num(t.proba_totale) * 100 * 10) / 10,
-				probaRenforceePct: Math.round(num(t.proba_renforcee) * 100 * 10) / 10,
+				// Affichage HONNÊTE : 0,04 % ne devient jamais « 0 % » (qui voudrait dire
+				// impossible). Calculé sur la fraction RÉELLE relue, jamais sur un arrondi.
+				probaTotalePct: pctHonnete(num(t.proba_totale)),
+				probaRenforceePct: pctHonnete(num(t.proba_renforcee)),
 				probaTotale: num(t.proba_totale),
 				probaRenforcee: num(t.proba_renforcee),
 				nbRetirees: num(t.nb_retirees),

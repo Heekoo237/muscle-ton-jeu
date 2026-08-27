@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getAppSession } from '$lib/server/session';
 import { getTicket, getAnalysisText } from '$lib/server/fixtures/ticketStore';
+import { pctHonnete } from '$lib/format';
 import { supprimerTicket } from '$lib/server/fixtures/ticketDeletion';
 import { parseAnalyse } from '$lib/server/services/writing/serialize';
 import { DEMO_MODE, isDemoId, demoTicketDetail } from '$lib/server/demo';
@@ -55,7 +56,7 @@ export const load: PageServerLoad = async (event) => {
 		// Règle unique : analysable = résolu ET pourvu d'une probabilité (figée au moment
 		// de l'analyse). Un match résolu sans proba reste « non analysé », jamais compté.
 		analysable: isAnalysable(s),
-		probabilitePct: typeof s.probabilite === 'number' ? Math.round(s.probabilite * 100 * 10) / 10 : null,
+		probabilitePct: typeof s.probabilite === 'number' ? pctHonnete(s.probabilite) : null,
 		// Même honnêteté qu'au résultat : la VRAIE raison de non-analyse, pas « non couvert »
 		// par défaut. Absente si la ligne est analysée.
 		raisonNonAnalyse: isAnalysable(s) ? undefined : (s.raison ?? 'sans_donnee')
@@ -91,7 +92,7 @@ export const load: PageServerLoad = async (event) => {
 				s.ordre,
 				issues.map((iss) => ({
 					libelleFr: marketLabelFr(iss.marche, home, away),
-					probabilitePct: Math.round(iss.probabilite * 100 * 10) / 10
+					probabilitePct: pctHonnete(iss.probabilite)
 				}))
 			);
 		}

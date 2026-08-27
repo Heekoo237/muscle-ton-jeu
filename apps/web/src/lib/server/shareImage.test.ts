@@ -60,9 +60,10 @@ describe('image de partage — multiplicateur, mêmes règles que le résultat',
 		]
 	};
 
-	it('TRÈS PETITS CHIFFRES : original affiché « 0 % » → multiplicateur calculé sur la VRAIE valeur (jamais ÷0)', () => {
-		// 0,04 % affiché « 0 % », 0,14 % affiché « 0,1 % ». Ratio réel = 3,5 → « 4 fois ».
-		// Si on divisait sur l'affichage (0 %), le garde-fou proba<=0 masquerait tout.
+	it('TRÈS PETITS CHIFFRES : jamais « 0 % » (= impossible), et multiplicateur sur la VRAIE valeur', () => {
+		// Original 0,04 % (0,0004), renforcé 0,14 % (0,0014). Avant : l'original s'affichait
+		// « 0 % » (faux : impossible) ET le garde-fou proba<=0 masquait le multiplicateur.
+		// Désormais : « 0,04 % » affiché, et ratio réel 3,5 → « 4 fois plus de chances ».
 		const svg = renderShareSvg({
 			probaTotalePct: 0,
 			probaRenforceePct: 0.1,
@@ -72,7 +73,9 @@ describe('image de partage — multiplicateur, mêmes règles que le résultat',
 			...base
 		});
 		expect(svg).toContain('fois plus de chances');
-		expect(svg).toContain('0,1'); // le pourcentage renforcé RESTE affiché à côté du mult
+		expect(svg).toContain('0,04'); // l'original s'affiche « 0,04 % », JAMAIS « 0 % »
+		expect(svg).toContain('0,1'); // le renforcé RESTE affiché à côté du mult
+		expect(svg).not.toMatch(/>\s*0\s*[  ]%/); // aucun « 0 % » nu affiché
 	});
 
 	it('AUCUN retrait → aucun multiplicateur', () => {

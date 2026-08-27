@@ -13,6 +13,7 @@
 import type { StoredTicket } from './fixtures/ticketStore';
 import { ANTON_B64, GEIST_B64, MONO_B64 } from './fonts.b64';
 import { multiplicateurRetrait } from './domain/resultDisplay';
+import { pctHonnete } from '$lib/format';
 
 const CANVAS = '#F8F1E4';
 const PAPER = '#FDFAF3';
@@ -95,7 +96,8 @@ function ticket(x: number, side: 'left' | 'right', vm: ShareVM): string {
 	const y0 = 215;
 	const y1 = 785;
 	const label = side === 'left' ? 'TON TICKET' : 'RENFORCÉ';
-	const pct = side === 'left' ? vm.probaTotalePct : vm.probaRenforceePct;
+	// Affichage depuis la fraction RÉELLE : 0,04 % ne devient jamais « 0 % » (impossible).
+	const pct = pctHonnete(side === 'left' ? vm.probaTotale : vm.probaRenforcee);
 	const pctColor = side === 'left' ? INK : ACCENT; // unique accent = % de droite
 	const rot = side === 'left' ? -1 : 1;
 
@@ -171,7 +173,7 @@ export function renderShareSvg(vm: ShareVM, standalone = true): string {
 	// Sur les VRAIES fractions, jamais sur les pourcentages affichés : un original arrondi
 	// à « 0 % » (0,04 % réel) diviserait sinon par ~0 et masquerait le multiplicateur.
 	const mult = multiplicateurRetrait(vm.probaTotale, vm.probaRenforcee, vm.nbRetirees > 0);
-	const pcts = `<tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaTotalePct))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(vm.probaRenforceePct))}</tspan>`;
+	const pcts = `<tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(pctHonnete(vm.probaTotale)))}</tspan> <tspan fill="${INK3}">»</tspan> <tspan font-weight="600" style="font-feature-settings:'tnum' 1">${esc(fmtPct(pctHonnete(vm.probaRenforcee)))}</tspan>`;
 	// Sans multiplicateur : une seule ligne, comme avant. Avec : les pourcentages
 	// montent d'un cran et le multiplicateur passe dessous, plus gros — c'est lui qu'on
 	// retient d'un coup d'œil dans une conversation.
