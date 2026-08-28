@@ -24,7 +24,7 @@ import {
 	syntheseDeterministe
 } from '$lib/server/services/writing/enrich';
 import { serialiseAnalyse, parseAnalyse } from '$lib/server/services/writing/serialize';
-import type { ExplicationVM, LineVM, Market, ResultVM, Selection } from '$lib/types';
+import type { ExplicationVM, LineVM, Market, ResultVM, Selection, SerreExplicationVM } from '$lib/types';
 import type { RaisonNonAnalyse } from '$lib/lineStatus';
 import { uncoveredFamily, marketLabelFr } from '$lib/server/domain/market-map';
 import { multiplicateurRetrait, autresIssuesParRetrait } from '$lib/server/domain/resultDisplay';
@@ -399,6 +399,49 @@ export const load: PageServerLoad = async (event) => {
 		.filter((x): x is ExplicationVM => x !== null)
 		.sort((a, b) => a.ordre - b.ordre);
 
+	// NIVEAU 2 bis — lignes GARDÉES mais SERRÉES : même traitement qu'un retrait
+	// (pourquoi c'est risqué + les autres issues), SAUF qu'on ne les retire pas.
+	// Explication DÉTERMINISTE — faits défavorables + issues lus en base, jamais le
+	// rédacteur : une ligne serrée n'ouvre AUCUN appel IA (règle d'or n°1). Les retirées
+	// sont exclues (une retirée n'est pas « serrée », elle est sortie).
+	const serrees = r.selections.filter(
+		(s) => !s.retireeDuRenforce && isAnalysable(s) && estSerree(s) && s.fixtureId !== null && s.marche !== null
+	);
+	const serreFixtureIds = [...new Set(serrees.map((s) => s.fixtureId as number))];
+	const predsSerre = serreFixtureIds.length ? await predictions.forFixtures(serreFixtureIds) : new Map();
+	// Faits DÉFAVORABLES lus en base, SEULEMENT en régime MESURE (en cote seule, aucun
+	// historique : faits vides, on ne prétend à aucune mesure).
+	const serreFaitFixtureIds = [
+		...new Set(serrees.filter((s) => regimeOf(s.source) === 'mesure').map((s) => s.fixtureId as number))
+	];
+	const faitsSerreParMatch = serreFaitFixtureIds.length ? await stats.forFixtures(serreFaitFixtureIds) : new Map();
+	const contenuSerre = autresIssuesParRetrait(
+		serrees.map((s) => ({ ordre: s.ordre, marche: s.marche as Market, fixtureId: s.fixtureId as number })),
+		predsSerre
+	);
+	const serreExplications: SerreExplicationVM[] = serrees
+		.map((s) => {
+			const parts = s.matchLabel.split(' – ');
+			const [home, away] = parts.length === 2 ? parts : ['', ''];
+			const mesure = regimeOf(s.source) === 'mesure';
+			return {
+				ordre: s.ordre,
+				matchLabel: s.matchLabel,
+				libelleFr: s.libelleFr,
+				probabilitePct: typeof s.probabilite === 'number' ? pct1(s.probabilite) : null,
+				faits:
+					mesure && s.fixtureId !== null
+						? faitsDescriptifs(faitsSerreParMatch.get(s.fixtureId), s.marche)
+						: [],
+				autresIssues: (contenuSerre.get(s.ordre) ?? []).map((iss) => ({
+					libelleFr: marketLabelFr(iss.marche, home, away),
+					probabilitePct: pct1(iss.probabilite)
+				})),
+				chancesCotes: regimeOf(s.source) === 'cote'
+			} satisfies SerreExplicationVM;
+		})
+		.sort((a, b) => a.ordre - b.ordre);
+
 	// AUCUNE ligne analysable : on ne laisse JAMAIS passer le « tient debout » du
 	// rédacteur (rienARetirer est vrai par vacuité). On dit la vérité, en une phrase ;
 	// le détail (pourquoi chaque ligne, ce qu'on couvre, gratuité) est dans le bloc dédié.
@@ -429,6 +472,7 @@ export const load: PageServerLoad = async (event) => {
 		synthese: syntheseFinale,
 		aucunAnalysable,
 		explications,
+		serreExplications,
 		rienARetirer: r.rienARetirer,
 		toutesFragiles: r.toutesFragiles,
 		// Plus de la moitié des analysables retirées (strictement) → on prévient.

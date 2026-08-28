@@ -82,6 +82,56 @@
 	</div>
 {/if}
 
+<!-- Niveau 2 bis : les lignes GARDÉES mais SERRÉES. Même traitement qu'un retrait —
+     on AVERTIT (jamais un mot qui valide), on montre pourquoi c'est risqué et les
+     autres issues — sauf qu'on ne les retire pas. -->
+{#if vm.serreExplications.length > 0}
+	<div class="explications">
+		{#each vm.serreExplications as e, i (e.ordre)}
+			<article class="exp serre rvl-fade" style="animation-delay:{i * 40}ms">
+				<div class="exp-match">
+					{e.matchLabel}&nbsp;<span class="serre-tag">serré</span>
+				</div>
+				<div class="exp-marche">
+					{e.libelleFr}{#if e.probabilitePct != null}&nbsp;<span class="serre-pct"
+							>{pctBig(e.probabilitePct)}</span
+						>{/if}
+				</div>
+				<p class="exp-texte avert">Ce pari est risqué. Tu peux le jouer, mais c'est fragile.</p>
+				{#if e.faits.length > 0}
+					<!-- Faits DÉFAVORABLES lus en base — le « pourquoi c'est risqué », jamais un
+					     jugement inventé (règle d'or n°1). Vides en cote seule. -->
+					<ul class="faits">
+						{#each e.faits as f (f)}
+							<li>{f}</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if e.autresIssues.length > 0}
+					<!-- Comme sur un retrait : les paris les plus probables, curatés (max 2, hors
+					     double chance, hors évidence). On MONTRE, jamais « joue ça ». -->
+					<div class="autres">
+						<div class="autres-t">
+							{e.chancesCotes
+								? 'Sur ce match, d’après les cotes'
+								: 'Sur ce match, voici ce que disent les chances'}
+						</div>
+						{#each e.autresIssues as iss (iss.libelleFr)}
+							<div class="issue">
+								<span>{iss.libelleFr}</span>
+								<span class="issue-n">{pctBig(iss.probabilitePct)}</span>
+							</div>
+						{/each}
+						{#if e.chancesCotes}
+							<div class="autres-note">On n’a pas encore étudié ce championnat.</div>
+						{/if}
+					</div>
+				{/if}
+			</article>
+		{/each}
+	</div>
+{/if}
+
 <!-- Comparaison en tickets papier. -->
 <div class="paper rvl-fade">
 	<PaperTicketCompare
@@ -138,19 +188,13 @@
 			</div>
 		{/if}
 	{:else if vm.nbSerrees > 0}
-		<!-- (b-serré) Rien à RETIRER, mais des lignes gardées restent serrées. -->
-		<div class="serrees">
-			{#each vm.lignes.filter((l) => l.serree) as l (l.ordre)}
-				<div class="serre-line">
-					<div class="serre-match">
-						{l.matchLabel} — {l.libelleFr}{#if l.probabilitePct != null}&nbsp;<span class="serre-pct"
-								>{pctBig(l.probabilitePct)}</span
-							>{/if}
-					</div>
-					<div class="serre-note">On la garde, mais elle est juste au-dessus de notre barre.</div>
-				</div>
-			{/each}
-		</div>
+		<!-- (b-serré) Rien à RETIRER, mais des lignes gardées restent risquées. Le détail
+		     (pourquoi + autres issues) est développé plus haut, comme pour un retrait. -->
+		<div class="t-body-lg">Ton ticket tient. Rien à retirer.</div>
+		<p class="serree t-body">
+			Mais {vm.nbSerrees} pari{vm.nbSerrees > 1 ? 's restent risqués' : ' reste risqué'} — on te dit
+			pourquoi plus haut.
+		</p>
 	{:else}
 		<div class="t-body-lg">Ton ticket tient. Rien à retirer.</div>
 		{#if vm.laPlusSerree && vm.nbAnalysables >= 2}
@@ -336,31 +380,31 @@
 		font-feature-settings: 'tnum' 1;
 	}
 
-	/* Lignes serrées développées (verdict) : NEUTRE, jamais l'ocre du fragile. */
-	.serrees {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-		margin-top: var(--s-2);
-	}
-	.serre-line {
-		padding: var(--s-3) var(--s-4);
-		border: 1px solid var(--c-line);
-		border-left: 3px solid var(--c-line-strong);
-		border-radius: var(--r-sm);
-		background: var(--c-surface);
-	}
-	.serre-match {
-		font-weight: 600;
-	}
 	.serre-pct {
 		font-variant-numeric: tabular-nums;
 		color: var(--c-ink-2);
 	}
-	.serre-note {
+
+	/* Explication d'une ligne SERRÉE : même carte qu'un retrait, filet NEUTRE (jamais
+	   l'ocre du fragile — c'est risqué, pas « trop juste »). L'avertissement en tête. */
+	.exp.serre {
+		border-left: 3px solid var(--c-line-strong);
+	}
+	.exp-texte.avert {
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.faits {
+		margin: var(--s-2) 0 0;
+		padding-left: var(--s-4);
 		color: var(--c-ink-2);
-		font-size: 0.9em;
-		margin-top: 2px;
+		font-size: 0.92em;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.faits li {
+		list-style: disc;
 	}
 
 	/* ---- Lecture détaillée (match par match) ---- */

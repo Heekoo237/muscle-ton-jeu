@@ -215,6 +215,30 @@ export interface ExplicationVM {
 	chancesCotes: boolean;
 }
 
+/**
+ * Explication d'une ligne GARDÉE mais SERRÉE. Même traitement qu'un retrait — on
+ * explique pourquoi c'est risqué, avec les faits DÉFAVORABLES lus en base et les
+ * autres issues du match — SAUF qu'on ne la retire pas. L'explication est
+ * DÉTERMINISTE (facts + issues lus en base, jamais le rédacteur) : la ligne serrée
+ * n'ouvre pas d'appel IA. Le libellé d'AVERTISSEMENT (« ce pari est risqué ») est
+ * porté par le composant, jamais un mot qui ressemble à une validation.
+ */
+export interface SerreExplicationVM {
+	ordre: number;
+	matchLabel: string;
+	libelleFr: string;
+	/** Probabilité de la ligne (%), affichée à côté ; null si absente. */
+	probabilitePct: number | null;
+	/** Faits DÉFAVORABLES lus en base (le « pourquoi c'est risqué »), max 3. Vide en
+	 *  cote seule (aucun historique mesuré) ou quand rien de défavorable ne ressort. */
+	faits: string[];
+	/** Comme sur un retrait : les paris les plus probables du match (max 2, hors double
+	 *  chance, hors évidence > 72 %). On MONTRE, on ne suggère jamais. */
+	autresIssues: { libelleFr: string; probabilitePct: number }[];
+	/** Régime cote seule : « d'après les cotes », jamais un fait présenté comme mesuré. */
+	chancesCotes: boolean;
+}
+
 export interface ResultVM {
 	lignes: LineVM[];
 	probaTotalePct: number;
@@ -230,6 +254,9 @@ export interface ResultVM {
 	synthese: string;
 	/** Niveau 2 : une explication par sélection retirée (peut être vide en repli). */
 	explications: ExplicationVM[];
+	/** Niveau 2 bis : une explication par ligne GARDÉE mais SERRÉE — même traitement
+	 *  qu'un retrait (pourquoi c'est risqué, faits, autres issues), sans la retirer. */
+	serreExplications: SerreExplicationVM[];
 	rienARetirer: boolean;
 	/**
 	 * Rien retiré parce que TOUTES les sélections sont fragiles : alléger viderait le

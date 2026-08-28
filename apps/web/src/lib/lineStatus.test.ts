@@ -30,10 +30,13 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 		expect(ligneNote({ ...base, fragile: true, retiree: true })).toContain('Retirée');
 	});
 
-	it('ligne SERRÉE gardée → « juste au-dessus de notre barre » (jamais « solide » ni « seuil »)', () => {
+	it('ligne SERRÉE gardée → AVERTIT (« risqué »), jamais un mot qui valide', () => {
 		const note = ligneNote({ ...base, serree: true });
-		expect(note).toBe('On la garde, mais elle est juste au-dessus de notre barre.');
+		expect(note).toBe('Ce pari est risqué. Tu peux le jouer, mais c’est fragile.');
+		expect(note).toContain('risqué');
+		// Jamais un mot qui rassure/valide : le terrain lisait « on l'a validée ».
 		expect(note).not.toContain('solide');
+		expect(note).not.toMatch(/on la garde/i);
 		expect(note).not.toContain('seuil'); // « barre », pas le mot de statisticien
 	});
 

@@ -36,6 +36,7 @@
 			multiplicateur: null,
 			synthese: '',
 			explications: [],
+			serreExplications: [],
 			rienARetirer: false,
 			toutesFragiles: false,
 			majoriteRetiree: false,
@@ -92,20 +93,37 @@
 		}
 	);
 
-	// ── Cas 2 : une ligne SERRÉE, rien retiré ──
+	// ── Cas 2 : une ligne SERRÉE, rien retiré. On l'AVERTIT comme un retrait. ──
 	const casSerre = VM(
 		[
 			L(1, 'Manchester City – Everton', 'Manchester City gagne', { probabilitePct: 78 }),
-			L(2, 'Angers – Lille', 'Match nul', { serree: true, probabilitePct: 25 }),
+			L(2, 'Lyon – Fenerbahçe', 'Lyon gagne', { serree: true, probabilitePct: 54 }),
 			L(3, 'Bayern – Fribourg', 'Bayern gagne', { probabilitePct: 72 }),
 			L(4, 'Real – Getafe', 'Real ou match nul', { probabilitePct: 84 })
 		],
 		{
-			synthese: 'Ton ticket de quatre matchs. Un est serré, on le garde.',
-			probaTotalePct: 34.6,
-			probaRenforceePct: 34.6,
+			synthese: 'Ton ticket de quatre matchs. Rien à retirer, mais un pari est risqué.',
+			probaTotalePct: 24.1,
+			probaRenforceePct: 24.1,
 			rienARetirer: true,
-			nbSerrees: 1
+			nbSerrees: 1,
+			serreExplications: [
+				{
+					ordre: 2,
+					matchLabel: 'Lyon – Fenerbahçe',
+					libelleFr: 'Lyon gagne',
+					probabilitePct: 54,
+					faits: [
+						'Lyon a gagné 2 de ses 5 derniers matchs.',
+						'Fenerbahçe marque à l’extérieur presque à chaque match.'
+					],
+					autresIssues: [
+						{ libelleFr: 'Plus de 2,5 buts', probabilitePct: 58 },
+						{ libelleFr: 'Les deux équipes marquent', probabilitePct: 56 }
+					],
+					chancesCotes: false
+				}
+			]
 		}
 	);
 

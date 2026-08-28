@@ -125,9 +125,10 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 			: 'Retirée du ticket renforcé — sélection fragile.';
 	}
 	if (l.fragile) return 'Ce pari est trop juste.';
-	// Gardée mais serrée (juste au-dessus de la barre) : « pas retiré » n'est pas
-	// « solide » — on le dit, sans dramatiser (marge mesurée, voir domain/ticket.ts).
-	if (l.serree) return 'On la garde, mais elle est juste au-dessus de notre barre.';
+	// Gardée mais serrée (juste au-dessus de la barre) : « pas retiré » n'est PAS
+	// « solide ». On AVERTIT, jamais un mot qui ressemble à une validation — le terrain
+	// lisait « on l'a validée » dans l'ancien « on la garde ». (Marge mesurée, ticket.ts.)
+	if (l.serree) return 'Ce pari est risqué. Tu peux le jouer, mais c’est fragile.';
 	return 'Sélection solide.';
 }
 
