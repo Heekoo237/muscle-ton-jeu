@@ -61,11 +61,7 @@
 					<!-- Sur ce match : les paris les plus probables, curatés (max 2, hors double
 					     chance, hors évidence). On MONTRE, jamais « joue ça » (règle d'or n°3). -->
 					<div class="autres">
-						<div class="autres-t">
-							{e.chancesCotes
-								? 'Sur ce match, d’après les cotes'
-								: 'Sur ce match, voici ce que disent les chances'}
-						</div>
+						<div class="autres-t">Voici nos suggestions si tu veux garder ce match</div>
 						{#each e.autresIssues as iss (iss.libelleFr)}
 							<div class="issue">
 								<span>{iss.libelleFr}</span>
@@ -97,7 +93,7 @@
 							>{pctBig(e.probabilitePct)}</span
 						>{/if}
 				</div>
-				<p class="exp-texte avert">Ce pari est risqué. Tu peux le jouer, mais c'est fragile.</p>
+				<p class="exp-texte avert">Tu peux jouer ce match si tu veux mais c'est fragile.</p>
 				{#if e.faits.length > 0}
 					<!-- Faits DÉFAVORABLES lus en base — le « pourquoi c'est risqué », jamais un
 					     jugement inventé (règle d'or n°1). Vides en cote seule. -->
@@ -111,11 +107,7 @@
 					<!-- Comme sur un retrait : les paris les plus probables, curatés (max 2, hors
 					     double chance, hors évidence). On MONTRE, jamais « joue ça ». -->
 					<div class="autres">
-						<div class="autres-t">
-							{e.chancesCotes
-								? 'Sur ce match, d’après les cotes'
-								: 'Sur ce match, voici ce que disent les chances'}
-						</div>
+						<div class="autres-t">Voici nos suggestions si tu veux garder ce match</div>
 						{#each e.autresIssues as iss (iss.libelleFr)}
 							<div class="issue">
 								<span>{iss.libelleFr}</span>

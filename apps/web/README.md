@@ -40,3 +40,24 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+## Décisions de copie (assumées)
+
+### Titre du bloc « autres issues » : « Voici nos suggestions si tu veux garder ce match »
+
+Sur les lignes **retirées** ET **serrées**, le bloc des autres paris du match
+s'intitule **« Voici nos suggestions si tu veux garder ce match »** (avant :
+« Sur ce match, voici ce que disent les chances »).
+
+**Ce titre a été choisi contre l'avis de l'assistant, et le porteur du produit
+l'assume et le décide.** La raison : *les utilisateurs comprennent mieux
+« suggestions » que « ce que disent les chances ».*
+
+Le mot **« suggestions » rapproche du conseil** — c'est la réserve soulevée, à
+l'inverse de la discipline « on MONTRE, on ne suggère jamais » (voir
+`domain/resultDisplay.ts`). Décision consciente : **seul le titre change**. Le
+contenu du bloc reste identique — on affiche les probabilités déjà en base, sans
+les classer par recommandation, sans verbe de conseil dans les lignes elles-mêmes.
+
+Noté ici pour que, **si un problème apparaît** (frontière aide-à-la-décision /
+pronostic), on sache d'où il vient.

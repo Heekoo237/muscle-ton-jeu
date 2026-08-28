@@ -128,7 +128,7 @@ export function ligneNote(l: LigneStatutIn, opts?: { retraitUnique?: boolean }):
 	// Gardée mais serrée (juste au-dessus de la barre) : « pas retiré » n'est PAS
 	// « solide ». On AVERTIT, jamais un mot qui ressemble à une validation — le terrain
 	// lisait « on l'a validée » dans l'ancien « on la garde ». (Marge mesurée, ticket.ts.)
-	if (l.serree) return 'Ce pari est risqué. Tu peux le jouer, mais c’est fragile.';
+	if (l.serree) return 'Tu peux jouer ce match si tu veux mais c’est fragile.';
 	return 'Sélection solide.';
 }
 

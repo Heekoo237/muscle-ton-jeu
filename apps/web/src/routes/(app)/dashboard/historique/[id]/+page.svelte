@@ -109,11 +109,7 @@
 						<!-- Sur ce match : les paris les plus probables (parité écran de résultat).
 						     On MONTRE, jamais « joue ça ». Présent tant que le ticket n'est pas réglé. -->
 						<div class="autres">
-							<div class="autres-t">
-								{e.chancesCotes
-									? 'Sur ce match, d’après les cotes'
-									: 'Sur ce match, voici ce que disent les chances'}
-							</div>
+							<div class="autres-t">Voici nos suggestions si tu veux garder ce match</div>
 							{#each e.autresIssues as iss (iss.libelleFr)}
 								<div class="autres-l">
 									<span>{iss.libelleFr}</span>

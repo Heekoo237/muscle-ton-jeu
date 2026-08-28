@@ -32,8 +32,8 @@ describe('statut de ligne — une non analysée ne porte AUCUN jugement', () => 
 
 	it('ligne SERRÉE gardée → AVERTIT (« risqué »), jamais un mot qui valide', () => {
 		const note = ligneNote({ ...base, serree: true });
-		expect(note).toBe('Ce pari est risqué. Tu peux le jouer, mais c’est fragile.');
-		expect(note).toContain('risqué');
+		expect(note).toBe('Tu peux jouer ce match si tu veux mais c’est fragile.');
+		expect(note).toContain('fragile');
 		// Jamais un mot qui rassure/valide : le terrain lisait « on l'a validée ».
 		expect(note).not.toContain('solide');
 		expect(note).not.toMatch(/on la garde/i);
